@@ -152,8 +152,11 @@ final class ClipboardMonitor {
 
     // MARK: - File capture
 
-    /// Returns true when a file clip was captured so the caller can skip text/image.
-    /// Only the first file URL is captured; multi-file selections are not yet supported.
+    /// Returns true when at least one file clip was captured so the caller can
+    /// skip text/image. Multi-file Finder selections are captured as one clip
+    /// per file URL (mirroring how single-file clips are saved), so a Cmd+C of
+    /// five files produces five file clips in history rather than silently
+    /// keeping only the first URL.
     @discardableResult
     private func captureFileIfPresent(from frontApp: NSRunningApplication?) -> Bool {
         let settings = AppSettings.shared
@@ -164,49 +167,66 @@ final class ClipboardMonitor {
         ]
         guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options)
                 as? [URL],
-              let fileURL = urls.first
+              !urls.isEmpty
         else { return false }
 
-        // Determine file size without reading the bytes yet.
-        let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
-        guard let attributes else { return false }
-        let fileSize = (attributes[.size] as? Int) ?? 0
-        guard fileSize > 0 else { return false }
-
-        let displayName = fileURL.lastPathComponent
-        let thresholdBytes = settings.maxFileSizeMB * 1_000_000
-
-        do {
-            var mediaFilename: String? = nil
-            var storedByteSize: Int = fileSize
-
-            if fileSize <= thresholdBytes {
-                // Copy bytes into the media store.
-                let stored = try database.media.storeFile(at: fileURL)
-                mediaFilename = stored.mediaFilename
-                storedByteSize = stored.byteSize
-            }
-
-            var clip = Clip(
-                id: nil,
-                contentText: displayName,
-                contentRTF: nil,
-                contentHTML: nil,
-                typeIdentifier: "public.file-url",
-                sourceAppBundleID: frontApp?.bundleIdentifier,
-                sourceAppName: frontApp?.localizedName,
-                createdAt: Date(),
-                contentKind: .file,
-                mediaFilename: mediaFilename,
-                byteSize: storedByteSize
-            )
-            clip.filePath = fileURL.path
-
-            try database.saveCapturedFileClip(&clip, cap: settings.maxHistoryItems)
-            playCaptureSound()
-        } catch {
-            ClippyLog.error("Failed to save file clip: \(error)", category: ClippyLog.capture)
+        // Filter out zero-byte / unreadable files up front so one bad file in a
+        // multi-selection does not abort the whole capture. A single empty file
+        // (the legacy behavior) still returns false here so the caller can fall
+        // through to text/image capture.
+        let viable = urls.filter { url in
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let size = (attrs?[.size] as? Int) ?? 0
+            return size > 0
         }
+        guard !viable.isEmpty else { return false }
+
+        let thresholdBytes = settings.maxFileSizeMB * 1_000_000
+        var capturedAny = false
+        for fileURL in viable {
+            let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let fileSize = (attributes?[.size] as? Int) ?? 0
+            let displayName = fileURL.lastPathComponent
+
+            do {
+                var mediaFilename: String? = nil
+                var storedByteSize: Int = fileSize
+
+                if fileSize <= thresholdBytes {
+                    // Copy bytes into the media store.
+                    let stored = try database.media.storeFile(at: fileURL)
+                    mediaFilename = stored.mediaFilename
+                    storedByteSize = stored.byteSize
+                }
+
+                var clip = Clip(
+                    id: nil,
+                    contentText: displayName,
+                    contentRTF: nil,
+                    contentHTML: nil,
+                    typeIdentifier: "public.file-url",
+                    sourceAppBundleID: frontApp?.bundleIdentifier,
+                    sourceAppName: frontApp?.localizedName,
+                    createdAt: Date(),
+                    contentKind: .file,
+                    mediaFilename: mediaFilename,
+                    byteSize: storedByteSize
+                )
+                clip.filePath = fileURL.path
+
+                try database.saveCapturedFileClip(&clip, cap: settings.maxHistoryItems)
+                capturedAny = true
+            } catch {
+                ClippyLog.error("Failed to save file clip: \(error)", category: ClippyLog.capture)
+            }
+        }
+        if capturedAny {
+            playCaptureSound()
+        }
+        // Return true whenever viable file URLs were on the pasteboard, even if
+        // every save threw, so the caller does not fall through to text/image
+        // capture and create a spurious filename text clip. Mirrors the legacy
+        // single-file behavior of treating "file URLs present" as "handled".
         return true
     }
 

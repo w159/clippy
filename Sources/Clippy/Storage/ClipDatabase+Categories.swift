@@ -55,6 +55,21 @@ extension ClipDatabase {
     }
 
     func deleteCategory(id: Int64) throws {
+        // Audit finding: recreating the starter after deletion loses its custom
+        // name/color/icon. Snapshot the starter's attributes BEFORE the row is
+        // removed so ensureStarterCategoryID can restore them instead of falling
+        // back to the hardcoded "Pinned"/#FF9500/pin.fill defaults.
+        if id == cachedStarterCategoryID || cachedStarterCategoryID == nil {
+            // try? flattens the optional from fetchOne, so doomed is non-optional
+            // Category when a matching row exists.
+            if let doomed = try? dbQueue.read({ db in
+                try Category.filter(Column("id") == id).fetchOne(db)
+            }), doomed.isStarter == true {
+                StarterSnapshot.last = StarterSnapshot(
+                    name: doomed.name, colorHex: doomed.colorHex,
+                    iconKind: doomed.iconKind, iconValue: doomed.iconValue)
+            }
+        }
         _ = try dbQueue.write { db in
             try Category.deleteOne(db, key: id)
         }
@@ -83,13 +98,23 @@ extension ClipDatabase {
 
     /// Recreate the starter ("Pinned") category if the user deleted it, so the
     /// Cmd+P pin shortcut always has a home to toggle.
+    ///
+    /// Audit finding: the previous recreation always clobbered the starter with
+    /// hardcoded "Pinned"/#FF9500/pin.fill, so a renamed/recolored starter lost
+    /// its customization after delete + Cmd+P. If a snapshot was captured at
+    /// delete time, restore those attributes. A starter row that still exists is
+    /// returned untouched (no clobber), which already held before this change.
     private func ensureStarterCategoryID() throws -> Int64? {
         if let id = try starterCategoryID() { return id }
+        let snap = StarterSnapshot.last
         let created = try dbQueue.write { db -> Int64? in
             let maxOrder = try Int.fetchOne(db, sql: "SELECT IFNULL(MAX(sortOrder), -1) FROM category") ?? -1
             var category = Category(
-                id: nil, name: "Pinned", colorHex: "#FF9500",
-                iconKind: .symbol, iconValue: "pin.fill",
+                id: nil,
+                name: snap?.name ?? "Pinned",
+                colorHex: snap?.colorHex ?? "#FF9500",
+                iconKind: snap?.iconKind ?? .symbol,
+                iconValue: snap?.iconValue ?? "pin.fill",
                 sortOrder: maxOrder + 1, isStarter: true, createdAt: Date()
             )
             try category.insert(db)
@@ -176,8 +201,14 @@ extension ClipDatabase {
             // reorderIDs returns ids unchanged in that case.
             guard ids.contains(clipID) else { return }
             let newIDs = reorderIDs(ids, draggedID: clipID, before: targetClipID)
-            // Write back gap-free sortOrder values, touching only changed rows.
+            // Audit finding: this loop previously wrote every sortOrder row
+            // unconditionally, so a single-clip move issued N UPDATEs. Mirror
+            // moveCategory's guard: skip rows whose current order already equals
+            // the target order. `ids` is ordered by current sortOrder, so its
+            // index IS the current order of each id.
+            let currentOrder = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
             for (order, id) in newIDs.enumerated() {
+                guard currentOrder[id] != order else { continue }
                 try db.execute(
                     sql: """
                         UPDATE clip_category SET sortOrder = ?
@@ -206,4 +237,17 @@ extension ClipDatabase {
         }
         return map
     }
+}
+
+// MARK: - Starter category snapshot
+//
+// Process-lifetime cache of the starter category's last-known attributes, so
+// delete + Cmd+P recreate restores the user's name/color/icon instead of the
+// hardcoded defaults. Held as a file-private var; nil means "no snapshot."
+private struct StarterSnapshot {
+    let name: String
+    let colorHex: String
+    let iconKind: CategoryIconKind
+    let iconValue: String
+    fileprivate static var last: StarterSnapshot?
 }

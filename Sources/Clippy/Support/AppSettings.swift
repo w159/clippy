@@ -525,7 +525,50 @@ final class AppSettings: ObservableObject {
     // MARK: - Computed properties (not persisted directly)
 
     /// The resolved token table for the active theme. Views read this.
-    var theme: ThemeTokens { Theme.tokens(self) }
+    ///
+    /// Memoized: Theme.tokens(self) re-parses up to 13 custom-hex overrides on
+    /// every call, and views read `theme` many times per render across hundreds
+    /// of cards. The cache recomputes only when a signature of the inputs
+    /// changes, so a steady-state render pays the parse cost once. Cache state
+    /// lives on the instance; AppSettings is a singleton, so this is safe.
+    private var _cachedTokens: ThemeTokens?
+    private var _cachedTokenSignature: Int = 0
+
+    var theme: ThemeTokens {
+        let signature = tokenSignature
+        if let cached = _cachedTokens, signature == _cachedTokenSignature {
+            return cached
+        }
+        let resolved = Theme.tokens(self)
+        _cachedTokens = resolved
+        _cachedTokenSignature = signature
+        return resolved
+    }
+
+    /// Hash of every input Theme.tokens consults, so the cache invalidates the
+    /// instant any of them changes. accentColor derives from accentTheme, so
+    /// accentTheme alone covers the accent path.
+    private var tokenSignature: Int {
+        var hasher = Hasher()
+        hasher.combine(themePreset)
+        hasher.combine(customIsDark)
+        hasher.combine(appearanceMode)
+        hasher.combine(accentTheme)
+        hasher.combine(customPanelHex)
+        hasher.combine(customScrollBgHex)
+        hasher.combine(customCardSurfaceHex)
+        hasher.combine(customCardBorderHex)
+        hasher.combine(customHeaderHex)
+        hasher.combine(customFooterHex)
+        hasher.combine(customSidebarHex)
+        hasher.combine(customScrollbarHex)
+        hasher.combine(customTextPrimaryHex)
+        hasher.combine(customTextSecondaryHex)
+        hasher.combine(customAccentHex)
+        hasher.combine(customSuccessHex)
+        hasher.combine(customDangerHex)
+        return hasher.finalize()
+    }
 
     var accentColor: Color { accentTheme.color }
 
@@ -567,6 +610,66 @@ final class AppSettings: ObservableObject {
         customAccentHex = ""
         customSuccessHex = ""
         customDangerHex = ""
+    }
+
+    /// Reset every setting to its registered default. Audit finding: the only
+    /// global reset was clearColorOverrides. This wipes all stored keys so the
+    /// @AppDefault wrappers fall back to their declared defaults, then re-applies
+    /// the same clamping/migration the init does for the @Published properties.
+    /// The theme's base colors, AI config, capture knobs, hotkeys, and behavior
+    /// toggles all return to their out-of-box values. Does not touch the
+    /// keychain (API keys) or the clip database.
+    func resetAllToDefaults() {
+        // Wipe every persisted settings key. @AppDefault reads live from
+        // UserDefaults, so removing a key makes its wrapper return the declared
+        // default on the next access without needing an explicit assignment.
+        let allKeys: [String] = [
+            Keys.positionMode, Keys.panelWidth, Keys.panelHeight, Keys.rememberPanelSize,
+            Keys.pollingIntervalMs, Keys.maxHistoryItems, Keys.movePastedItemToTop,
+            Keys.pastePlainTextByDefault, Keys.ignoredBundleIDs, Keys.appearanceMode,
+            Keys.accentTheme, Keys.panelMaterial, Keys.cardColorMode, Keys.showAppIcons,
+            Keys.showSectionHeaders, Keys.captureImages, Keys.maxImageSizeMB,
+            Keys.captureSoundEnabled, Keys.captureSoundName, Keys.captureSoundID,
+            Keys.captureSoundVolume, Keys.cardStyle, Keys.cardTintStrength,
+            Keys.highContrastCardText, Keys.fontFamily, Keys.fontSizeBase, Keys.themePreset,
+            Keys.panelOpacity, Keys.customIsDark, Keys.customPanelHex, Keys.customScrollBgHex,
+            Keys.customCardSurfaceHex, Keys.customCardBorderHex, Keys.customHeaderHex,
+            Keys.customFooterHex, Keys.customSidebarHex, Keys.customScrollbarHex,
+            Keys.customTextPrimaryHex, Keys.customTextSecondaryHex, Keys.customAccentHex,
+            Keys.customSuccessHex, Keys.customDangerHex, Keys.aiEnabled, Keys.aiProvider,
+            Keys.aiModel, Keys.aiBaseURL, Keys.aiAzureAPIVersion, Keys.aiAutoSuggestTitles,
+            Keys.aiAgentAllowScripts, Keys.aiAgentAllowCodeExecution, Keys.aiAgentAllowWebSearch,
+            Keys.onePasswordEnabled, Keys.onePasswordVault, Keys.onePasswordAutoClearClipboard,
+            Keys.onePasswordAutoClearDelaySecs, Keys.iCloudSyncEnabled, Keys.clickCopyOnly,
+            Keys.keystrokeSpeed, Keys.keystrokeWarnThreshold, Keys.mcpEnabled, Keys.mcpPort,
+            Keys.hideOnClickAway, Keys.allowMultipleCategories, Keys.hideAfterPaste,
+            Keys.hideOnEscape, Keys.panelFloatLevel, Keys.panelPinned, Keys.clipColumns,
+            Keys.captureFiles, Keys.maxFileSizeMB, Keys.logLevel,
+        ]
+        for key in allKeys where defaults.object(forKey: key) != nil {
+            defaults.removeObject(forKey: key)
+        }
+
+        // @Published properties live in instance memory, not UserDefaults, so
+        // removing keys is not enough: reset them to their defaults explicitly.
+        // Each assignment fires objectWillChange so bound views re-render.
+        pollingIntervalMs = 200.0
+        mcpEnabled = false
+        fontSizeBase = 13
+        panelOpacity = 1.0
+        captureSoundID = SoundCatalog.defaultID
+        keystrokeWarnThreshold = 2000
+        onePasswordAutoClearDelaySecs = 90
+        mcpPort = 51764
+
+        // Re-seed the logger threshold from the reset value.
+        ClippyLog.threshold = logLevel
+
+        // Fire one consolidated change so views bound to @AppDefault properties
+        // (which did not go through their wrapper setter) re-read UserDefaults.
+        // @AppDefault reads live from UserDefaults, so after the key removals
+        // above they will return their declared defaultValue on the next access.
+        objectWillChange.send()
     }
 
     // MARK: - Init

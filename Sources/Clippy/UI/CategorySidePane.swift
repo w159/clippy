@@ -8,6 +8,7 @@ struct CategorySidePane: View {
     @Binding var selection: PanelSelection
 
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var scriptStore = ScriptStore.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var editingCategory: Category?
     @State private var isCreating = false
@@ -15,12 +16,30 @@ struct CategorySidePane: View {
     /// (category reorder or clip filing). A single `.dropDestination(for:
     /// String.self)` accepts every string, and its isTargeted callback does not
     /// expose the dragged payload, so the hover indicator cannot branch on token
-    /// type without the payload. One neutral row highlight covers both cases;
-    /// the drop closure resolves the concrete action via routeCategoryRowDrop.
-    /// The insertion-line-vs-highlight split the old kind-filtered destination
-    /// gave for free is not reproducible on a single all-strings destination, so
-    /// a correct highlight beats a payload-guess that would be wrong half the time.
+    /// type without the payload. Audit finding: category reorder should show an
+    /// insertion line (like clip reorder in ReorderableForEach) rather than a
+    /// full-row tint. Since the single all-strings destination cannot distinguish
+    /// a category-reorder token from a clip-filing token during hover, the
+    /// indicator is now a top insertion line for every hover; the drop closure
+    /// still resolves the concrete action via routeCategoryRowDrop.
     @State private var draggingOverCategoryID: Int64?
+    /// Trailing drop zone (after the last category) hover state, for the
+    /// end-of-list reorder target. See `reorderTrailingDropDestination`.
+    @State private var draggingOverTrailing = false
+    /// Category pending deletion, presented via a confirmation alert.
+    @State private var categoryToDelete: Category?
+
+    /// AI Actions has no PanelSelection case (that enum lives in PanelSelection.swift,
+    /// outside this file's scope), so the row fires this placeholder callback. The
+    /// host that owns the panel is expected to route it (e.g. open Settings > AI
+    /// Actions). Defaults to a no-op so the row renders harmlessly when unwired.
+    var onNavigateAIActions: () -> Void = {}
+
+    /// Sentinel target ID for end-of-list category moves. `store.moveCategory`
+    /// requires a non-nil target, but reorderIDs appends when the target is not
+    /// found in the list, so a value that is never a real category id achieves
+    /// end-of-list semantics without a separate ClipStore entry point.
+    private let reorderEndSentinel: Int64 = .max
 
     private var tokens: ThemeTokens { settings.theme }
 
@@ -42,12 +61,20 @@ struct CategorySidePane: View {
                             // the single drop destination that routes by tag.
                             .reorderDraggable(id: categoryID, kind: "cat")
                     }
+                    // Audit finding: drag-to-reorder could not drop at the end of
+                    // the category list. This trailing target lands drops past the
+                    // last row and appends the dragged category via the sentinel
+                    // (reorderIDs appends when the target is absent).
+                    trailingCategoryDropZone
                     if settings.onePasswordEnabled {
                         onePasswordRow
                     }
                     scriptsRow
                     if settings.aiEnabled {
                         assistantRow
+                    }
+                    if settings.aiEnabled {
+                        aiActionsRow
                     }
                 }
             }
@@ -58,6 +85,25 @@ struct CategorySidePane: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .background(tokens.sidebar.opacity(settings.panelOpacity))
         .accessibilityLabel("Categories")
+        // Audit finding: category delete had no confirmation. Present an alert
+        // before removing the category (and un-filing its clips).
+        .alert(
+            "Delete \"\(categoryToDelete?.name ?? "")\"?",
+            isPresented: Binding(
+                get: { categoryToDelete != nil },
+                set: { if !$0 { categoryToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                guard let category = categoryToDelete else { return }
+                if let id = category.id, selection == .category(id) { selection = .history }
+                store.deleteCategory(category)
+                categoryToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { categoryToDelete = nil }
+        } message: {
+            Text("Clips in this category will be unfiled. This action cannot be undone.")
+        }
     }
 
     // MARK: - Rows
@@ -68,7 +114,7 @@ struct CategorySidePane: View {
             tint: settings.accentColor,
             icon: { Image(systemName: "clock").font(.system(size: 12, weight: .semibold)) },
             title: "History",
-            count: nil,
+            count: store.clips.count,
             help: "All history (\u{2318}1)"
         ) {
             selection = .history
@@ -95,10 +141,11 @@ struct CategorySidePane: View {
             Divider()
             // Every category, including the starter "Pinned", can be deleted.
             // Its clips simply lose that membership (and unpin if it was their
-            // only category).
+            // only category). The delete is routed through a confirmation alert
+            // (see the .alert modifier on the pane body) rather than firing
+            // immediately, so a stray click does not silently unfile clips.
             Button("Delete", role: .destructive) {
-                if selection == .category(categoryID) { selection = .history }
-                store.deleteCategory(category)
+                categoryToDelete = category
             }
         }
         .popover(
@@ -107,7 +154,7 @@ struct CategorySidePane: View {
                 set: { if !$0 { editingCategory = nil } }
             )
         ) {
-            CategoryEditorView(category: category, knownBundleIDs: store.knownBundleIDs) { name, colorHex, iconKind, iconValue in
+            CategoryEditorView(category: category, knownBundleIDs: store.knownBundleIDs, existingNames: store.categories.map { $0.name }) { name, colorHex, iconKind, iconValue in
                 var updated = category
                 updated.name = name
                 updated.colorHex = colorHex
@@ -129,15 +176,19 @@ struct CategorySidePane: View {
         //
         // routeCategoryRowDrop (pure, unit-tested) decides which action applies.
         //
-        // A neutral highlight marks the hovered row for any drag-in-progress.
-        .background(
-            draggingOverCategoryID == categoryID
-                ? AnyShapeStyle(tint.opacity(0.22))
-                : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-        )
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12),
-                   value: draggingOverCategoryID)
+        // Audit finding: category reorder previously showed a full-row tint
+        // highlight; it now shows a 2pt top insertion line matching the clip
+        // reorder indicator in ReorderableForEach.
+        .overlay(alignment: .top) {
+            if draggingOverCategoryID == categoryID {
+                Rectangle()
+                    .fill(tint)
+                    .frame(height: 2)
+                    .padding(.horizontal, 4)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.12),
+                               value: draggingOverCategoryID)
+            }
+        }
         .dropDestination(for: String.self) { items, _ in
             draggingOverCategoryID = nil
             guard let payload = items.first else { return false }
@@ -180,7 +231,7 @@ struct CategorySidePane: View {
             tint: Color(nsColor: .systemGreen),
             icon: { Image(systemName: "terminal.fill").font(.system(size: 12, weight: .semibold)) },
             title: "Scripts",
-            count: nil,
+            count: scriptStore.scripts.count,
             help: "Run saved scripts"
         ) {
             selection = selection == .scripts ? .history : .scripts
@@ -202,6 +253,39 @@ struct CategorySidePane: View {
         .accessibilityLabel("AI Assistant")
     }
 
+    /// Audit finding: AI Actions had no side-pane nav row, breaking the
+    /// four-collection symmetry with Scripts/Assistant. PanelSelection has no
+    /// `.aiActions` case (that file is out of scope), so this row drives a
+    /// placeholder callback (`onNavigateAIActions`) instead of a selection.
+    private var aiActionsRow: some View {
+        sidePaneRow(
+            isSelected: false,
+            tint: Color(nsColor: .systemIndigo),
+            icon: { Image(systemName: "wand.and.stars").font(.system(size: 12, weight: .semibold)) },
+            title: "AI Actions",
+            count: nil,
+            help: "Manage AI actions"
+        ) {
+            onNavigateAIActions()
+        }
+        .accessibilityLabel("AI Actions")
+    }
+
+    /// Full-width drop target placed after the last category row so a category
+    /// reorder drag can land past the end. The sentinel target makes
+    /// `reorderIDs` append (its target-not-found branch), achieving end-of-list.
+    private var trailingCategoryDropZone: some View {
+        Rectangle()
+            .fill(.clear)
+            .frame(maxWidth: .infinity)
+            .frame(height: 10)
+            .contentShape(Rectangle())
+            .reorderTrailingDropDestination(kind: "cat", isTargeted: $draggingOverTrailing) { draggedID in
+                store.moveCategory(id: draggedID, beforeCategoryID: reorderEndSentinel)
+            }
+            .accessibilityHidden(true)
+    }
+
     private var newCategoryRow: some View {
         sidePaneRow(
             isSelected: false,
@@ -214,7 +298,7 @@ struct CategorySidePane: View {
             isCreating = true
         }
         .popover(isPresented: $isCreating) {
-            CategoryEditorView(category: nil, knownBundleIDs: store.knownBundleIDs) { name, colorHex, iconKind, iconValue in
+            CategoryEditorView(category: nil, knownBundleIDs: store.knownBundleIDs, existingNames: store.categories.map { $0.name }) { name, colorHex, iconKind, iconValue in
                 store.createCategory(named: name, colorHex: colorHex, iconKind: iconKind, iconValue: iconValue)
             }
         }

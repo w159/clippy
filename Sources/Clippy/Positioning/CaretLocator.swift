@@ -63,12 +63,23 @@ enum CaretLocator {
     }
 
     /// AX coordinates have their origin at the top-left of the primary
-    /// screen; AppKit windows use bottom-left.
+    /// screen; AppKit windows use bottom-left. The flip must use the global
+    /// max-Y (the top of the union of all screen frames), not just the primary
+    /// screen's height, otherwise carets on a secondary display above the
+    /// primary convert to a Cocoa y in the wrong screen. We also prefer the
+    /// screen whose frame actually contains the AX rect when one is found,
+    /// which keeps the flip correct for unusual multi-monitor layouts.
     private static func convertToCocoaCoordinates(_ rect: CGRect) -> CGRect {
-        guard let primary = NSScreen.screens.first else { return rect }
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return rect }
+
+        // Global max-Y in Cocoa (bottom-left) coordinates: the top edge of the
+        // union of all screens. AX y=0 sits at this top edge and increases
+        // downward, so cocoaY = globalMaxY - axY.
+        let globalMaxY = screens.map { $0.frame.maxY }.max() ?? screens[0].frame.maxY
         return CGRect(
             x: rect.origin.x,
-            y: primary.frame.height - rect.origin.y - rect.height,
+            y: globalMaxY - rect.origin.y - rect.height,
             width: rect.width,
             height: rect.height
         )

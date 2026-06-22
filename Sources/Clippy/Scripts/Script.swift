@@ -56,8 +56,17 @@ enum ScriptInterpreter: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// A user-stored script that can be run from Clippy. Bodies are arbitrary code;
-/// running one is gated behind a confirmation in the UI.
+/// A user-stored script that can be run from Clippy. Bodies are arbitrary code.
+///
+/// Run-confirmation policy (must stay in sync between the two surfaces):
+///   - Settings (ScriptsView): every Run goes through a confirmationDialog.
+///     Editing happens here, so the user is already engaged and a per-run
+///     prompt is acceptable.
+///   - Panel (ScriptsPanelView): a quick-launch surface, so it only nags once
+///     per script (an in-memory Set<UUID> of confirmed script ids). After the
+///     first confirmation for a given script it runs directly until the panel
+///     is rebuilt. This keeps the panel fast while still warning the first time
+///     arbitrary code is executed from a passive surface.
 struct Script: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
@@ -132,4 +141,20 @@ struct ScriptResult: Equatable {
     // A truncation-kill yields a SIGTERM exit status, so exitCode != 0; treat it
     // as success since the captured output is complete up to the ceiling.
     var succeeded: Bool { (exitCode == 0 || truncated) && !timedOut }
+
+    /// Display cap applied to each stream in the UI so very large output does
+    /// not flood the view. Distinct from `truncated` (a runner-side stream
+    /// ceiling kill): this is a pure display concern. Shared by ScriptsView and
+    /// ScriptsPanelView so both surfaces cap at the same width.
+    static let displayCap = 2000
+
+    /// Returns `stream` capped to `displayCap` characters with a trailing note
+    /// when truncation was applied, e.g. "(showing first 2000 of 4500 characters)".
+    /// Use for rendering stdout/stderr; never use this to decide success.
+    static func displayCapped(_ stream: String) -> String {
+        let cap = displayCap
+        guard stream.count > cap else { return stream }
+        let prefix = String(stream.prefix(cap))
+        return prefix + "\n(showing first \(cap) of \(stream.count) characters)"
+    }
 }

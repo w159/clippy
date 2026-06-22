@@ -55,10 +55,10 @@ struct SettingsView: View {
                 .foregroundStyle(tokens.accent)
             VStack(alignment: .leading, spacing: 0) {
                 Text("Clippy")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(SettingsTypography.brand(settings))
                     .foregroundStyle(tokens.textPrimary)
                 Text("Settings")
-                    .font(.system(size: 11))
+                    .font(SettingsTypography.brandSubtitle(settings))
                     .foregroundStyle(tokens.textSecondary)
             }
             Spacer(minLength: 0)
@@ -78,12 +78,12 @@ struct SettingsView: View {
                         .fill((isSelected ? tokens.accent : tokens.textSecondary).gradient)
                         .frame(width: 22, height: 22)
                     Image(systemName: section.icon)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(SettingsTypography.sidebarIcon(settings))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.white)
                 }
                 Text(section.title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(SettingsTypography.sidebarRow(settings, selected: isSelected))
                     .foregroundStyle(tokens.textPrimary)
                 Spacer(minLength: 0)
             }
@@ -103,10 +103,10 @@ struct SettingsView: View {
     private var footer: some View {
         HStack(spacing: 6) {
             Image(systemName: "doc.on.clipboard")
-                .font(.system(size: 10))
+                .font(SettingsTypography.footer(settings))
                 .symbolRenderingMode(.hierarchical)
             Text("Clippy \(Bundle.main.shortVersion)")
-                .font(.system(size: 10))
+                .font(SettingsTypography.footer(settings))
         }
         .foregroundStyle(tokens.textSecondary)
         .padding(.horizontal, 16)
@@ -119,7 +119,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(selection.title)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(SettingsTypography.detailTitle(settings))
                     .foregroundStyle(tokens.textPrimary)
                 Spacer()
             }
@@ -184,6 +184,142 @@ extension Bundle {
     }
 }
 
+/// Settings-window typography. Audit finding: the settings chrome used raw
+/// .font(.system(size:)), so the user's panel font family never applied here.
+/// These helpers mirror PanelTypography's approach (respect fontFamily and
+/// fontSizeBase) so the settings window follows the same font choice as the
+/// panel. Sizes are fixed per role (the settings layout is denser than the
+/// panel and should not scale with fontSizeBase), but the family tracks the
+/// user's choice. System-default falls back to .system so semantic designs
+/// (rounded wordmark) still apply.
+enum SettingsTypography {
+    // Caseless enum used as a namespace; no instances can be constructed.
+
+    /// Build a font in the user's chosen family, falling back to the system font
+    /// (with an optional design) when .systemDefault is selected.
+    private static func make(size: CGFloat, weight: Font.Weight,
+                            design: Font.Design? = nil,
+                            _ settings: AppSettings) -> Font {
+        guard let family = settings.fontFamily.familyName,
+              settings.fontFamily.isAvailable
+        else {
+            if let design { return .system(size: size, weight: weight, design: design) }
+            return .system(size: size, weight: weight)
+        }
+        return .custom(family, size: size).weight(weight)
+    }
+
+    /// The "Clippy" wordmark in the sidebar header.
+    static func brand(_ s: AppSettings) -> Font {
+        make(size: 16, weight: .bold, design: .rounded, s)
+    }
+
+    /// The "Settings" subtitle under the wordmark.
+    static func brandSubtitle(_ s: AppSettings) -> Font {
+        make(size: 11, weight: .regular, s)
+    }
+
+    /// The glyph inside a sidebar section tile.
+    static func sidebarIcon(_ s: AppSettings) -> Font {
+        make(size: 11, weight: .semibold, s)
+    }
+
+    /// A sidebar row label. Weight tracks selection.
+    static func sidebarRow(_ s: AppSettings, selected: Bool) -> Font {
+        make(size: 13, weight: selected ? .semibold : .regular, s)
+    }
+
+    /// The footer version line.
+    static func footer(_ s: AppSettings) -> Font {
+        make(size: 10, weight: .regular, s)
+    }
+
+    /// The large section title at the top of the detail pane.
+    static func detailTitle(_ s: AppSettings) -> Font {
+        make(size: 22, weight: .bold, design: .rounded, s)
+    }
+
+    /// The checkmark on a selected accent swatch.
+    static func swatchCheck(_ s: AppSettings) -> Font {
+        make(size: 9, weight: .bold, s)
+    }
+}
+
+/// A typed test/install outcome so the UI can render success and failure with
+/// distinct icons and colors. Audit finding: test-connection results were
+/// rendered as plain secondary Text with no success/failure visual distinction.
+/// This mirrors the key-save pattern (checkmark/xmark + colored) already used
+/// for the API-key save indicator.
+private struct StatusOutcome: Equatable {
+    let succeeded: Bool
+    let message: String
+}
+
+private struct StatusOutcomeLabel: View {
+    let outcome: StatusOutcome
+    var successColor: Color
+    var failureColor: Color = Color.red
+
+    var body: some View {
+        Label {
+            Text(outcome.message)
+        } icon: {
+            Image(systemName: outcome.succeeded ? "checkmark.circle.fill" : "xmark.circle")
+                .symbolRenderingMode(.hierarchical)
+        }
+        .font(.caption)
+        .foregroundStyle(outcome.succeeded ? successColor : failureColor)
+        .textSelection(.enabled)
+    }
+}
+
+/// A TextField that validates on commit (not per keystroke) and shows an inline
+/// error. Audit finding: AI endpoint URL, model, and 1Password vault name had
+/// no inline validation. Reuses the CustomColorRow commit pattern: a local
+/// draft so a half-typed invalid value never writes through to settings.
+private struct ValidatedTextField: View {
+    let title: String
+    var prompt: Text? = nil
+    @Binding var value: String
+    /// Returns an error message when the committed input is invalid, nil when
+    /// it is acceptable. Empty string handling is the caller's responsibility.
+    let validate: (String) -> String?
+
+    @State private var draft: String = ""
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            TextField(title, text: $draft, prompt: prompt)
+                .onSubmit { commit() }
+                .foregroundStyle(error != nil ? Color.red : Color.primary)
+            if let error {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .onAppear { draft = value }
+        // Keep the draft in sync when the stored value changes elsewhere
+        // (reset-to-defaults, another window) so the field does not show stale
+        // text after an external change.
+        .onChange(of: value) { _, newValue in
+            if newValue != draft { draft = newValue; error = nil }
+        }
+    }
+
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let msg = validate(trimmed) {
+            error = msg
+            return
+        }
+        error = nil
+        value = trimmed
+        draft = trimmed
+    }
+}
+
 /// Pushes an NSAppearance onto the hosting window. Used so changing the theme
 /// repaints the settings window (a grouped Form) in matching light/dark.
 private struct WindowAppearanceApplier: NSViewRepresentable {
@@ -209,6 +345,7 @@ private struct GeneralSettingsTab: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var launchAtLoginError: String?
+    @State private var showResetConfirmation = false
 
     private var isRunningFromBundle: Bool {
         Bundle.main.bundlePath.hasSuffix(".app")
@@ -336,8 +473,39 @@ private struct GeneralSettingsTab: View {
                         .foregroundStyle(.red)
                 }
             }
+
+            Section("Reset") {
+                // Audit finding: no global "Reset all settings to defaults". The
+                // destructive action is gated by a confirmation dialog so a
+                // misclick does not wipe a configured setup. Keychain secrets and
+                // the clip database are untouched.
+                Button("Reset all settings to defaults...", role: .destructive) {
+                    showResetConfirmation = true
+                }
+                Text("Restores every setting above to its default value. API keys in the keychain and your clip history are not affected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        // Audit finding: launchAtLogin was snapshotted once at view init, so an
+        // external change to the login-item status (System Settings, another
+        // build) left the toggle stale. Re-sync from the service on appear.
+        .onAppear {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+        .confirmationDialog(
+            "Reset all settings to defaults?",
+            isPresented: $showResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset all settings", role: .destructive) {
+                settings.resetAllToDefaults()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This restores every Clippy setting to its default. Your API keys and clip history are not affected.")
+        }
     }
 
     private func updateLaunchAtLogin(_ enabled: Bool) {
@@ -550,7 +718,7 @@ private struct AppearanceSettingsTab: View {
                 .overlay {
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(SettingsTypography.swatchCheck(settings))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.white)
                     }
@@ -856,6 +1024,19 @@ private struct CaptureSettingsTab: View {
             .font(.callout)
         }
         .formStyle(.grouped)
+        // Audit finding: ignoredAppsText/soundVolumeSlider were snapshotted once
+        // at init, so an external change to the settings (reset, another window)
+        // left the local draft stale. Re-sync on change, guarding the text
+        // editor so an in-progress edit is not clobbered.
+        .onChange(of: settings.ignoredBundleIDs) { _, newValue in
+            let joined = newValue.joined(separator: "\n")
+            if !ignoredAppsFocused && joined != ignoredAppsText {
+                ignoredAppsText = joined
+            }
+        }
+        .onChange(of: settings.captureSoundVolume) { _, newValue in
+            if Double(newValue) != soundVolumeSlider { soundVolumeSlider = Double(newValue) }
+        }
     }
 
     /// Parse the editor on focus loss: persist only well-formed bundle IDs and
@@ -892,16 +1073,25 @@ private struct CaptureSettingsTab: View {
 
 private struct AISettingsTab: View {
     @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var mcpController = McpServerController.shared
     private var tokens: ThemeTokens { settings.theme }
-    @State private var apiKey = ""
+    // Audit finding: switching provider cleared apiKey, discarding in-progress
+    // entry. Keep a per-provider draft so typing a key for OpenAI then tabbing
+    // to Anthropic and back restores the OpenAI draft.
+    @State private var apiKeyDrafts: [AIProviderKind: String] = [:]
     @State private var keyStatus = ""
-    @State private var testResult: String?
+    @State private var testResult: StatusOutcome?
     @State private var testing = false
-    @State private var mcpTestResult: String?
-    @State private var mcpTesting = false
-    @State private var mcpInstallResult: String?
-    @State private var mcpInstalledClients: Set<McpClient> = []
+
+    /// The draft API key for the currently selected provider.
+    private var currentDraft: String { apiKeyDrafts[settings.aiProvider] ?? "" }
+
+    /// Binding into the per-provider draft map for the SecureField.
+    private var apiKeyBinding: Binding<String> {
+        Binding(
+            get: { currentDraft },
+            set: { apiKeyDrafts[settings.aiProvider] = $0 }
+        )
+    }
 
     var body: some View {
         Form {
@@ -916,21 +1106,46 @@ private struct AISettingsTab: View {
                 Picker("Provider", selection: $settings.aiProvider) {
                     ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
                 }
-                TextField("Model", text: $settings.aiModel,
-                          prompt: Text(settings.aiProvider.defaultModel))
+                // Audit finding: no inline validation for Model. Reject model ids
+                // with internal spaces (a common typo) on commit; empty is valid
+                // because it falls back to the provider default.
+                ValidatedTextField(
+                    title: "Model",
+                    prompt: Text(settings.aiProvider.defaultModel),
+                    value: $settings.aiModel,
+                    validate: { input in
+                        guard !input.isEmpty else { return nil }
+                        if input.contains(" ") { return "Model ids cannot contain spaces." }
+                        return nil
+                    }
+                )
                 Text(settings.aiProvider.modelHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("Endpoint URL", text: $settings.aiBaseURL,
-                          prompt: Text(settings.aiProvider.defaultBaseURL))
+                // Audit finding: no inline validation for Endpoint URL. Validate
+                // it parses as an http/https URL on commit; empty falls back to the
+                // provider default and is therefore allowed.
+                ValidatedTextField(
+                    title: "Endpoint URL",
+                    prompt: Text(settings.aiProvider.defaultBaseURL),
+                    value: $settings.aiBaseURL,
+                    validate: { input in
+                        guard !input.isEmpty else { return nil }
+                        guard let url = URL(string: input),
+                              let scheme = url.scheme?.lowercased(),
+                              scheme == "http" || scheme == "https"
+                        else { return "Enter a valid http:// or https:// URL." }
+                        return nil
+                    }
+                )
                 if settings.aiProvider == .azureFoundry {
                     TextField("API version", text: $settings.aiAzureAPIVersion)
                 }
                 if settings.aiProvider.needsAPIKey {
-                    SecureField("API key", text: $apiKey, prompt: Text("Paste, then Save"))
+                    SecureField("API key", text: apiKeyBinding, prompt: Text("Paste, then Save"))
                     HStack(spacing: 8) {
                         Button("Save key") { saveKey() }
-                            .disabled(apiKey.isEmpty)
+                            .disabled(currentDraft.isEmpty)
                         Button("Clear") { clearKey() }
                         if !keyStatus.isEmpty {
                             let keySaved = keyStatus.hasPrefix("Key")
@@ -952,12 +1167,13 @@ private struct AISettingsTab: View {
                 Divider()
                 HStack(spacing: 8) {
                     Button(testing ? "Testing..." : "Test AI connection") { test() }
-                        .disabled(testing || !settings.aiEnabled)
+                        // Audit finding: "Test AI connection" was disabled until
+                        // aiEnabled. Testing is read-only (a sample completion
+                        // request), so allow it regardless of the master switch.
+                        .disabled(testing)
                     if let testResult {
-                        Text(testResult)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
+                        StatusOutcomeLabel(outcome: testResult,
+                                            successColor: tokens.success)
                     }
                 }
             }
@@ -993,117 +1209,23 @@ private struct AISettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            Section("MCP integration") {
-                Toggle("Enable Clippy MCP server", isOn: $settings.mcpEnabled)
-                Text("Runs a local server so AI tools (Claude, Copilot) can read and search your clips.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LabeledContent("Port") {
-                    HStack(spacing: 8) {
-                        TextField("Port", value: $settings.mcpPort, format: .number)
-                            .frame(width: 70)
-                            .multilineTextAlignment(.trailing)
-                        let portFree = mcpController.isPortFree(settings.mcpPort)
-                        Label {
-                            Text(portFree ? "Port \(settings.mcpPort) is available"
-                                          : "Port \(settings.mcpPort) is in use")
-                        } icon: {
-                            Image(systemName: portFree ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                            .font(.caption)
-                            .foregroundStyle(portFree ? tokens.success : tokens.danger)
-                    }
-                }
-                .disabled(!settings.mcpEnabled)
-
-                LabeledContent("Status") {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(mcpStatusColor)
-                            .frame(width: 8, height: 8)
-                        Text(mcpController.status.description)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                }
-            }
-
-            Section("Install for...") {
-                ForEach(McpClient.allCases) { client in
-                    HStack {
-                        if mcpInstalledClients.contains(client) {
-                            Label {
-                                Text(client.displayName)
-                            } icon: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                            }
-                                .foregroundStyle(tokens.success)
-                        } else {
-                            Label {
-                                Text(client.displayName)
-                            } icon: {
-                                Image(systemName: "circle")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(tokens.textSecondary)
-                            }
-                        }
-                        Spacer()
-                        Button("Install") {
-                            let result = McpInstallService.install(client, port: settings.mcpPort)
-                            switch result {
-                            case .success(let msg):
-                                mcpInstallResult = msg
-                                refreshInstalledClients()
-                            case .failure(let err):
-                                mcpInstallResult = err.localizedDescription
-                            }
-                        }
-                        .disabled(!settings.mcpEnabled)
-                    }
-                }
-                if let mcpInstallResult {
-                    Text(mcpInstallResult)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                if !settings.mcpEnabled {
-                    Text("Enable the MCP server above before installing.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                HStack(spacing: 8) {
-                    Button(mcpTesting ? "Testing..." : "Test MCP server") {
-                        mcpTest()
-                    }
-                    .disabled(mcpTesting || !mcpController.status.isRunning)
-                    if let mcpTestResult {
-                        Text(mcpTestResult)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                }
-            }
         }
         .formStyle(.grouped)
         .onAppear {
             refreshKeyStatus()
-            refreshInstalledClients()
         }
-        .onChange(of: settings.aiProvider) { refreshKeyStatus() }
+        // Audit finding: refreshKeyStatus cleared apiKey on every provider change,
+        // discarding in-progress entry. It now only updates the keyStatus indicator
+        // and leaves the per-provider drafts intact. Two-arg .onChange per the
+        // standardization finding.
+        .onChange(of: settings.aiProvider) { _, _ in
+            refreshKeyStatus()
+        }
     }
 
     private func refreshKeyStatus() {
-        apiKey = ""
+        // Audit finding: do not clear the draft here. Only refresh the indicator
+        // so switching providers preserves a half-typed key per provider.
         guard settings.aiProvider.needsAPIKey else { keyStatus = ""; return }
         keyStatus = KeychainStore.shared.has(account: settings.aiProvider.keychainAccount)
             ? "Key stored in Keychain."
@@ -1111,9 +1233,14 @@ private struct AISettingsTab: View {
     }
 
     private func saveKey() {
-        let ok = KeychainStore.shared.write(apiKey, account: settings.aiProvider.keychainAccount)
+        let ok = KeychainStore.shared.write(
+            currentDraft,
+            account: settings.aiProvider.keychainAccount,
+            label: "Clippy - \(settings.aiProvider.displayName) API key",
+            description: "Clippy AI API key for \(settings.aiProvider.displayName)."
+        )
         keyStatus = ok ? "Key saved to Keychain." : "Could not save to Keychain."
-        apiKey = ""
+        apiKeyDrafts[settings.aiProvider] = ""
     }
 
     private func clearKey() {
@@ -1121,51 +1248,12 @@ private struct AISettingsTab: View {
         refreshKeyStatus()
     }
 
-    private var mcpStatusColor: Color {
-        switch mcpController.status {
-        case .running:   return .green
-        case .starting:  return .yellow
-        case .stopped:   return .secondary
-        case .portInUse: return .orange
-        case .failed:    return .red
-        }
-    }
-
-    private func refreshInstalledClients() {
-        // isInstalled(.claudeCode) can spawn a login shell ("zsh -l -c which claude")
-        // and run "claude mcp list", each blocking for hundreds of ms. Probe off
-        // the main thread so opening this tab never freezes the window.
-        Task.detached(priority: .utility) {
-            var found = Set<McpClient>()
-            for client in McpClient.allCases where McpInstallService.isInstalled(client) {
-                found.insert(client)
-            }
-            await MainActor.run { [found] in mcpInstalledClients = found }
-        }
-    }
-
-    private func mcpTest() {
-        mcpTesting = true
-        mcpTestResult = nil
-        McpServerController.shared.testConnection { result in
-            switch result {
-            case .success(let count):
-                mcpTestResult = count > 0
-                    ? "Connected. \(count) tool\(count == 1 ? "" : "s") available."
-                    : "Connected."
-            case .failure(let err):
-                mcpTestResult = err.localizedDescription
-            }
-            mcpTesting = false
-        }
-    }
-
     private func test() {
         testing = true
         testResult = nil
         switch AIService.fromSettings() {
         case .failure(let error):
-            testResult = error.localizedDescription
+            testResult = StatusOutcome(succeeded: false, message: error.localizedDescription)
             testing = false
         case .success(let service):
             Task {
@@ -1173,12 +1261,14 @@ private struct AISettingsTab: View {
                     let proposal = try await service.suggestTitle(
                         forText: "The quick brown fox jumps over the lazy dog.")
                     await MainActor.run {
-                        testResult = "Connected. Sample title: \(proposal.proposed)"
+                        testResult = StatusOutcome(
+                            succeeded: true,
+                            message: "Connected. Sample title: \(proposal.proposed)")
                         testing = false
                     }
                 } catch {
                     await MainActor.run {
-                        testResult = error.localizedDescription
+                        testResult = StatusOutcome(succeeded: false, message: error.localizedDescription)
                         testing = false
                     }
                 }
@@ -1190,9 +1280,33 @@ private struct AISettingsTab: View {
 private struct IntegrationsSettingsTab: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var cloud = ICloudSyncService.shared
+    @ObservedObject private var mcpController = McpServerController.shared
     private var tokens: ThemeTokens { settings.theme }
     @State private var exportResult: String?
     @State private var archiveResult: String?
+    // Audit finding: MCP was filed under "AI". The MCP sections live here now.
+    // Audit finding: isPortFree was called inline on every body render. Cache it
+    // and recompute only when the port or the server status changes.
+    @State private var portFree: Bool = true
+    // Audit finding: the install probe showed empty circles while still
+    // loading, indistinguishable from "not installed". Track loading state.
+    @State private var installedClientsLoading = false
+    // Audit finding: refreshInstalledClients shelled out on every tab appearance.
+    // Cache the probe result with a TTL and only re-probe on explicit action.
+    @State private var lastClientsRefresh: Date = .distantPast
+    @State private var mcpInstalledClients: Set<McpClient> = []
+    // Audit finding: install blocked the main thread. Per-client installing state
+    // drives both the button label and a ProgressView while the async install
+    // runs.
+    @State private var installingClients: Set<McpClient> = []
+    @State private var mcpTestResult: StatusOutcome?
+    @State private var mcpTesting = false
+    @State private var mcpInstallOutcome: StatusOutcome?
+
+    /// TTL for the installed-clients cache. Re-probing "claude mcp list" on every
+    /// tab appearance is wasteful; 30s is short enough to reflect an external
+    /// install but long enough to avoid repeated shell-outs while browsing.
+    private static let clientsRefreshTTL: TimeInterval = 30
 
     var body: some View {
         Form {
@@ -1234,7 +1348,20 @@ private struct IntegrationsSettingsTab: View {
 
             Section("1Password") {
                 Toggle("Show 1Password vault in the sidebar", isOn: $settings.onePasswordEnabled)
-                TextField("Vault name", text: $settings.onePasswordVault, prompt: Text("Clippy"))
+                // Audit finding: no inline validation for vault name. Reject an
+                // empty vault name when the 1Password sidebar is on, since the op
+                // CLI cannot resolve a vault without a name.
+                ValidatedTextField(
+                    title: "Vault name",
+                    prompt: Text("Clippy"),
+                    value: $settings.onePasswordVault,
+                    validate: { input in
+                        if settings.onePasswordEnabled && input.isEmpty {
+                            return "Enter a vault name, or turn off the 1Password sidebar."
+                        }
+                        return nil
+                    }
+                )
                 Toggle("Auto-clear clipboard after copying a secret",
                        isOn: $settings.onePasswordAutoClearClipboard)
                 if settings.onePasswordAutoClearClipboard {
@@ -1266,8 +1393,8 @@ private struct IntegrationsSettingsTab: View {
 
             Section("iCloud sync") {
                 Toggle("Sync clips and categories through iCloud Drive", isOn: $settings.iCloudSyncEnabled)
-                    .onChange(of: settings.iCloudSyncEnabled) {
-                        if settings.iCloudSyncEnabled { ICloudSyncService.shared.startIfEnabled() }
+                    .onChange(of: settings.iCloudSyncEnabled) { _, enabled in
+                        if enabled { ICloudSyncService.shared.startIfEnabled() }
                     }
                 HStack {
                     Button(cloud.syncing ? "Syncing..." : "Sync now") {
@@ -1287,8 +1414,205 @@ private struct IntegrationsSettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Audit finding: MCP was filed under "AI". Moved here so the MCP
+            // server lives alongside the other integrations.
+            Section("MCP server") {
+                Toggle("Enable Clippy MCP server", isOn: $settings.mcpEnabled)
+                Text("Runs a local server so AI tools (Claude, Copilot) can read and search your clips.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                LabeledContent("Port") {
+                    HStack(spacing: 8) {
+                        TextField("Port", value: $settings.mcpPort, format: .number)
+                            .frame(width: 70)
+                            .multilineTextAlignment(.trailing)
+                        Label {
+                            Text(portFree ? "Port \(settings.mcpPort) is available"
+                                          : "Port \(settings.mcpPort) is in use")
+                        } icon: {
+                            Image(systemName: portFree ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                            .font(.caption)
+                            .foregroundStyle(portFree ? tokens.success : tokens.danger)
+                    }
+                }
+                .disabled(!settings.mcpEnabled)
+
+                LabeledContent("Status") {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(mcpStatusColor)
+                            .frame(width: 8, height: 8)
+                        Text(mcpController.status.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+
+            Section("Install for...") {
+                ForEach(McpClient.allCases) { client in
+                    HStack {
+                        if installedClientsLoading && !mcpInstalledClients.contains(client) {
+                            // Audit finding: while the probe is running, show a
+                            // spinner instead of an empty circle so "loading" is
+                            // distinguishable from "not installed".
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 16, height: 16)
+                            Text(client.displayName)
+                                .foregroundStyle(tokens.textSecondary)
+                        } else if mcpInstalledClients.contains(client) {
+                            Label {
+                                Text(client.displayName)
+                            } icon: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+                                .foregroundStyle(tokens.success)
+                        } else {
+                            Label {
+                                Text(client.displayName)
+                            } icon: {
+                                Image(systemName: "circle")
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(tokens.textSecondary)
+                            }
+                        }
+                        Spacer()
+                        // Audit finding: no Uninstall. Swap the button to
+                        // "Uninstall" when installed. The action runs async with a
+                        // per-client installing state so the main thread is not
+                        // blocked on a subprocess.
+                        Button(installingClients.contains(client) ? "Working..." : (mcpInstalledClients.contains(client) ? "Uninstall" : "Install")) {
+                            toggleInstall(client)
+                        }
+                        .disabled(!settings.mcpEnabled || installingClients.contains(client))
+                    }
+                }
+                if let mcpInstallOutcome {
+                    StatusOutcomeLabel(outcome: mcpInstallOutcome,
+                                        successColor: tokens.success)
+                }
+                if !settings.mcpEnabled {
+                    Text("Enable the MCP server above before installing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                HStack(spacing: 8) {
+                    Button(mcpTesting ? "Testing..." : "Test MCP server") {
+                        mcpTest()
+                    }
+                    .disabled(mcpTesting || !mcpController.status.isRunning)
+                    if let mcpTestResult {
+                        StatusOutcomeLabel(outcome: mcpTestResult,
+                                            successColor: tokens.success)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
+        .onAppear {
+            updatePortFree()
+            refreshInstalledClients()
+        }
+        .onChange(of: settings.mcpPort) { _, _ in updatePortFree() }
+        .onChange(of: mcpController.status.isRunning) { _, _ in
+            // The server status affects isPortFree (a running server holds the
+            // port, which the helper treats as free-for-us). Recompute on change.
+            // McpServerStatus itself is not Equatable, so observe the Bool.
+            updatePortFree()
+        }
+    }
+
+    // MARK: - MCP helpers
+
+    private var mcpStatusColor: Color {
+        switch mcpController.status {
+        case .running:   return .green
+        case .starting:  return .yellow
+        case .stopped:   return .secondary
+        case .portInUse: return .orange
+        case .failed:    return .red
+        }
+    }
+
+    private func updatePortFree() {
+        portFree = mcpController.isPortFree(settings.mcpPort)
+    }
+
+    private func refreshInstalledClients(force: Bool = false) {
+        // Audit finding: shelling out on every tab appearance. Skip when the
+        // cache is still fresh unless the caller forces a refresh (after an
+        // install/uninstall action).
+        let now = Date()
+        if !force && now.timeIntervalSince(lastClientsRefresh) < Self.clientsRefreshTTL {
+            return
+        }
+        lastClientsRefresh = now
+        installedClientsLoading = true
+        // isInstalled(.claudeCode) can spawn a login shell ("zsh -l -c which
+        // claude") and run "claude mcp list", each blocking for hundreds of ms.
+        // Probe off the main thread so opening this tab never freezes the window.
+        Task.detached(priority: .utility) {
+            var found = Set<McpClient>()
+            for client in McpClient.allCases where await McpInstallService.isInstalled(client) {
+                found.insert(client)
+            }
+            await MainActor.run { [found] in
+                mcpInstalledClients = found
+                installedClientsLoading = false
+            }
+        }
+    }
+
+    /// Install or uninstall the client depending on its current state. Runs
+    /// the subprocess async on a detached task so the button does not pin the
+    /// main thread (audit finding: install blocked on a DispatchSemaphore).
+    private func toggleInstall(_ client: McpClient) {
+        let isInstalled = mcpInstalledClients.contains(client)
+        installingClients.insert(client)
+        let port = settings.mcpPort
+        Task.detached(priority: .utility) {
+            let result: Result<String, Error> = isInstalled
+                ? await McpInstallService.remove(client)
+                : await McpInstallService.install(client, port: port)
+            await MainActor.run {
+                installingClients.remove(client)
+                switch result {
+                case .success(let msg):
+                    mcpInstallOutcome = StatusOutcome(succeeded: true, message: msg)
+                    // Force a refresh so the row reflects the new state immediately.
+                    refreshInstalledClients(force: true)
+                case .failure(let err):
+                    mcpInstallOutcome = StatusOutcome(succeeded: false, message: err.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func mcpTest() {
+        mcpTesting = true
+        mcpTestResult = nil
+        McpServerController.shared.testConnection { result in
+            switch result {
+            case .success(let count):
+                mcpTestResult = StatusOutcome(
+                    succeeded: true,
+                    message: count > 0
+                        ? "Connected. \(count) tool\(count == 1 ? "" : "s") available."
+                        : "Connected.")
+            case .failure(let err):
+                mcpTestResult = StatusOutcome(succeeded: false, message: err.localizedDescription)
+            }
+            mcpTesting = false
+        }
     }
 
     /// True when the iCloud service has reported a sync write failure. The

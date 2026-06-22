@@ -6,6 +6,10 @@ import SwiftUI
 /// and hyphens into dashes: no rich-text round-trip, no smart substitutions.
 struct PlainTextEditor: NSViewRepresentable {
     @Binding var text: String
+    // Optional accessibility label so VoiceOver announces the field's purpose
+    // instead of only the raw text. Defaults to nil so existing callers that
+    // do not pass a label compile unchanged.
+    var accessibilityLabel: String? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -28,6 +32,12 @@ struct PlainTextEditor: NSViewRepresentable {
         textView.autoresizingMask = [.width]
         textView.delegate = context.coordinator
         textView.string = text
+        // Apply the accessibility label if one was supplied so screen readers
+        // announce the field's purpose (e.g. "Script body") rather than only
+        // reading the raw text content.
+        if let label = accessibilityLabel {
+            textView.setAccessibilityLabel(label)
+        }
 
         return scrollView
     }
@@ -36,6 +46,10 @@ struct PlainTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         if textView.string != text {
             textView.string = text
+        }
+        // Keep the label in sync if a caller re-renders with a different one.
+        if let label = accessibilityLabel, textView.accessibilityLabel() != Optional(label) {
+            textView.setAccessibilityLabel(label)
         }
     }
 

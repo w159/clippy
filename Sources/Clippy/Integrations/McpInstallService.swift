@@ -26,22 +26,45 @@ enum McpInstallService {
 
     /// Write (or merge) the Clippy MCP entry for the given client.
     /// Idempotent: calling twice leaves one entry. Existing servers are preserved.
-    /// Returns a human-readable message on success, or an error.
-    static func install(_ client: McpClient, port: Int) -> Result<String, Error> {
+    /// Async so the caller can run it off the main thread (audit finding: the old
+    /// sync path blocked a background thread on a DispatchSemaphore to bridge the
+    /// async subprocess API; we now surface the async API directly).
+    static func install(_ client: McpClient, port: Int) async -> Result<String, Error> {
         switch client {
         case .claudeDesktop: return installClaudeDesktop(port: port)
-        case .claudeCode:    return installClaudeCode(port: port)
+        case .claudeCode:    return await installClaudeCode(port: port)
         case .vscode:        return installVSCode(port: port)
+        }
+    }
+
+    // MARK: Uninstall
+
+    /// Remove the Clippy MCP entry for the given client. Idempotent: a missing
+    /// entry is reported as success with a "not installed" note. Audit finding:
+    /// there was no uninstall path.
+    static func remove(_ client: McpClient) async -> Result<String, Error> {
+        switch client {
+        case .claudeDesktop: return removeServer(name: "clippy", topKey: "mcpServers",
+                                                  fileURL: claudeDesktopConfigURL,
+                                                  successMessage: "Removed from \(claudeDesktopConfigURL.path). Restart Claude Desktop to apply.")
+        case .claudeCode:    return await removeClaudeCode()
+        case .vscode:        return removeServer(name: "clippy", topKey: "servers",
+                                                  fileURL: vscodeConfigURL,
+                                                  successMessage: "Removed from \(vscodeConfigURL.path). Reload VS Code to apply.")
         }
     }
 
     // MARK: Is installed
 
     /// Best-effort check that a "clippy" entry already exists for the client.
-    static func isInstalled(_ client: McpClient) -> Bool {
+    /// Async so the Claude Code probe can run `claude mcp list` through the
+    /// async subprocess API without pinning a thread on a semaphore (audit
+    /// finding). The SettingsView probe loop already runs in a Task.detached,
+    /// so awaiting here is natural.
+    static func isInstalled(_ client: McpClient) async -> Bool {
         switch client {
         case .claudeDesktop: return checkClaudeDesktop()
-        case .claudeCode:    return checkClaudeCode()
+        case .claudeCode:    return await checkClaudeCode()
         case .vscode:        return checkVSCode()
         }
     }
@@ -97,10 +120,10 @@ enum McpInstallService {
         return home.appendingPathComponent(".claude.json")
     }
 
-    private static func installClaudeCode(port: Int) -> Result<String, Error> {
+    private static func installClaudeCode(port: Int) async -> Result<String, Error> {
         // Prefer the CLI: claude mcp add --transport http clippy <url> -s user
         if let claudePath = findClaudeBinary() {
-            let result = runCLI(claudePath, args: [
+            let result = await runCLI(claudePath, args: [
                 "mcp", "add",
                 "--transport", "http",
                 "clippy",
@@ -126,10 +149,26 @@ enum McpInstallService {
                            successMessage: "Registered in \(url.path). Restart Claude Code to apply.")
     }
 
-    private static func checkClaudeCode() -> Bool {
-        // Try claude mcp list first
+    private static func removeClaudeCode() async -> Result<String, Error> {
+        // Prefer the CLI: claude mcp remove clippy -s user
+        if let claudePath = findClaudeBinary() {
+            let result = await runCLI(claudePath, args: ["mcp", "remove", "clippy", "-s", "user"])
+            switch result {
+            case .success(let output):
+                let msg = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                return .success(msg.isEmpty ? "Removed from Claude Code (user scope)." : msg)
+            case .failure:
+                break // fall through to JSON fallback
+            }
+        }
+        return removeServer(name: "clippy", topKey: "mcpServers", fileURL: claudeCodeConfigURL,
+                            successMessage: "Removed from \(claudeCodeConfigURL.path). Restart Claude Code to apply.")
+    }
+
+    private static func checkClaudeCode() async -> Bool {
+        // Try claude mcp list first through the async subprocess API.
         if let claudePath = findClaudeBinary(),
-           case .success(let output) = runCLI(claudePath, args: ["mcp", "list"]),
+           case .success(let output) = await runCLI(claudePath, args: ["mcp", "list"]),
            output.contains("clippy") {
             return true
         }
@@ -148,25 +187,19 @@ enum McpInstallService {
 
     // MARK: - CLI runner
 
-    private static func runCLI(_ path: String, args: [String]) -> Result<String, Error> {
-        // Subprocess.run is async; runCLI is called from synchronous install paths,
-        // so we block a background thread here. The call sites already run off-main.
-        var result: Result<String, Error> = .failure(McpInstallError.cliFailed("not started"))
-        let sem = DispatchSemaphore(value: 0)
-        Task.detached {
-            let output = await Subprocess.run(path, args)
-            if output.succeeded {
-                result = .success(output.stdout)
-            } else {
-                result = .failure(McpInstallError.cliFailed(output.stderr))
-            }
-            sem.signal()
+    /// Async subprocess runner. Audit finding: the old runCLI blocked a thread
+    /// on a DispatchSemaphore to bridge the async Subprocess.run into a sync
+    /// Result; we now expose the async API directly so install/uninstall callers
+    /// can await it without pinning a thread.
+    private static func runCLI(_ path: String, args: [String]) async -> Result<String, Error> {
+        let output = await Subprocess.run(path, args)
+        if output.succeeded {
+            return .success(output.stdout)
         }
-        sem.wait()
-        return result
+        return .failure(McpInstallError.cliFailed(output.stderr))
     }
 
-    // MARK: - JSON merge helpers
+    // MARK: - JSON merge/remove helpers
 
     /// Read the file (or start with empty dict), merge serverName under topKey,
     /// write back as pretty-printed JSON.
@@ -198,6 +231,35 @@ enum McpInstallService {
             let data = try JSONSerialization.data(withJSONObject: root,
                                                   options: [.prettyPrinted, .sortedKeys])
             try data.write(to: fileURL, options: .atomic)
+            return .success(successMessage)
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Remove serverName from topKey in the file. Succeeds (with successMessage)
+    /// even when the entry was not present, so uninstall is idempotent.
+    private static func removeServer(
+        name: String,
+        topKey: String,
+        fileURL: URL,
+        successMessage: String
+    ) -> Result<String, Error> {
+        do {
+            guard FileManager.default.fileExists(atPath: fileURL.path),
+                  let data = try? Data(contentsOf: fileURL),
+                  let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return .success(successMessage)
+            }
+            var root = parsed
+            if var servers = root[topKey] as? [String: Any] {
+                servers.removeValue(forKey: name)
+                root[topKey] = servers
+            }
+            let out = try JSONSerialization.data(withJSONObject: root,
+                                                 options: [.prettyPrinted, .sortedKeys])
+            try out.write(to: fileURL, options: .atomic)
             return .success(successMessage)
         } catch {
             return .failure(error)

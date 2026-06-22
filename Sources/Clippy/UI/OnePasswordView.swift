@@ -50,6 +50,7 @@ struct OnePasswordView: View {
                 Image(systemName: "plus").symbolRenderingMode(.hierarchical)
             }
                 .help("New secret")
+                .accessibilityLabel("New secret")
             Button { reload() } label: {
                 Image(systemName: "arrow.clockwise")
                     .symbolRenderingMode(.hierarchical)
@@ -58,6 +59,7 @@ struct OnePasswordView: View {
                     .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
             }
                 .help("Refresh")
+                .accessibilityLabel("Refresh")
                 .disabled(loading)
         }
         .padding(10)
@@ -75,13 +77,13 @@ struct OnePasswordView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if creating { newSecretForm }
                     if let status {
-                        Text(status).font(.caption).foregroundStyle(.secondary)
+                        Text(status).font(.caption).foregroundStyle(tokens.textSecondary)
                     }
                     if loading {
                         ProgressView().controlSize(.small)
                     } else if items.isEmpty {
                         Text("No secrets in this vault yet. Use + to add one.")
-                            .font(.callout).foregroundStyle(.secondary)
+                            .font(.callout).foregroundStyle(tokens.textSecondary)
                     } else {
                         ForEach(items) { item in
                             itemRow(item)
@@ -150,6 +152,11 @@ struct OnePasswordView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(isExpanded ? "expanded" : "collapsed")
+        .accessibilityHint("Shows or hides the fields for this item.")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Item detail panel (expanded)
@@ -160,7 +167,7 @@ struct OnePasswordView: View {
             if detailLoading {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Loading fields...").font(.caption).foregroundStyle(.secondary)
+                    Text("Loading fields...").font(.caption).foregroundStyle(tokens.textSecondary)
                 }
                 .padding(.horizontal, 8)
             } else if let detailError {
@@ -189,7 +196,7 @@ struct OnePasswordView: View {
             if let section {
                 Text(section.label)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(tokens.textSecondary)
                     .padding(.horizontal, 4)
                     .padding(.top, 4)
             }
@@ -208,7 +215,7 @@ struct OnePasswordView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(tokens.textSecondary)
             Text(title).font(PanelTypography.body(settings).weight(.semibold))
-            Text(detail).font(PanelTypography.metadata(settings)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(detail).font(PanelTypography.metadata(settings)).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
@@ -311,7 +318,7 @@ private struct FieldRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(field.label)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(tokens.textSecondary)
                 fieldValueView
             }
             Spacer(minLength: 8)
@@ -332,7 +339,7 @@ private struct FieldRow: View {
         if field.type.isOTP {
             Text("TOTP - fetched on copy")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(tokens.textSecondary)
                 .italic()
         } else if field.type.isConcealed {
             if revealed, let v = field.value {
@@ -343,7 +350,7 @@ private struct FieldRow: View {
                 HStack(spacing: 4) {
                     Text(String(repeating: "\u{2022}", count: 8))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(tokens.textSecondary)
                     Button {
                         revealed.toggle()
                     } label: {
@@ -356,6 +363,10 @@ private struct FieldRow: View {
                     }
                     .buttonStyle(.plain)
                     .help(revealed ? "Hide" : "Reveal")
+                    // Expose reveal state to VoiceOver so the button's purpose
+                    // is clear without seeing the eye/eye.slash glyph swap.
+                    .accessibilityLabel(revealed ? "Hide" : "Reveal")
+                    .accessibilityValue(revealed ? "shown" : "hidden")
                 }
             }
         } else if let v = field.value {
@@ -366,7 +377,7 @@ private struct FieldRow: View {
         } else {
             Text("(empty)")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(tokens.textSecondary)
                 .italic()
         }
 

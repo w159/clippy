@@ -13,9 +13,30 @@ struct AIProviderConfig {
 /// Shared JSON POST used by every HTTP provider. Throws a typed AIError on a
 /// non-2xx so the UI can show a readable message.
 enum AIHTTP {
+    /// POST with a transient-error retry wrapper (audit [MEDIUM]). Up to
+    /// `AIRetry.maxAttempts` tries with jittered backoff on retryable statuses.
     static func post(url urlString: String,
                      headers: [String: String],
                      body: [String: Any]) async throws -> Data {
+        var attempt = 0
+        while true {
+            do {
+                return try await postSingle(url: urlString, headers: headers, body: body)
+            } catch {
+                attempt += 1
+                if attempt < AIRetry.maxAttempts && AIRetry.isTransient(error) {
+                    try? await Task.sleep(for: .milliseconds(AIRetry.backoffMs(attempt)))
+                    continue
+                }
+                throw error
+            }
+        }
+    }
+
+    /// One-shot POST with no retry. Separated so `post` can wrap it.
+    private static func postSingle(url urlString: String,
+                                   headers: [String: String],
+                                   body: [String: Any]) async throws -> Data {
         guard let url = URL(string: urlString) else { throw AIError.badURL(urlString) }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

@@ -11,25 +11,139 @@ struct ScriptsView: View {
 
     @State private var selection: UUID?
     @State private var editing = Script(name: "")
-    @State private var running = false
+    /// Script currently being run (keyed by id so a stale Task cannot paint its
+    /// output under the wrong script after the user switches selection).
+    @State private var runningScriptID: UUID?
+    @State private var runTask: Task<Void, Never>?
     @State private var result: ScriptResult?
-    @State private var confirmRun = false
     @State private var draggingOverScriptID: String?
+    @State private var searchQuery = ""
+    // Dirty-discard gate: when the user switches scripts with unsaved edits, ask
+    // before replacing the editor contents.
+    @State private var pendingNav: PendingNav?
+    // Single dialog driver. Consolidating run/discard/delete into one enum-driven
+    // confirmationDialog avoids the "only one .confirmationDialog fires" pitfall
+    // when several are stacked on the same view.
+    @State private var activeDialog: Dialog?
+    // Save feedback (success banner / error banner with Retry).
+    @State private var saveOutcome: SaveOutcome?
+
+    private enum PendingNav: Equatable { case select(UUID), newScript }
+    private enum SaveOutcome: Equatable { case saved, failed }
+    private enum Dialog: Equatable { case run, discard, delete }
+
+    /// True when the editor holds edits that differ from the stored script
+    /// (or, for an unsaved script, when any field has content). Drives the
+    /// discard-confirmation gate on selection change.
+    private var isDirty: Bool {
+        if let stored = store.script(id: editing.id) {
+            return stored.name != editing.name
+                || stored.interpreter != editing.interpreter
+                || stored.body != editing.body
+                || stored.feedsClipboard != editing.feedsClipboard
+                || stored.outputToClipboard != editing.outputToClipboard
+        }
+        return !editing.name.isEmpty || !editing.body.isEmpty
+    }
+
+    private var isRunning: Bool { runningScriptID == editing.id }
+
+    private var filteredScripts: [Script] {
+        let q = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return store.scripts }
+        return store.scripts.filter { $0.name.localizedCaseInsensitiveContains(q) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            editor
+            if store.scripts.isEmpty {
+                emptyState
+            } else {
+                editor
+            }
         }
-        .onAppear { if store.scripts.isEmpty { newScript() } else { select(store.scripts.first?.id) } }
-        .confirmationDialog("Run \"\(editing.name.isEmpty ? "Untitled" : editing.name)\"?",
-                            isPresented: $confirmRun, titleVisibility: .visible) {
-            Button("Run", role: .destructive) { run() }
-            Button("Cancel", role: .cancel) {}
+        // Do not auto-create a blank script on appear (the audit flagged that it
+        // suppressed the true empty state). Show the empty state instead; the +
+        // button creates the first script on demand.
+        .onAppear { select(store.scripts.first?.id) }
+        .confirmationDialog(
+            dialogTitle,
+            isPresented: Binding(
+                get: { activeDialog != nil },
+                set: { if !$0 { activeDialog = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            switch activeDialog {
+            case .run:
+                Button("Run", role: .destructive) { performRun(); activeDialog = nil }
+                Button("Cancel", role: .cancel) { activeDialog = nil }
+            case .discard:
+                Button("Discard", role: .destructive) {
+                    if let nav = pendingNav {
+                        switch nav {
+                        case .select(let id): performSelect(id)
+                        case .newScript: performNew()
+                        }
+                    }
+                    pendingNav = nil
+                    activeDialog = nil
+                }
+                Button("Cancel", role: .cancel) { pendingNav = nil; activeDialog = nil }
+            case .delete:
+                Button("Delete", role: .destructive) { performDelete(); activeDialog = nil }
+                Button("Cancel", role: .cancel) { activeDialog = nil }
+            case nil:
+                EmptyView()
+            }
         } message: {
-            Text("This executes code on your Mac with your user permissions.")
+            switch activeDialog {
+            case .run:
+                Text("This executes code on your Mac with your user permissions.")
+            case .discard:
+                Text("Switching scripts will lose your edits to the current one.")
+            case .delete:
+                Text("This removes the script from your saved list. This cannot be undone.")
+            case nil:
+                EmptyView()
+            }
         }
+    }
+
+    private var dialogTitle: String {
+        switch activeDialog {
+        case .run:
+            return "Run \"\(editing.name.isEmpty ? "Untitled" : editing.name)\"?"
+        case .discard:
+            return "Discard unsaved changes?"
+        case .delete:
+            let name = store.script(id: selection ?? UUID())?.name ?? "Untitled"
+            return "Delete \"\(name)\"?"
+        case nil:
+            return ""
+        }
+    }
+
+    // MARK: - Empty state (#16: show a real empty state instead of auto-creating)
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "applepencil.on.rectangle")
+                .font(.system(size: 30, weight: .light))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tokens.textSecondary)
+            Text("No scripts yet")
+                .font(.headline)
+                .foregroundStyle(tokens.textPrimary)
+            Text("Click + to create a script, then run it from here or the panel.")
+                .font(.subheadline)
+                .foregroundStyle(tokens.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Header (script list + add/delete)
@@ -49,7 +163,32 @@ struct ScriptsView: View {
             }
             .padding(10)
             Divider()
-            // Reorderable script list replaces the Picker so rows can be dragged.
+            // Search field above the list so a long script list can be narrowed.
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(tokens.textSecondary)
+                TextField("Search scripts", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(tokens.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear search")
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            Divider()
+            // Reorderable script list. Rows are Buttons (keyboard-focusable and
+            // VoiceOver-announced as actionable); the drag handle carries
+            // .reorderDraggable so it does not compete with the Button's tap.
             ScrollView {
                 LazyVStack(spacing: 2) {
                     // "New script" row mirrors the old Picker's nil-tag entry.
@@ -73,46 +212,52 @@ struct ScriptsView: View {
                     }
                     .buttonStyle(.plain)
 
-                    ForEach(store.scripts) { script in
-                        // Plain HStack instead of Button so that .draggable
-                        // can start a drag on macOS. A Button's tap gesture
-                        // takes priority over .draggable on macOS 14, making
-                        // drags nearly impossible to initiate. onTapGesture
-                        // fires on click without competing with drag recognition.
-                        HStack {
-                            Text(script.name.isEmpty ? "Untitled" : script.name)
-                                .font(.body)
-                                .foregroundStyle(
-                                    selection == script.id
-                                        ? Color.accentColor
-                                        : tokens.textPrimary
-                                )
-                                .lineLimit(1)
-                            Spacer()
-                            Text(script.interpreter.displayName)
-                                .font(.caption2)
-                                .foregroundStyle(tokens.textSecondary)
+                    ForEach(filteredScripts) { script in
+                        Button {
+                            select(script.id)
+                        } label: {
+                            HStack(spacing: 6) {
+                                // Explicit drag handle so .draggable does not fight
+                                // the Button's tap. The whole row stays a Button for
+                                // keyboard focus and VoiceOver "actionable" role.
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(tokens.textSecondary)
+                                    .reorderDraggable(id: script.id.uuidString)
+                                    .help("Drag to reorder")
+                                Text(script.name.isEmpty ? "Untitled" : script.name)
+                                    .font(.body)
+                                    .foregroundStyle(
+                                        selection == script.id
+                                            ? Color.accentColor
+                                            : tokens.textPrimary
+                                    )
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(script.interpreter.displayName)
+                                    .font(.caption2)
+                                    .foregroundStyle(tokens.textSecondary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(
+                                selection == script.id
+                                    ? tokens.cardSurface
+                                    : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .strokeBorder(
+                                        selection == script.id
+                                            ? tokens.cardBorder
+                                            : Color.clear,
+                                        lineWidth: 1
+                                    )
+                            )
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            selection == script.id
-                                ? tokens.cardSurface
-                                : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(
-                                    selection == script.id
-                                        ? tokens.cardBorder
-                                        : Color.clear,
-                                    lineWidth: 1
-                                )
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { select(script.id) }
-                        .reorderDraggable(id: script.id.uuidString)
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selection == script.id ? .isSelected : [])
                         .reorderDropDestination(
                             id: script.id.uuidString,
                             draggingOver: $draggingOverScriptID
@@ -156,16 +301,39 @@ struct ScriptsView: View {
                 HStack {
                     Button("Save") { save() }
                         .disabled(editing.name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    Button(running ? "Running..." : "Run") { confirmRun = true }
-                        .disabled(running || editing.body.isEmpty)
+                    Button(isRunning ? "Running..." : "Run") { activeDialog = .run }
+                        .disabled(isRunning || editing.body.isEmpty)
                     Spacer()
                 }
 
-                if running {
-                    // No cancel yet (out of scope); label clarifies the script is still running.
+                // Save feedback: themed success banner or an error banner with
+                // Retry. ScriptStore.add/update now return whether the write
+                // persisted, so a failed save is surfaced instead of dropped.
+                if let saveOutcome {
+                    HStack(spacing: 6) {
+                        if saveOutcome == .saved {
+                            Label("Saved", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        } else {
+                            Label("Could not save script", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                            Button("Retry") { save() }
+                                .controlSize(.small)
+                        }
+                    }
+                    .font(.caption)
+                }
+
+                if isRunning {
+                    // Cancel path: the Task handle lets us abort a run before the
+                    // 30s timeout. ScriptRunner owns the Process and terminates it
+                    // on Task.cancel().
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.small)
                         Text("Running...").font(.caption).foregroundStyle(tokens.textSecondary)
+                        Spacer()
+                        Button("Cancel") { stopRun() }
+                            .controlSize(.small)
                     }
                     .help("The script is still running.")
                 }
@@ -193,10 +361,17 @@ struct ScriptsView: View {
                         .controlSize(.small)
                 }
             }
-            if !result.stdout.isEmpty { outputBox(result.stdout, mono: true) }
+            // Truncation banner: the runner hit the 5 MB stream ceiling. Distinct
+            // from the display cap applied per box below.
+            if result.truncated {
+                Label("Output truncated: hit the capture ceiling", systemImage: "scissors")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            if !result.stdout.isEmpty { outputBox(ScriptResult.displayCapped(result.stdout), mono: true) }
             if !result.stderr.isEmpty {
                 Text("stderr").font(.caption2).foregroundStyle(tokens.textSecondary)
-                outputBox(result.stderr, mono: true)
+                outputBox(ScriptResult.displayCapped(result.stderr), mono: true)
             }
         }
         .padding(8)
@@ -218,44 +393,100 @@ struct ScriptsView: View {
     // MARK: - Actions
 
     private func newScript() {
+        if isDirty {
+            pendingNav = .newScript
+            activeDialog = .discard
+            return
+        }
+        performNew()
+    }
+
+    private func performNew() {
         editing = Script(name: "")
         selection = nil
         result = nil
     }
 
     private func select(_ id: UUID?) {
+        // Re-clicking the current selection is a no-op; do not prompt to discard.
+        if id == selection { return }
+        if isDirty {
+            pendingNav = id.map { PendingNav.select($0) } ?? .newScript
+            activeDialog = .discard
+            return
+        }
+        performSelect(id)
+    }
+
+    private func performSelect(_ id: UUID?) {
         result = nil
-        guard let id, let script = store.script(id: id) else { newScript(); return }
+        guard let id, let script = store.script(id: id) else {
+            // No selection: blank editor without creating a script.
+            editing = Script(name: "")
+            selection = nil
+            return
+        }
         editing = script
         selection = id
     }
 
     private func save() {
-        if store.script(id: editing.id) != nil {
-            store.update(editing)
+        let wasNew = store.script(id: editing.id) == nil
+        let ok = wasNew ? store.add(editing) : store.update(editing)
+        if ok {
+            saveOutcome = .saved
+            selection = editing.id
         } else {
-            store.add(editing)
+            saveOutcome = .failed
         }
-        selection = editing.id
+        // Auto-clear success after a short delay so the banner does not linger;
+        // a failure stays until the user retries or edits further.
+        if ok {
+            let snapshot = saveOutcome
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                if saveOutcome == snapshot { saveOutcome = nil }
+            }
+        }
     }
 
     private func deleteSelected() {
-        guard let id = selection else { return }
-        store.delete(id: id)
-        newScript()
+        guard selection != nil else { return }
+        activeDialog = .delete
     }
 
-    private func run() {
-        let input = editing.feedsClipboard ? NSPasteboard.general.string(forType: .string) : nil
-        running = true
+    private func performDelete() {
+        guard let id = selection else { return }
+        store.delete(id: id)
+        performNew()
+    }
+
+    private func performRun() {
+        // Capture the script by value so the Task always runs the one the user
+        // launched, even if selection changes mid-run.
+        let scriptToRun = editing
+        let launchedID = editing.id
+        let input = scriptToRun.feedsClipboard ? NSPasteboard.general.string(forType: .string) : nil
+        runningScriptID = launchedID
         result = nil
-        Task {
-            let outcome = await ScriptRunner.run(editing, input: input)
-            await MainActor.run {
-                result = outcome
-                running = false
+        runTask = Task { @MainActor in
+            let outcome = await ScriptRunner.run(scriptToRun, input: input)
+            // Discard stale results so output never renders under the wrong script
+            // after the user switched selection while the run was in flight.
+            guard launchedID == editing.id else {
+                if runningScriptID == launchedID { runningScriptID = nil }
+                return
             }
+            result = outcome
+            runningScriptID = nil
+            runTask = nil
         }
+    }
+
+    private func stopRun() {
+        // Cancelling trips ScriptRunner's cancellation handler, which terminates
+        // the child; the Task then resumes with a result and surfaces it.
+        runTask?.cancel()
     }
 
     private func copyToPasteboard(_ text: String) {

@@ -7,10 +7,19 @@ final class PastePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// Bound by PanelController so Escape routes through hide() (which saves the
+    /// panel origin and remembered size) instead of a bare orderOut(nil) that
+    /// would discard them.
+    var onCancel: (() -> Void)?
+
     override func cancelOperation(_ sender: Any?) {
         let settings = AppSettings.shared
         // Pinned panel ignores all auto-hide triggers, including Escape.
         guard !settings.panelPinned, settings.hideOnEscape else { return }
-        orderOut(nil)
+        if let onCancel {
+            onCancel()
+        } else {
+            orderOut(nil)
+        }
     }
 }

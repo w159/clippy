@@ -27,20 +27,24 @@ final class KeystrokeService {
         let source = CGEventSource(stateID: .combinedSessionState)
 
         DispatchQueue.global(qos: .userInitiated).async {
-            for character in text.unicodeScalars {
-                let scalar = character
-                if scalar == Unicode.Scalar("\n") {
+            // Iterate by Character (extended grapheme cluster), NOT unicodeScalars.
+            // A scalar loop splits combining marks and emoji skin-tone modifiers
+            // into separate events, so "cafe\u{0301}" or a skin-tone emoji types
+            // mangled. Iterating Characters keeps each user-perceived glyph intact
+            // and encodes the whole cluster's UTF-16 in a single key event.
+            for character in text {
+                if character == "\n" {
                     // Newline: post a real Return key so apps that intercept
                     // the Return key (terminal emulators, chat apps) receive it.
                     Self.postKey(CGKeyCode(kVK_Return), source: source)
-                } else if scalar == Unicode.Scalar("\t") {
+                } else if character == "\t" {
                     // Tab: post a real Tab key for form navigation.
                     Self.postKey(CGKeyCode(kVK_Tab), source: source)
                 } else {
-                    // All other characters: encode as UTF-16 and embed directly
-                    // in the event via keyboardSetUnicodeString so the character
+                    // All other characters: encode the cluster as UTF-16 and embed
+                    // directly in the event via keyboardSetUnicodeString so it
                     // arrives unmodified regardless of keyboard layout.
-                    var utf16: [UniChar] = Array(String(scalar).utf16)
+                    var utf16: [UniChar] = Array(String(character).utf16)
                     let len = utf16.count
                     if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
                        let keyUp   = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {

@@ -27,6 +27,10 @@ struct PanelHeaderView: View {
     let onClose: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Dynamic Type: scale the header button glyph with the system text size.
+    // The central PanelTypography fix belongs to Theme (owned separately), so
+    // this is a local adoption for fonts built directly in this view.
+    @ScaledMetric(relativeTo: .body) private var headerButtonSize: CGFloat = 11
 
     private var tokens: ThemeTokens { AppSettings.shared.theme }
     private let settings = AppSettings.shared
@@ -53,7 +57,7 @@ struct PanelHeaderView: View {
                 Spacer(minLength: 0)
                 Button(action: onTogglePin) {
                     Image(systemName: isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: headerButtonSize, weight: .medium))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(isPinned ? tokens.accent : tokens.textSecondary)
                         .frame(width: 20, height: 20)
@@ -65,6 +69,9 @@ struct PanelHeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .help(isPinned ? "Unpin panel" : "Pin panel")
+                .accessibilityLabel(isPinned ? "Unpin panel" : "Pin panel")
+                .accessibilityValue(isPinned ? "pinned" : "not pinned")
+                .accessibilityHint("Keeps the panel visible when you click elsewhere.")
                 headerButton(systemName: "gearshape",
                              help: "Settings", action: onOpenSettings)
                 headerButton(systemName: "xmark",
@@ -82,7 +89,7 @@ struct PanelHeaderView: View {
                               action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: headerButtonSize, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(tokens.textSecondary)
                 .frame(width: 20, height: 20)
@@ -90,5 +97,6 @@ struct PanelHeaderView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
     }
 }

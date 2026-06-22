@@ -38,6 +38,17 @@ struct ClipCardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
+    /// When the quick-action buttons are visible and hit-testable. Basing this
+    /// on selection (not just hover) makes the actions reachable for keyboard
+    /// users, who navigate by moving the selection rather than hovering. The
+    /// buttons themselves are real Buttons, so once visible they are
+    /// keyboard-focusable and activatable with Space/Return.
+    private var showsActions: Bool { isHovering || isSelected }
+    // Dynamic Type: scale the placeholder glyph size with system text size.
+    // The central PanelTypography fix belongs to Theme (owned separately); this
+    // is a local adoption for fonts built directly in this view.
+    @ScaledMetric(relativeTo: .body) private var placeholderIconSize: CGFloat = 24
+
     private var tokens: ThemeTokens { settings.theme }
 
     /// Icon point size derived from the user's base font so glyphs scale with
@@ -163,8 +174,16 @@ struct ClipCardView: View {
             .onHover { hovering in
                 isHovering = hovering
                 // The whole card is clickable; show the hand cursor so that
-                // affordance is discoverable.
-                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                // affordance is discoverable. Guard against NSCursor stack
+                // imbalance when the mouse moves directly between two cards
+                // (card B's enter-push can land before card A's exit-pop): only
+                // push when the current cursor is not already the pointing hand,
+                // and only pop when the current cursor is the pointing hand.
+                if hovering, NSCursor.current !== NSCursor.pointingHand {
+                    NSCursor.pointingHand.push()
+                } else if !hovering, NSCursor.current === NSCursor.pointingHand {
+                    NSCursor.pop()
+                }
             }
         // Whole card area hit-testable so taps land anywhere on the card.
         .contentShape(Rectangle())
@@ -172,6 +191,12 @@ struct ClipCardView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
         .accessibilityAddTraits(.isButton)
+        // Expose selection state so VoiceOver announces "selected" when the
+        // card is in the active multi-selection (replicates CategorySidePane's
+        // .isSelected pattern). Combined with .isButton above.
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityValue(isSelected ? "selected" : "not selected")
+        .accessibilityHint(isPinned ? "Pinned clip. Activate to paste." : "Activate to paste.")
     }
 
     private var accessibilitySummary: String {
@@ -193,15 +218,25 @@ struct ClipCardView: View {
 
             Spacer(minLength: 4)
 
-            // Keep metadata and actions in the same trailing slot (overlay, not
-            // swap) so hovering does not shift layout or hide the timestamp.
-            // The metadata stays mounted underneath and only fades out.
+            // Keep category dots and rich-text/pin badges mounted during hover
+            // so the card never loses context; only the timestamp moves out of
+            // the way for the quick-action buttons. The badges stay visible at
+            // reduced opacity so they do not fight the hover actions for
+            // attention but are still readable. (Audit: hover swaps out dots
+            // and rich indicator, losing persistent context.)
             ZStack(alignment: .trailing) {
-                trailingMetadata
-                    .opacity(isHovering ? 0 : 1)
+                HStack(spacing: 6) {
+                    categoryDots
+                    kindIndicator
+                    richIndicator
+                    pinBadge
+                    timestampText
+                        .opacity(showsActions ? 0 : 1)
+                }
+                .opacity(showsActions ? 0.35 : 1)
                 hoverActions
-                    .opacity(isHovering ? 1 : 0)
-                    .allowsHitTesting(isHovering)
+                    .opacity(showsActions ? 1 : 0)
+                    .allowsHitTesting(showsActions)
             }
         }
         // minHeight lets the row grow with larger fonts instead of clipping.
@@ -273,6 +308,7 @@ struct ClipCardView: View {
             initialText: clip.userTitle ?? clip.displayTitle,
             font: PanelTypography.nsTitleFont(settings),
             textColor: NSColor(tokens.textPrimary),
+            accessibilityLabel: "Rename clip",
             onCommit: { commitRename($0) },
             onCancel: { cancelRename() }
         )
@@ -290,7 +326,14 @@ struct ClipCardView: View {
     }
 
     private var renameFieldFill: Color {
-        tokens.isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.08)
+        // Theme-derived fill so the rename field never relies on hardcoded
+        // Color.white/Color.black (which bypassed the token system and could
+        // break custom themes). Uses the primary text color at low opacity: on
+        // dark themes textPrimary is light so the field reads as a light tint
+        // on the dark card; on light themes textPrimary is dark so the field
+        // reads as a dark tint on the light card. Opposite-luminance is
+        // preserved without hardcoded Color literals.
+        tokens.textPrimary.opacity(tokens.isDark ? 0.16 : 0.08)
     }
 
     private func beginRename() {
@@ -374,17 +417,27 @@ struct ClipCardView: View {
         try? proc.run()
     }
 
-    private var trailingMetadata: some View {
-        HStack(spacing: 6) {
-            ForEach(Array(categoryColors.prefix(3).enumerated()), id: \.offset) { _, color in
-                Circle()
-                    .fill(color)
-                    .frame(width: 9, height: 9)
-            }
-            Image(systemName: kind.iconName)
-                .font(.system(size: iconSize, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(kind.tint)
+    // MARK: - Trailing metadata pieces
+    // Split out from the former single trailingMetadata so the hover behavior
+    // can keep the contextual badges mounted while hiding only the timestamp.
+
+    private var categoryDots: some View {
+        ForEach(Array(categoryColors.prefix(3).enumerated()), id: \.offset) { _, color in
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+        }
+    }
+
+    private var kindIndicator: some View {
+        Image(systemName: kind.iconName)
+            .font(.system(size: iconSize, weight: .semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(kind.tint)
+    }
+
+    private var richIndicator: some View {
+        Group {
             if clip.isRich {
                 Image(systemName: "textformat")
                     .font(.system(size: iconSize))
@@ -392,6 +445,11 @@ struct ClipCardView: View {
                     .foregroundStyle(tokens.textSecondary)
                     .help("Has rich formatting")
             }
+        }
+    }
+
+    private var pinBadge: some View {
+        Group {
             if isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: iconSize))
@@ -400,11 +458,14 @@ struct ClipCardView: View {
                     // Bounce when a card becomes pinned so the toggle is felt.
                     .symbolEffect(.bounce, value: reduceMotion ? false : isPinned)
             }
-            Text(clip.createdAt, format: Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow))
-                .font(PanelTypography.metadata(settings))
-                .foregroundStyle(tokens.textSecondary)
-                .monospacedDigit()
         }
+    }
+
+    private var timestampText: some View {
+        Text(clip.createdAt, format: Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow))
+            .font(PanelTypography.metadata(settings))
+            .foregroundStyle(tokens.textSecondary)
+            .monospacedDigit()
     }
 
     private var hoverActions: some View {
@@ -527,7 +588,7 @@ struct ClipCardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 } else {
                     Image(systemName: "photo")
-                        .font(.system(size: 24, weight: .light))
+                        .font(.system(size: placeholderIconSize, weight: .light))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(tokens.textSecondary)
                         .frame(width: 72, height: 48)
@@ -545,7 +606,7 @@ struct ClipCardView: View {
     private var filePreview: some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: clip.contentText.hasSuffix(".zip") ? "doc.zipper" : "doc")
-                .font(.system(size: 24, weight: .light))
+                .font(.system(size: placeholderIconSize, weight: .light))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(kind.tint)
                 .frame(width: 28, height: 28)

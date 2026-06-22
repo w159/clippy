@@ -10,7 +10,7 @@ import AppKit
 /// a clip is pinned when it belongs to at least one category.
 final class ClipStore: ObservableObject {
     @Published var query: String = "" {
-        didSet { refilter() }
+        didSet { scheduleRefilter() }
     }
     @Published private(set) var clips: [Clip] = []
     @Published private(set) var categories: [Category] = []
@@ -19,10 +19,17 @@ final class ClipStore: ObservableObject {
     /// Reflects clip_category.sortOrder so category panes can present clips
     /// in user-defined order rather than global createdAt order.
     @Published private(set) var categoryClipOrder: [Int64: [Int64]] = [:]
+    /// Last search failure. Non-nil triggers an error banner with Retry in the
+    /// panel. Cleared on the next successful search or when the query empties.
+    @Published var searchError: String?
+    /// Last DB observation failure. Non-nil triggers an error banner with a
+    /// Retry that re-starts the ValueObservation pipelines.
+    @Published var observationError: String?
 
     private var recents: [Clip] = [] {
         didSet { refilter() }
     }
+    private var searchDebounce: Task<Void, Never>?
     private var clipsCancellable: AnyDatabaseCancellable?
     private var categoriesCancellable: AnyDatabaseCancellable?
     private let database: ClipDatabase
@@ -30,6 +37,15 @@ final class ClipStore: ObservableObject {
 
     init(database: ClipDatabase) {
         self.database = database
+        startObservations()
+    }
+
+    /// (Re)start both ValueObservation pipelines. Called once from init and again
+    /// from retryObservation() when a prior pipeline failed and the user taps
+    /// Retry. Cancels any existing cancellables first so it is idempotent.
+    private func startObservations() {
+        clipsCancellable?.cancel()
+        categoriesCancellable?.cancel()
         let limit = displayLimit
         // Two observations on purpose: clips churn on every copy, while categories
         // and membership change rarely; separating them avoids refetching the clip
@@ -54,11 +70,16 @@ final class ClipStore: ObservableObject {
         clipsCancellable = clipObservation.start(
             in: database.dbQueue,
             scheduling: .immediate,
-            onError: { error in
+            onError: { [weak self] error in
                 ClippyLog.error("Clip observation failed: \(error)", category: ClippyLog.storage)
+                DispatchQueue.main.async { self?.observationError = error.localizedDescription }
             },
             onChange: { [weak self] clips in
-                self?.recents = clips
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    self.observationError = nil
+                    self.recents = clips
+                }
             }
         )
 
@@ -85,15 +106,33 @@ final class ClipStore: ObservableObject {
         categoriesCancellable = categoryObservation.start(
             in: database.dbQueue,
             scheduling: .async(onQueue: .main),
-            onError: { error in
+            onError: { [weak self] error in
                 ClippyLog.error("Category observation failed: \(error)", category: ClippyLog.storage)
+                DispatchQueue.main.async { self?.observationError = error.localizedDescription }
             },
             onChange: { [weak self] categories, map, order in
-                self?.categories = categories
-                self?.membership = map
-                self?.categoryClipOrder = order
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    self.observationError = nil
+                    self.categories = categories
+                    self.membership = map
+                    self.categoryClipOrder = order
+                }
             }
         )
+    }
+
+    /// Re-run the search immediately. Bound to the Retry button on the search
+    /// error banner; clears the error if the search now succeeds.
+    func retrySearch() {
+        refilter()
+    }
+
+    /// Tear down and re-start the DB observation pipelines. Bound to the Retry
+    /// button on the observation error banner.
+    func retryObservation() {
+        observationError = nil
+        startObservations()
     }
 
     // MARK: - Memory pressure
@@ -190,19 +229,26 @@ final class ClipStore: ObservableObject {
 
     /// Clips for a category in user-defined sortOrder. Uses the categoryClipOrder
     /// map so the result is instantly consistent with the live observation.
+    /// When a search query is active, the result is further filtered in-memory
+    /// so the search bar scopes to the pane the user is viewing.
     func clipsForCategory(_ categoryID: Int64) -> [Clip] {
         // Source from `recents` (every categorized clip, unconditionally) rather
         // than `clips` (overwritten by FTS search results): otherwise an active
         // global search query makes category members that do not match the query
         // vanish from their own category pane.
-        guard let orderedIDs = categoryClipOrder[categoryID] else {
-            return recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
+        let ordered: [Clip]
+        if let orderedIDs = categoryClipOrder[categoryID] {
+            let clipByID = Dictionary(uniqueKeysWithValues: recents.compactMap { c -> (Int64, Clip)? in
+                guard let id = c.id else { return nil }
+                return (id, c)
+            })
+            ordered = orderedIDs.compactMap { clipByID[$0] }
+        } else {
+            ordered = recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
         }
-        let clipByID = Dictionary(uniqueKeysWithValues: recents.compactMap { c -> (Int64, Clip)? in
-            guard let id = c.id else { return nil }
-            return (id, c)
-        })
-        return orderedIDs.compactMap { clipByID[$0] }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return ordered }
+        return ordered.filter { $0.matchesLocally(query: trimmed) }
     }
 
     /// Move a clip to a new position within a category (drag-to-reorder).
@@ -304,12 +350,54 @@ final class ClipStore: ObservableObject {
         return categories.first { $0.id.map { ids.contains($0) } ?? false }
     }
 
+    /// Debounced entry from `query.didSet`. An empty query refilters
+    /// immediately (so clearing search feels instant); a non-empty query waits
+    /// ~180ms for the user to stop typing, coalescing rapid keystrokes into one
+    /// FTS5 read instead of one per character on the main thread.
+    private func scheduleRefilter() {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchDebounce?.cancel()
+        if trimmed.isEmpty {
+            // Immediate: clearing search should never feel laggy.
+            searchError = nil
+            clips = recents
+            return
+        }
+        searchDebounce = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.refilter()
+        }
+    }
+
     private func refilter() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
+            searchError = nil
             clips = recents
-        } else {
-            clips = (try? database.searchClips(matching: trimmed, limit: displayLimit)) ?? []
+            return
         }
+        do {
+            clips = try database.searchClips(matching: trimmed, limit: displayLimit)
+            searchError = nil
+        } catch {
+            ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
+            // Keep the last results on screen rather than wiping to empty; the
+            // banner carries the failure and a Retry action.
+            searchError = error.localizedDescription
+        }
+    }
+}
+
+extension Clip {
+    /// Case-insensitive in-memory substring match against the clip's text and
+    /// title, used to scope the search field to the active category pane (FTS5
+    /// only runs against the global history window).
+    func matchesLocally(query: String) -> Bool {
+        let needle = query.lowercased()
+        if contentText.lowercased().contains(needle) { return true }
+        if let title = userTitle, title.lowercased().contains(needle) { return true }
+        if let app = sourceAppName, app.lowercased().contains(needle) { return true }
+        return false
     }
 }

@@ -31,8 +31,16 @@ struct ThemedPanelBackground: View {
     let tokens: ThemeTokens
     let opacity: Double
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
-        if opacity >= 0.999 {
+        if opacity >= 0.999 || reduceTransparency {
+            // At full opacity, or when the user has enabled Reduce Transparency
+            // (System Settings > Accessibility > Display), render the solid
+            // theme color and skip the blur. The blur layer depends on desktop
+            // content showing through; reduce-transparency users explicitly opt
+            // out of that, so we honor the preference and render tokens.panel at
+            // full opacity for guaranteed legible contrast.
             tokens.panel
         } else {
             ZStack {

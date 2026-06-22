@@ -51,9 +51,9 @@ final class AIAssistantViewModel: ObservableObject {
     func send() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        inputText = ""
 
-        // Validate configuration before touching the network.
+        // Audit [HIGH]: validate config BEFORE clearing the prompt so a
+        // misconfigured provider does not discard the user's typed text.
         switch AIService.fromSettings() {
         case .failure(let err):
             state = .notConfigured(err.localizedDescription)
@@ -61,6 +61,7 @@ final class AIAssistantViewModel: ObservableObject {
         case .success:
             break
         }
+        inputText = ""
 
         let settings = AppSettings.shared
         // Build an AIAgentProvider from the same settings used by AIService.
@@ -163,6 +164,23 @@ final class AIAssistantViewModel: ObservableObject {
 
     func clearConversation() { stop(); messages = []; state = .ready; inputText = "" }
 
+    // MARK: - Retry
+
+    /// Re-send the user turn that preceded an error bubble (audit [HIGH]/[LOW]).
+    /// Drops the failed assistant bubble (and anything after the preceding user
+    /// message) so the transcript does not accumulate duplicate error rows.
+    func retryTurn(forError errorId: UUID) {
+        guard let errorIdx = messages.firstIndex(where: { $0.id == errorId }) else { return }
+        // Find the user message immediately before the error bubble.
+        let prefix = messages.prefix(errorIdx)
+        guard let userIdx = prefix.lastIndex(where: { $0.role == .user }) else { return }
+        let text = messages[userIdx].text
+        // Trim from the preceding user message onward, then re-send.
+        messages = Array(messages.prefix(userIdx))
+        inputText = text
+        send()
+    }
+
     // MARK: - Confirmation
 
     /// Present a confirmation sheet and suspend until the user responds.
@@ -186,16 +204,36 @@ final class AIAssistantViewModel: ObservableObject {
     func stop() {
         cancelPendingConfirmation()
         runningTask?.cancel()
+        runningTask = nil
+        // Audit [MEDIUM, bug]: reset state right away so a wedged stream does not
+        // strand the UI in .streaming. The running task's `defer` is a backstop.
+        if case .streaming = state { state = .ready }
     }
 
     // MARK: - Helpers
 
     private func buildHistory() -> [AIMessage] {
         messages.compactMap { msg -> AIMessage? in
+            if msg.role == .user {
+                return AIMessage(role: .user, content: msg.text)
+            }
+            // Assistant turn: keep text-bearing turns. Tool-only turns (empty
+            // text but tool activities) are serialized as a stub so the model
+            // retains what it already did on the next send (audit [LOW]).
+            if !msg.text.isEmpty {
+                return AIMessage(role: .assistant, content: msg.text)
+            }
+            if !msg.toolActivities.isEmpty {
+                let stub = msg.toolActivities.map { activity -> String in
+                    switch activity {
+                    case .running(let name): return "Running \(name)"
+                    case .done(let name): return "Ran \(name)"
+                    }
+                }.joined(separator: "\n")
+                return AIMessage(role: .assistant, content: stub)
+            }
             // Skip empty trailing assistant placeholder.
-            guard !msg.text.isEmpty || msg.role == .user else { return nil }
-            let role: AIRole = msg.role == .user ? .user : .assistant
-            return AIMessage(role: role, content: msg.text)
+            return nil
         }
     }
 }
@@ -223,6 +261,15 @@ struct AIAssistantPanelView: View {
                 content
                 Divider()
                 inputBar
+            }
+            // Audit [LOW]: announce turn start/finish to VoiceOver so a user
+            // relying on accessibility knows when the assistant begins and ends.
+            .onChange(of: vm.state) { oldState, newState in
+                if oldState != .streaming && newState == .streaming {
+                    AccessibilityNotification.Announcement("Assistant is responding").post()
+                } else if oldState == .streaming && newState != .streaming {
+                    AccessibilityNotification.Announcement("Assistant finished responding").post()
+                }
             }
             if let confirmation = vm.pendingConfirmation {
                 Color.black.opacity(0.25).ignoresSafeArea()
@@ -321,8 +368,10 @@ struct AIAssistantPanelView: View {
 
     private func suggestionButton(_ text: String) -> some View {
         Button {
+            // Audit [LOW]: fill and send in one tap instead of leaving the
+            // prompt sitting in the field waiting for a second action.
             vm.inputText = text
-            inputFocused = true
+            if vm.state == .ready { vm.send() }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.up.circle")
@@ -352,15 +401,26 @@ struct AIAssistantPanelView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(vm.messages) { message in
-                        MessageBubble(
-                            message: message,
-                            tokens: tokens,
-                            settings: settings,
-                            isLive: vm.state == .streaming
-                                && message.id == vm.messages.last?.id
-                                && message.role == .assistant
-                        )
-                            .id(message.id)
+                        // Audit [MEDIUM]: suppress the empty trailing assistant
+                        // placeholder while the thinking indicator is showing so
+                        // the user does not see an empty bubble next to the spinner.
+                        if showsEmptyPlaceholder(message) {
+                            EmptyView()
+                                .id(message.id)
+                        } else {
+                            MessageBubble(
+                                message: message,
+                                tokens: tokens,
+                                settings: settings,
+                                isLive: vm.state == .streaming
+                                    && message.id == vm.messages.last?.id
+                                    && message.role == .assistant,
+                                onRetry: message.isError
+                                    ? { vm.retryTurn(forError: message.id) }
+                                    : nil
+                            )
+                                .id(message.id)
+                        }
                     }
                     if showThinkingIndicator {
                         thinkingIndicator
@@ -380,7 +440,24 @@ struct AIAssistantPanelView: View {
                     withAnimation { proxy.scrollTo("thinking", anchor: .bottom) }
                 }
             }
+            // Audit [HIGH]: the live bubble mutates `messages.last.text` without
+            // changing count/state, so scroll on text change too. Throttled by
+            // the ~50ms flush cadence in send(); debounce slightly to stay smooth.
+            .onChange(of: vm.messages.last?.text) { _, _ in
+                guard vm.state == .streaming, let last = vm.messages.last else { return }
+                withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+            }
         }
+    }
+
+    /// True when `message` is the live empty assistant placeholder that should be
+    /// hidden in favour of the thinking indicator.
+    private func showsEmptyPlaceholder(_ message: AssistantMessage) -> Bool {
+        showThinkingIndicator
+            && message.role == .assistant
+            && message.id == vm.messages.last?.id
+            && message.text.isEmpty
+            && message.toolActivities.isEmpty
     }
 
     /// Show the typing indicator only while streaming AND before the first
@@ -403,6 +480,9 @@ struct AIAssistantPanelView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
+        // Audit [LOW]: label the indicator for VoiceOver users.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Assistant is thinking")
     }
 
     private func notConfiguredState(icon: String, message: String, cta: String) -> some View {
@@ -454,6 +534,10 @@ struct AIAssistantPanelView: View {
                     .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            // Audit [LOW]: Cmd+Return submits from the multi-line field where
+            // plain Return inserts a newline; also surfaces the hint as a tooltip.
+            .keyboardShortcut(.return, modifiers: .command)
+            .help(vm.state == .streaming ? "Stop" : "Send (Cmd-Return)")
             .accessibilityLabel(vm.state == .streaming ? "Stop" : "Send")
             .disabled(vm.state != .streaming && vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -470,50 +554,66 @@ private struct MessageBubble: View {
     let tokens: ThemeTokens
     let settings: AppSettings
     let isLive: Bool
+    /// Re-send the preceding user message when the user activates Retry on an
+    /// error bubble (audit [HIGH]). nil for non-error bubbles.
+    let onRetry: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
             HStack {
                 if message.role == .user { Spacer(minLength: 40) }
-                // Error messages show a warning glyph prefix and use danger color.
-                Group {
-                    if message.isError {
-                        Label {
-                            Text(message.text.isEmpty ? " " : message.text)
-                        } icon: {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                            .font(PanelTypography.body(settings))
-                            .foregroundStyle(tokens.danger)
-                    } else if message.role == .assistant {
-                        // While a turn is streaming, render plain Text: re-parsing the
-                        // whole markdown string on every flush saturates the main thread.
-                        // Swap to Markdown once the turn is done (isLive == false).
-                        if isLive {
-                            // Selectable while streaming, but via our own read-only NSTextView
-                            // (not SwiftUI's .textSelection). SwiftUI's SelectionOverlay re-runs
-                            // AppKit text layout per token and re-enters the view-graph transaction
-                            // without converging (100% CPU, runaway memory). An NSTextView lays out
-                            // in AppKit and only re-measures once per token, so it stays flat.
-                            StreamingSelectableText(
-                                text: message.text.isEmpty ? " " : message.text,
-                                font: .systemFont(ofSize: CGFloat(settings.fontSizeBase)),
-                                color: NSColor(tokens.textPrimary)
-                            )
+                // The bubble wraps the content plus, for assistant turns, the
+                // per-tool step list so progress reads inside the bubble while
+                // the agent streams (audit [POLISH]/[MEDIUM]).
+                VStack(alignment: .leading, spacing: 6) {
+                    // Error messages show a warning glyph prefix and use danger color.
+                    Group {
+                        if message.isError {
+                            Label {
+                                Text(message.text.isEmpty ? " " : message.text)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+                                .font(PanelTypography.body(settings))
+                                .foregroundStyle(tokens.danger)
+                        } else if message.role == .assistant {
+                            // While a turn is streaming, render plain Text: re-parsing the
+                            // whole markdown string on every flush saturates the main thread.
+                            // Swap to Markdown once the turn is done (isLive == false).
+                            if isLive {
+                                // Selectable while streaming, but via our own read-only NSTextView
+                                // (not SwiftUI's .textSelection). SwiftUI's SelectionOverlay re-runs
+                                // AppKit text layout per token and re-enters the view-graph transaction
+                                // without converging (100% CPU, runaway memory). An NSTextView lays out
+                                // in AppKit and only re-measures once per token, so it stays flat.
+                                StreamingSelectableText(
+                                    text: message.text.isEmpty ? " " : message.text,
+                                    font: .systemFont(ofSize: CGFloat(settings.fontSizeBase)),
+                                    color: NSColor(tokens.textPrimary)
+                                )
+                            } else {
+                                Markdown(message.text.isEmpty ? " " : message.text)
+                                    .markdownTheme(.clippy(tokens: tokens, settings: settings))
+                            }
                         } else {
-                            Markdown(message.text.isEmpty ? " " : message.text)
-                                .markdownTheme(.clippy(tokens: tokens, settings: settings))
+                            Text(message.text.isEmpty ? " " : message.text)
+                                .font(PanelTypography.body(settings))
+                                .foregroundStyle(tokens.isDark ? Color.white : Color(nsColor: .labelColor).opacity(0.9))
                         }
-                    } else {
-                        Text(message.text.isEmpty ? " " : message.text)
-                            .font(PanelTypography.body(settings))
-                            .foregroundStyle(tokens.isDark ? Color.white : Color(nsColor: .labelColor).opacity(0.9))
+                    }
+                    // Tool activity step list lives inside the bubble for assistant
+                    // turns (audit [POLISH]). Empty for user/error turns.
+                    if message.role == .assistant {
+                        ForEach(Array(message.toolActivities.enumerated()), id: \.offset) { _, activity in
+                            toolActivityLabel(activity)
+                        }
                     }
                 }
-                // Selection stays off for the live (streaming) assistant bubble; see the
-                // isLive branch above. Static bubbles (user, error, finished assistant) keep it.
+                // Audit [MEDIUM]: selection during streaming is provided by the
+                // read-only NSTextView above (SwiftUI's .textSelection re-runs AppKit
+                // layout per token). SwiftUI text selection stays on for static bubbles.
                 .textSelectionEnabled(!isLive)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
@@ -531,14 +631,39 @@ private struct MessageBubble: View {
                             lineWidth: 1
                         )
                 )
+                // Audit [LOW]: combine the bubble's children into one accessible
+                // element with a "You: ..." / "Assistant: ..." / "Error: ..." label.
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityText)
                 if message.role == .assistant { Spacer(minLength: 40) }
             }
-            // Tool activity notices (assistant turns only).
-            ForEach(Array(message.toolActivities.enumerated()), id: \.offset) { _, activity in
-                toolActivityLabel(activity)
+            // Audit [HIGH]: Retry CTA under error bubbles, re-sending the
+            // preceding user message. Lives outside the bubble background.
+            if message.isError, let onRetry = onRetry {
+                HStack {
+                    Button {
+                        onRetry()
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                            .font(PanelTypography.metadata(settings))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Retry sending the last message")
+                    Spacer()
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
+    }
+
+    /// VoiceOver-friendly description of the bubble contents.
+    private var accessibilityText: String {
+        if message.isError { return "Error: \(message.text)" }
+        switch message.role {
+        case .user:      return "You: \(message.text)"
+        case .assistant:  return "Assistant: \(message.text)"
+        }
     }
 
     private func toolActivityLabel(_ activity: AssistantMessage.ToolActivity) -> some View {
@@ -559,6 +684,8 @@ private struct MessageBubble: View {
             .font(PanelTypography.metadata(settings))
             .foregroundStyle(isRunning ? tokens.accent : tokens.textSecondary)
             .padding(.leading, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(label)
     }
 }
 
@@ -598,9 +725,16 @@ private struct InlineConfirmationCard: View {
             .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tokens.cardBorder, lineWidth: 1))
             HStack {
-                Button("Deny", role: .cancel, action: onDeny).keyboardShortcut(.escape, modifiers: [])
+                // Audit [MEDIUM]: for code-executing tools the safe choice (Deny)
+                // is the default Return action; Allow needs an explicit click or
+                // Cmd-Return so a stray Enter does not approve a destructive tool.
+                Button("Deny", role: .cancel, action: onDeny)
+                    .keyboardShortcut(.return, modifiers: [])
                 Spacer()
-                Button("Allow", action: onAllow).keyboardShortcut(.return, modifiers: []).buttonStyle(.borderedProminent)
+                Button("Allow", action: onAllow)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .buttonStyle(.borderedProminent)
+                    .help("Press Cmd-Return to allow")
             }
         }
         .padding(18)
@@ -608,6 +742,8 @@ private struct InlineConfirmationCard: View {
         .background(tokens.panel, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(tokens.cardBorder, lineWidth: 1))
         .shadow(radius: 20)
+        // Escape also denies (cancel convention), in addition to Return above.
+        .onExitCommand { onDeny() }
     }
 }
 

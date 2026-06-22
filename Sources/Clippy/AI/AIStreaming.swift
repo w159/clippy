@@ -46,7 +46,9 @@ enum AIStreamingHTTP {
                     while !Task.isCancelled {
                         try? await Task.sleep(for: .seconds(1))
                         if lastActivity.secondsSince() > idleTimeout {
-                            continuation.finish(throwing: AIError.http(-1, "stream idle timeout"))
+                            // Audit [LOW]: dedicated case so the UI shows a friendly
+                            // "idle timeout" message instead of "HTTP -1".
+                            continuation.finish(throwing: AIError.idleTimeout)
                             return
                         }
                     }
@@ -81,4 +83,49 @@ final class ActivityClock: @unchecked Sendable {
     private let lock = NSLock()
     func bump() { lock.lock(); last = Date(); lock.unlock() }
     func secondsSince() -> TimeInterval { lock.lock(); defer { lock.unlock() }; return Date().timeIntervalSince(last) }
+}
+
+// MARK: - Transient-error retry policy
+//
+// Audit [MEDIUM]: wrap provider calls in a small retry loop so a transient
+// 5xx/429/network blip does not fail a whole turn. Shared by AIHTTP.post
+// (non-streaming) and AIAgent.streamWithTools (streaming, which also surfaces
+// "Retrying (attempt N/M)..." via toolActivity).
+enum AIRetry {
+    /// HTTP statuses worth a retry: timeouts, rate limits, and the recoverable 5xx.
+    static let retryableStatuses: Set<Int> = [408, 429, 500, 502, 503, 504]
+
+    /// Max attempts including the first try.
+    static let maxAttempts = 3
+
+    /// True for errors a retry can plausibly fix. Idle timeouts are NOT retryable
+    /// (the stream already hung once; retrying would likely hang again).
+    static func isTransient(_ error: Error) -> Bool {
+        if let ai = error as? AIError {
+            switch ai {
+            case .http(let code, _) where retryableStatuses.contains(code):
+                return true
+            default:
+                return false
+            }
+        }
+        if let url = error as? URLError {
+            switch url.code {
+            case .timedOut, .cannotConnectToHost, .networkConnectionLost,
+                 .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost:
+                return true
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
+    /// Jittered exponential backoff in milliseconds for the given attempt number
+    /// (1-based). ~500ms, ~1000ms, ~2000ms with up to ~250ms jitter.
+    static func backoffMs(_ attempt: Int) -> Int {
+        let base = 500 * (1 << max(0, attempt - 1))   // 500, 1000, 2000...
+        let jitter = Int.random(in: 0...250)
+        return base + jitter
+    }
 }

@@ -11,6 +11,12 @@ import Foundation
 ///
 /// Merge is non-destructive: it reuses ClippyArchive's TOML import (add/update,
 /// never clear), so two devices converge instead of clobbering each other.
+///
+/// The class is @MainActor so @Published state is only ever touched on the main
+/// actor. Audit finding: the DB/TOML export and file IO used to run inline on the
+/// main thread. That heavy work now runs in a Task.detached that captures only
+/// the Sendable file URL (pullIfPresent is static so it does not capture self),
+/// and the result is applied back on the main actor after `await`.
 @MainActor
 final class ICloudSyncService: ObservableObject {
     static let shared = ICloudSyncService()
@@ -65,23 +71,42 @@ final class ICloudSyncService: ObservableObject {
             return
         }
         syncing = true
-        defer { syncing = false }
 
-        do {
-            // Pull: merge any archive another device wrote (non-destructive).
-            try await pullIfPresent(url)
-            // Push: write the merged local state back for the other devices.
-            let toml = try ClippyArchive.exportTOML(from: ClipDatabase.shared)
-            try toml.write(to: url, atomically: true, encoding: .utf8)
+        // Heavy DB/TOML work off the main actor. The detached task captures only
+        // the Sendable `url`: pullIfPresent is static (no `self` capture) and the
+        // archive/database calls go through global singletons. SyncOutcome is
+        // Sendable so it can cross back via .value, after which we resume on the
+        // main actor and mutate @Published state directly.
+        let outcome: SyncOutcome = await Task.detached(priority: .utility) {
+            do {
+                try await Self.pullIfPresent(url)
+                let toml = try ClippyArchive.exportTOML(from: ClipDatabase.shared)
+                try toml.write(to: url, atomically: true, encoding: .utf8)
+                return .success
+            } catch {
+                // Log the full error off-main where the Error object is still in
+                // scope; carry only the localizedDescription string back so the
+                // outcome type stays Sendable.
+                ClippyLog.error("iCloud sync failed: \(error)", category: ClippyLog.sync)
+                return .failure(error.localizedDescription)
+            }
+        }.value
+
+        syncing = false
+        switch outcome {
+        case .success:
             status = "Synced via iCloud Drive."
             ClippyLog.info("iCloud sync succeeded", category: ClippyLog.sync)
-        } catch {
-            status = "Sync failed: \(error.localizedDescription)"
-            ClippyLog.error("iCloud sync failed: \(error)", category: ClippyLog.sync)
+        case .failure(let message):
+            // Audit finding: include the underlying error and a short remediation
+            // hint instead of a bare "Sync failed:" line, so the user has
+            // something actionable in the red inline status.
+            status = "Sync failed: \(message) " +
+                "Check that iCloud Drive is enabled, the Clippy folder is writable, and you are not offline, then try Sync now."
         }
     }
 
-    private func pullIfPresent(_ url: URL) async throws {
+    private static func pullIfPresent(_ url: URL) async throws {
         let fm = FileManager.default
         if !fm.fileExists(atPath: url.path) {
             // iCloud keeps a not-yet-downloaded item as a hidden ".name.icloud"
@@ -100,4 +125,12 @@ final class ICloudSyncService: ObservableObject {
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         _ = try ClippyArchive.importTOML(text, into: ClipDatabase.shared)
     }
+}
+
+/// Internal result type for the off-main sync workload. Carries only a String
+/// (the localized error description) on failure so the type is Sendable and can
+/// cross the isolation boundary back through Task.value.
+private enum SyncOutcome: Sendable {
+    case success
+    case failure(String)
 }

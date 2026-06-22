@@ -20,6 +20,7 @@ struct IconPickerView: View {
 
     @State private var iconTab: CategoryIconKind
     @State private var symbolQuery: String = ""
+    @State private var emojiQuery: String = ""
 
     init(
         iconKind: Binding<CategoryIconKind>,
@@ -52,6 +53,27 @@ struct IconPickerView: View {
         "\u{1F4DD}", "\u{1F916}",
     ]
 
+    // Searchable names for the emoji tab, parallel to `emojis`. SF Symbols have
+    // names the system can match; emojis do not, so we carry a small keyword per
+    // emoji to power the filter field below.
+    private static let emojiNames: [String] = [
+        "pushpin", "star", "heart", "fire", "bolt", "label",
+        "folder", "folder open", "document", "laptop", "brain", "link",
+        "envelope", "key", "lock", "card", "cart", "gift",
+        "books", "graduation", "briefcase", "house", "plane", "car",
+        "game", "music", "picture", "art", "idea", "check",
+        "memo", "robot",
+    ]
+
+    /// Emojis whose keyword matches the emoji-tab query. An empty query shows the
+    /// full curated list, mirroring how the symbols tab behaves.
+    private var filteredEmojis: [(emoji: String, name: String)] {
+        let q = emojiQuery.trimmingCharacters(in: .whitespaces)
+        let pairs = zip(Self.emojis, Self.emojiNames).map { (emoji: $0.0, name: $0.1) }
+        guard !q.isEmpty else { return pairs }
+        return pairs.filter { $0.name.localizedStandardContains(q) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Picker("Icon", selection: $iconTab) {
@@ -66,6 +88,12 @@ struct IconPickerView: View {
                 TextField("Search symbols", text: $symbolQuery)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
+            } else if iconTab == .emoji {
+                // The emoji tab previously had no search while symbols did. Emojis
+                // lack system names, so we match against the keyword list above.
+                TextField("Search emoji", text: $emojiQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
             }
 
             iconGrid
@@ -78,6 +106,11 @@ struct IconPickerView: View {
     private var iconGrid: some View {
         if iconTab == .symbol && filteredSymbols.isEmpty {
             Text("No symbols match")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 110)
+        } else if iconTab == .emoji && filteredEmojis.isEmpty {
+            Text("No emoji match")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 110)
@@ -103,14 +136,15 @@ struct IconPickerView: View {
                         .accessibilityLabel(symbol)
                     }
                 case .emoji:
-                    ForEach(Self.emojis, id: \.self) { emoji in
+                    ForEach(filteredEmojis, id: \.emoji) { pair in
+                        let emoji = pair.emoji
                         iconCell(isSelected: iconKind == .emoji && iconValue == emoji) {
                             iconKind = .emoji
                             iconValue = emoji
                         } content: {
                             Text(emoji).font(.system(size: 15))
                         }
-                        .accessibilityLabel(emoji)
+                        .accessibilityLabel(pair.name)
                     }
                 case .appLogo:
                     if knownBundleIDs.isEmpty {

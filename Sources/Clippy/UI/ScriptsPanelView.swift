@@ -15,8 +15,24 @@ struct ScriptsPanelView: View {
 
     /// Per-script run state, keyed by script UUID.
     @State private var runStates: [UUID: RunState] = [:]
+    /// Scripts the user has already confirmed once this session. The panel is a
+    /// quick-launch surface, so we only nag the first time a given script runs
+    /// (see the run-confirmation policy documented on `Script`). Settings
+    /// confirms every run; the panel confirms once per script.
+    @State private var confirmedScripts: Set<UUID> = []
+    /// Search filter for the script list (in-memory name contains). Scripts are
+    /// a small set, so filtering live on every keystroke is cheaper than a timer.
+    @State private var query = ""
 
     private var tokens: ThemeTokens { settings.theme }
+
+    private var filteredScripts: [Script] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return scriptStore.scripts }
+        return scriptStore.scripts.filter {
+            $0.name.localizedCaseInsensitiveContains(q)
+        }
+    }
 
     var body: some View {
         if scriptStore.scripts.isEmpty {
@@ -41,7 +57,10 @@ struct ScriptsPanelView: View {
                 .font(PanelTypography.metadata(settings))
                 .foregroundStyle(tokens.textSecondary)
                 .multilineTextAlignment(.center)
-            Button("Open Settings > Scripts") {
+            // Relabelled from "Open Settings > Scripts": onOpenSettings opens the
+            // settings window generally and does not guarantee the Scripts tab,
+            // so the chevron-suffixed label overpromised.
+            Button("Open Settings") {
                 onOpenSettings()
             }
             .controlSize(.small)
@@ -56,10 +75,39 @@ struct ScriptsPanelView: View {
     private var scriptList: some View {
         VStack(spacing: 0) {
             manageHeader
+            // Search field so a long script list can be narrowed by name.
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(tokens.textSecondary)
+                TextField("Search scripts", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(PanelTypography.metadata(settings))
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(tokens.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear search")
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             Divider()
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(scriptStore.scripts) { script in
+                    if filteredScripts.isEmpty {
+                        Text("No scripts match \"\(query)\"")
+                            .font(PanelTypography.metadata(settings))
+                            .foregroundStyle(tokens.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                    }
+                    ForEach(filteredScripts) { script in
                         ScriptRowView(
                             script: script,
                             store: store,
@@ -67,6 +115,7 @@ struct ScriptsPanelView: View {
                                 get: { runStates[script.id] ?? .idle },
                                 set: { runStates[script.id] = $0 }
                             ),
+                            confirmedScripts: $confirmedScripts,
                             tokens: tokens,
                             settings: settings
                         )
@@ -103,14 +152,28 @@ private struct ScriptRowView: View {
     let script: Script
     let store: ClipStore
     @Binding var runState: RunState
+    @Binding var confirmedScripts: Set<UUID>
     let tokens: ThemeTokens
     let settings: AppSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Handle to the in-flight run so the Stop button can cancel it. ScriptRunner
+    /// owns the Process and terminates it on Task.cancel() (see ScriptRunner).
+    @State private var runTask: Task<Void, Never>?
+    /// Drives the first-run confirmation dialog (per-script, once per session).
+    @State private var pendingRun = false
+    /// Transient "Saved as clip" / "Could not save clip" feedback.
+    @State private var saveStatus: String?
+
+    private var isRunning: Bool {
+        if case .running = runState { return true }
+        return false
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             rowHeader
-            if case .running = runState {
+            if isRunning {
                 runningView
             } else if case .done(let result) = runState {
                 outputView(result)
@@ -122,6 +185,18 @@ private struct ScriptRowView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
+        // First-run confirmation: nags once per script, then runs directly.
+        // Policy is documented on Script; Settings confirms every run instead.
+        .confirmationDialog(
+            "Run \"\(script.name.isEmpty ? "Untitled" : script.name)\"?",
+            isPresented: $pendingRun,
+            titleVisibility: .visible
+        ) {
+            Button("Run", role: .destructive) { performRun() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This executes code on your Mac with your user permissions. You will not be asked again for this script in this session.")
+        }
     }
 
     // MARK: Header row
@@ -172,19 +247,18 @@ private struct ScriptRowView: View {
             .help(help)
     }
 
+    // While running, the button becomes a Stop control (which cancels the run
+    // via runTask). The running indicator below keeps the single spinner, so
+    // we avoid the double-spinner the audit flagged here.
     private var runButton: some View {
-        let isRunning: Bool = {
-            if case .running = runState { return true }
-            return false
-        }()
-        return Button {
-            run()
+        Button {
+            isRunning ? stop() : run()
         } label: {
             Group {
                 if isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 16, height: 16)
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
                 } else {
                     Image(systemName: "play.fill")
                         .font(.system(size: 11, weight: .semibold))
@@ -195,9 +269,8 @@ private struct ScriptRowView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .disabled(isRunning)
-        .help("Run script")
-        .accessibilityLabel("Run \(script.name)")
+        .help(isRunning ? "Stop script" : "Run script")
+        .accessibilityLabel(isRunning ? "Stop \(script.name)" : "Run \(script.name)")
     }
 
     // MARK: Running indicator
@@ -238,6 +311,14 @@ private struct ScriptRowView: View {
                     .monospacedDigit()
             }
 
+            // Truncation banner: the runner hit the 5 MB stream ceiling and killed
+            // the child. Distinct from the display cap applied per block below.
+            if result.truncated {
+                Label("Output truncated: hit the capture ceiling", systemImage: "scissors")
+                    .font(PanelTypography.micro(settings))
+                    .foregroundStyle(tokens.danger)
+            }
+
             // stdout (only shown when non-empty)
             if !result.stdout.isEmpty {
                 outputBlock(result.stdout, label: "stdout", isError: false)
@@ -267,7 +348,10 @@ private struct ScriptRowView: View {
                 .font(PanelTypography.micro(settings).weight(.semibold))
                 .foregroundStyle(isError ? tokens.danger.opacity(0.8) : tokens.textSecondary)
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(String(text.trimmingCharacters(in: .newlines).prefix(2000)))
+                // Display cap with a "(showing first 2000 of N characters)" note when
+                // the stream is longer than the cap. Kept in sync with ScriptsView
+                // via ScriptResult.displayCap / displayCapped.
+                Text(ScriptResult.displayCapped(text.trimmingCharacters(in: .newlines)))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(tokens.textPrimary)
                     .textSelection(.enabled)
@@ -280,27 +364,47 @@ private struct ScriptRowView: View {
     @ViewBuilder
     private func outputActions(_ result: ScriptResult) -> some View {
         let hasStdout = !result.stdout.isEmpty
-        HStack(spacing: 8) {
-            if hasStdout {
-                Button("Copy output") {
-                    copyToPasteboard(result.stdout)
-                }
-                .controlSize(.small)
-                .buttonStyle(.bordered)
+        let hasStderr = !result.stderr.isEmpty
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                if hasStdout {
+                    Button("Copy output") {
+                        copyToPasteboard(result.stdout)
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
 
-                Button("Save as clip") {
-                    store.saveScriptOutput(result.stdout)
+                    Button("Save as clip") {
+                        saveAsClip(result.stdout)
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+                }
+                // stderr was visible but not copyable from the panel; offer it
+                // whenever stderr is non-empty so errors can be shared/pasted.
+                if hasStderr {
+                    Button("Copy stderr") {
+                        copyToPasteboard(result.stderr)
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+                }
+                Spacer()
+                Button("Dismiss") {
+                    runState = .idle
                 }
                 .controlSize(.small)
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderless)
+                .foregroundStyle(tokens.textSecondary)
             }
-            Spacer()
-            Button("Dismiss") {
-                runState = .idle
+            // Transient save-as-clip feedback (mirrors the OCR status pattern in
+            // ClipEditorView): success/failure message that auto-clears.
+            if let saveStatus {
+                Text(saveStatus)
+                    .font(PanelTypography.micro(settings))
+                    .foregroundStyle(saveStatus.hasPrefix("Saved") ? tokens.success : tokens.danger)
+                    .transition(.opacity)
             }
-            .controlSize(.small)
-            .buttonStyle(.borderless)
-            .foregroundStyle(tokens.textSecondary)
         }
     }
 
@@ -314,22 +418,54 @@ private struct ScriptRowView: View {
     // MARK: Run action
 
     private func run() {
+        // First-run gate: nag once per script, then run directly (see Script).
+        guard confirmedScripts.contains(script.id) else {
+            pendingRun = true
+            return
+        }
+        performRun()
+    }
+
+    private func performRun() {
+        confirmedScripts.insert(script.id)
         let input = script.feedsClipboard ? NSPasteboard.general.string(forType: .string) : nil
         runState = .running
-        Task { @MainActor in
+        runTask = Task { @MainActor in
             let result = await ScriptRunner.run(script, input: input)
             // Honor outputToClipboard before surfacing the result in the UI.
             if script.outputToClipboard, result.succeeded, !result.stdout.isEmpty {
                 copyToPasteboard(result.stdout)
             }
             runState = .done(result)
+            runTask = nil
+        }
+    }
+
+    private func stop() {
+        // Cancelling the Task trips ScriptRunner's cancellation handler, which
+        // terminates the child promptly; the Task then resumes with a result
+        // (stderr "Cancelled") and surfaces it via runState.
+        runTask?.cancel()
+    }
+
+    // MARK: Save as clip
+
+    private func saveAsClip(_ text: String) {
+        // saveScriptOutput returns Bool; surface both outcomes instead of
+        // discarding it, so a failed insert is not silently lost.
+        let ok = store.saveScriptOutput(text)
+        let message = ok ? "Saved as clip" : "Could not save clip"
+        saveStatus = message
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            if saveStatus == message { saveStatus = nil }
         }
     }
 
     // MARK: Pasteboard helper
 
     /// Replaces the pasteboard contents with `string`. Called from both the
-    /// "Copy output" button and the outputToClipboard auto-copy path.
+    /// "Copy output" / "Copy stderr" buttons and the outputToClipboard auto-copy.
     private func copyToPasteboard(_ string: String) {
         let pb = NSPasteboard.general
         pb.clearContents()

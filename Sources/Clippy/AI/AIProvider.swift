@@ -24,16 +24,24 @@ enum AIError: LocalizedError, Equatable {
     case http(Int, String)
     case decoding(String)
     case empty
+    // Audit [LOW]: distinguish a wedged (idle) stream from a generic HTTP -1 so
+    // the user gets an actionable message instead of "HTTP -1".
+    case idleTimeout
 
     var errorDescription: String? {
         switch self {
         case .notConfigured(let why): return "AI is not configured: \(why)"
         case .badURL(let url): return "Invalid endpoint URL: \(url)"
         case .http(let code, let body):
+            // -1 was the old sentinel for an idle-timeout; the dedicated
+            // .idleTimeout case now carries that meaning with a friendlier text.
+            if code == -1 { return "The provider connection failed (HTTP -1)." }
             let snippet = body.prefix(300)
             return "Provider returned HTTP \(code): \(snippet)"
         case .decoding(let why): return "Could not read the provider response: \(why)"
         case .empty: return "The provider returned an empty response."
+        case .idleTimeout:
+            return "The assistant stopped responding. The connection was idle for too long. Try sending again."
         }
     }
 }

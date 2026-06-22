@@ -19,7 +19,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         userDriverDelegate: nil
     )
 
-    private let database = ClipDatabase.shared
+    // Computed so the recovery Retry path re-acquires the live database after
+    // ClipDatabase.retryLoad() replaces the in-memory sentinel with the real
+    // on-disk database. The lazy vars below capture `database` on first access,
+    // which in the Retry path happens AFTER the successful reopen.
+    private var database: ClipDatabase { ClipDatabase.shared }
     private lazy var store = ClipStore(database: database)
     private lazy var monitor = ClipboardMonitor(database: database)
     private lazy var pasteService = PasteService(monitor: monitor)
@@ -31,6 +35,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Database-open failure no longer crashes the process (ClipDatabase
+        // stores the error and returns an in-memory sentinel). Surface it as
+        // a recovery alert before any other launch work so the user can fix the
+        // on-disk condition, retry, or quit without losing data silently.
+        if ClipDatabase.loadError != nil {
+            presentDatabaseRecoveryAlert()
+            return
+        }
+
+        continueLaunch()
+    }
+
+    /// The full post-database launch sequence. Runs from the normal launch path
+    /// and again from the recovery Retry path after a successful database reopen,
+    /// so the recovered app gets the same setup as a clean launch.
+    private func continueLaunch() {
         setupStatusItem()
         setupMainMenu()
         monitor.start()
@@ -84,7 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Kick off an iCloud Drive sync if the user has enabled it (safe no-op
         // otherwise; never touches CloudKit, so it cannot crash on launch).
-        ICloudSyncService.shared.startIfEnabled()
+        // Hop to MainActor because ICloudSyncService is @MainActor-isolated;
+        // startIfEnabled() is a sync entry point that itself spawns the sync Task.
+        Task { @MainActor in ICloudSyncService.shared.startIfEnabled() }
 
         // Start the MCP server if the user has enabled it, and wire up
         // live reactions to settings changes.
@@ -95,70 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HotKeyCenter.shared.registerDefaultHotKey()
 
-        panelController.onPaste = { [weak self] clip, asPlainText in
-            guard let self else { return }
-            // hideAfterPaste=false lets the panel stay open for rapid multi-paste.
-            // panelPinned suppresses all auto-hide triggers.
-            let s = AppSettings.shared
-            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
-            self.panelController.restoreFocusToPreviousApp()
-            self.pasteService.paste(clip, asPlainText: asPlainText)
-        }
-        panelController.onPasteMany = { [weak self] clips, combined, asPlainText in
-            guard let self else { return }
-            let s = AppSettings.shared
-            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
-            self.panelController.restoreFocusToPreviousApp()
-            if combined {
-                self.pasteService.pasteCombined(clips, asPlainText: asPlainText)
-            } else {
-                self.pasteService.pasteSequence(clips, asPlainText: asPlainText)
-            }
-        }
-        panelController.onPasteFile = { [weak self] clip, move in
-            guard let self else { return }
-            let s = AppSettings.shared
-            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
-            self.panelController.restoreFocusToPreviousApp()
-            self.pasteService.pasteFile(clip, move: move)
-        }
-        panelController.onPrimary = { [weak self] clip in
-            guard let self else { return }
-            let s = AppSettings.shared
-            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
-            if s.clickCopyOnly {
-                self.pasteService.copy(clip, asPlainText: s.pastePlainTextByDefault)
-            } else {
-                self.panelController.restoreFocusToPreviousApp()
-                self.pasteService.paste(clip, asPlainText: s.pastePlainTextByDefault)
-            }
-        }
-        panelController.onSendKeystrokes = { [weak self] clip in
-            guard let self else { return }
-            let s = AppSettings.shared
-            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
-            // Hand keyboard focus back to the target app before typing, otherwise
-            // the unicode key events land on no first responder and the system
-            // beeps once per character. Write to clipboard too as a copy-fallback.
-            self.panelController.restoreFocusToPreviousApp()
-            self.pasteService.copy(clip, asPlainText: true)
-            let text = clip.contentText
-            // Slightly longer than the paste delay: re-activation has to settle
-            // and the target's text field must regain first responder first.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.keystrokeService.type(text)
-            }
-        }
-        panelController.onEdit = { [weak self] clip in
-            guard let self else { return }
-            // Panel stays open while the editor is visible; only item-click,
-            // hotkey toggle, and Escape are valid close triggers. The editor now
-            // saves directly through the store (text edits, image edits, title).
-            self.editorController.open(clip: clip, store: self.store)
-        }
-        panelController.onOpenSettings = { [weak self] in
-            self?.openSettings()
-        }
+        wirePanelCallbacks()
 
         // Caret positioning and the simulated Cmd-V both need Accessibility.
         // Prompt once; everything else degrades gracefully without it.
@@ -193,8 +152,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            CommandLine.arguments.indices.contains(flagIndex + 1)
         {
             let dir = URL(fileURLWithPath: CommandLine.arguments[flagIndex + 1])
-            let service = ICloudSyncService(rootOverride: dir)
             Task { @MainActor in
+                let service = ICloudSyncService(rootOverride: dir)
                 await service.sync(force: true)
                 ClippyLog.info("ICLOUD_SELFTEST status=\(service.status)", category: ClippyLog.sync)
                 let synced = dir.appendingPathComponent("Clippy/clippy-sync.toml")
@@ -227,6 +186,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = StatusBarIcon.image()
+        // Set the toolTip immediately so VoiceOver and hover have a name from
+        // the first run, instead of only after the first pause toggle.
+        statusItem.button?.toolTip = "Clippy"
         statusItem.button?.wantsLayer = true
 
         // Bounce the icon the instant a clip is captured, in sync with the
@@ -330,6 +292,107 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         if alert.runModal() == .alertFirstButtonReturn {
             try? database.deleteUnclassifiedClips()
+        }
+    }
+
+    // MARK: - Database recovery
+
+    /// Shows a modal alert when the on-disk database could not be opened,
+    /// offering Show in Finder (opens Application Support/Clippy), Retry
+    /// (re-attempts the open and continues launch if it succeeds), and Quit.
+    /// Replaces the fatalError crash path reported in the UI/UX audit.
+    private func presentDatabaseRecoveryAlert() {
+        let message = ClipDatabase.loadError.map { "\($0)" } ?? "Unknown database error."
+        let alert = NSAlert()
+        alert.messageText = "Clippy could not open its clipboard database."
+        alert.informativeText = "\(message)\n\nThe database lives in Application Support/Clippy. " +
+            "You can reveal it in Finder, retry after fixing the issue, or quit."
+        alert.addButton(withTitle: "Show in Finder")
+        alert.addButton(withTitle: "Retry")
+        alert.addButton(withTitle: "Quit")
+        alert.alertStyle = .critical
+        NSApp.activate()
+        let choice = alert.runModal()
+        switch choice {
+        case .alertFirstButtonReturn:
+            // Reveal the Application Support/Clippy folder so the user can
+            // inspect permissions / free disk space / remove a corrupt file.
+            NSWorkspace.shared.activateFileViewerSelecting([ClipDatabase.shared.databaseURL])
+            // After revealing, re-show the alert so the user can Retry or Quit
+            // without the app silently continuing on the sentinel.
+            presentDatabaseRecoveryAlert()
+        case .alertSecondButtonReturn:
+            if ClipDatabase.retryLoad() != nil {
+                // Recovery succeeded: run the full launch sequence so the
+                // reopened database is wired into the store, monitor, and panel
+                // exactly as on a clean launch.
+                continueLaunch()
+            } else {
+                // Still failing: loop back to the alert.
+                presentDatabaseRecoveryAlert()
+            }
+        default:
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// Wires the panel action callbacks. Factored out so the recovery Retry
+    /// path can invoke it after a late database open without duplicating the
+    /// large callback block from applicationDidFinishLaunching.
+    private func wirePanelCallbacks() {
+        panelController.onPaste = { [weak self] clip, asPlainText in
+            guard let self else { return }
+            let s = AppSettings.shared
+            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
+            self.panelController.restoreFocusToPreviousApp()
+            self.pasteService.paste(clip, asPlainText: asPlainText)
+        }
+        panelController.onPasteMany = { [weak self] clips, combined, asPlainText in
+            guard let self else { return }
+            let s = AppSettings.shared
+            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
+            self.panelController.restoreFocusToPreviousApp()
+            if combined {
+                self.pasteService.pasteCombined(clips, asPlainText: asPlainText)
+            } else {
+                self.pasteService.pasteSequence(clips, asPlainText: asPlainText)
+            }
+        }
+        panelController.onPasteFile = { [weak self] clip, move in
+            guard let self else { return }
+            let s = AppSettings.shared
+            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
+            self.panelController.restoreFocusToPreviousApp()
+            self.pasteService.pasteFile(clip, move: move)
+        }
+        panelController.onPrimary = { [weak self] clip in
+            guard let self else { return }
+            let s = AppSettings.shared
+            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
+            if s.clickCopyOnly {
+                self.pasteService.copy(clip, asPlainText: s.pastePlainTextByDefault)
+            } else {
+                self.panelController.restoreFocusToPreviousApp()
+                self.pasteService.paste(clip, asPlainText: s.pastePlainTextByDefault)
+            }
+        }
+        panelController.onSendKeystrokes = { [weak self] clip in
+            guard let self else { return }
+            let s = AppSettings.shared
+            if s.hideAfterPaste && !s.panelPinned { self.panelController.hide() }
+            self.panelController.restoreFocusToPreviousApp()
+            self.pasteService.copy(clip, asPlainText: true)
+            let text = clip.contentText
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.keystrokeService.type(text)
+            }
+        }
+        panelController.onEdit = { [weak self] clip in
+            guard let self else { return }
+            self.editorController.open(clip: clip, store: self.store)
+        }
+        panelController.onOpenSettings = { [weak self] in
+            self?.openSettings()
         }
     }
 

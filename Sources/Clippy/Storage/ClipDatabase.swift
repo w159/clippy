@@ -5,13 +5,101 @@ import GRDB
 /// clips table for full-text search. Unencrypted for milestone 1; SQLCipher
 /// swaps in behind this same interface later.
 final class ClipDatabase {
-    static let shared: ClipDatabase = {
+    /// The error from the most recent attempt to open the on-disk database, if
+    /// it failed. AppDelegate reads this at launch to present a recovery alert
+    /// (Show in Finder / Retry / Quit) instead of the process crashing via
+    /// fatalError. Reset to nil on a successful retry.
+    static var loadError: Error?
+
+    /// Backing cache for `shared`. guarded by `sharedLock` so concurrent
+    /// first-access from off-main threads is safe.
+    private static var _shared: ClipDatabase?
+    private static let sharedLock = NSLock()
+
+    /// On-disk singleton. Preserved as a non-optional accessor so existing
+    /// call sites compile unchanged. When the on-disk database cannot be
+    /// opened, the error is stored in `loadError` and an in-memory sentinel is
+    /// returned instead, so the app can run its launch sequence and show the
+    /// recovery alert rather than crashing. Callers that want to handle the
+    /// failure explicitly should use `loadShared()`.
+    static var shared: ClipDatabase {
+        sharedLock.lock()
+        defer { sharedLock.unlock() }
+        if let cached = _shared { return cached }
         do {
-            return try ClipDatabase()
+            let db = try ClipDatabase()
+            _shared = db
+            return db
         } catch {
-            fatalError("Clippy could not open its database: \(error)")
+            loadError = error
+            ClippyLog.error("Clippy could not open its database: \(error)", category: ClippyLog.storage)
+            let sentinel = makeRecoverySentinel()
+            _shared = sentinel
+            return sentinel
         }
-    }()
+    }
+
+    /// Throwing accessor for callers that prefer explicit error handling.
+    /// Returns the cached `shared` instance when the on-disk database opened
+    /// successfully; rethrows the stored failure otherwise.
+    static func loadShared() throws -> ClipDatabase {
+        if let error = loadError { throw error }
+        return shared
+    }
+
+    /// Re-attempt opening the on-disk database after a prior failure (e.g. the
+    /// user clicked Retry in the recovery alert). On success, replaces the
+    /// cached sentinel with the live database and clears `loadError`. Returns
+    /// the new database on success, nil on continued failure.
+    @discardableResult
+    static func retryLoad() -> ClipDatabase? {
+        sharedLock.lock()
+        defer { sharedLock.unlock() }
+        do {
+            let db = try ClipDatabase()
+            _shared = db
+            loadError = nil
+            return db
+        } catch {
+            loadError = error
+            ClippyLog.error("Clippy database retry failed: \(error)", category: ClippyLog.storage)
+            return nil
+        }
+    }
+
+    /// In-memory fallback used only when the on-disk database cannot be opened.
+    /// Lets the app run its launch sequence (status item, menu, recovery alert)
+    /// without crashing. The sentinel's databaseURL points at the intended
+    /// on-disk path so "Show in Finder" in the recovery alert opens the right
+    /// folder; media is a temp directory so nothing is written to disk.
+    private static func makeRecoverySentinel() -> ClipDatabase {
+        let supportDir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Clippy", isDirectory: true)
+        let dbURL = supportDir.appendingPathComponent("clippy.sqlite")
+        let mediaDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClippyRecoveryMedia", isDirectory: true)
+        try? FileManager.default.createDirectory(at: mediaDir, withIntermediateDirectories: true)
+
+        let queue: DatabaseQueue
+        do {
+            queue = try DatabaseQueue(path: ":memory:")
+            // Best-effort migrations; a failure here leaves an empty in-memory
+            // schema, which is fine because the app is about to show the
+            // recovery alert and will not read/write clips against the sentinel.
+            try? Self.makeMigrator().migrate(queue)
+        } catch {
+            // Extremely unlikely (in-memory open basically never fails); fall
+            // back to a fresh in-memory queue without migrations. Force-try is
+            // safe because :memory: open cannot fail, and this recovery path
+            // must not itself throw.
+            queue = try! DatabaseQueue(path: ":memory:")
+        }
+        // Temp directory is always writable; the recovery path must not itself
+        // throw, so use a force-try on a guaranteed location.
+        let media = try! MediaStore(directory: mediaDir)
+        return ClipDatabase(queue: queue, url: dbURL, media: media)
+    }
 
     let dbQueue: DatabaseQueue
     let databaseURL: URL
@@ -33,6 +121,14 @@ final class ClipDatabase {
         }
         dbQueue = try DatabaseQueue(path: self.databaseURL.path)
         try Self.makeMigrator().migrate(dbQueue)
+    }
+
+    /// Private init used by the recovery sentinel: assemble from pre-built
+    /// pieces so no on-disk open is attempted.
+    private init(queue: DatabaseQueue, url: URL, media: MediaStore) {
+        self.dbQueue = queue
+        self.databaseURL = url
+        self.media = media
     }
 
     /// Static so tests can run migrations stepwise without building a full ClipDatabase.

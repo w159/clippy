@@ -9,9 +9,15 @@ final class ScriptStore: ObservableObject {
     @Published private(set) var scripts: [Script] = []
 
     private let store: JSONFileStore<Script>
+    /// Kept so add/update can verify the on-disk write actually landed (the
+    /// generic JSONFileStore swallows encode/write errors with `try?`). Surfacing
+    /// this lets the Settings editor show an error banner with Retry instead of
+    /// silently dropping a save on a full disk or permission loss.
+    private let fileURL: URL
 
     init(fileURL: URL? = nil) {
         let url = fileURL ?? Self.defaultURL()
+        self.fileURL = url
         store = JSONFileStore<Script>(
             fileURL: url,
             configureEncoder: { $0.dateEncodingStrategy = .iso8601 },
@@ -47,19 +53,28 @@ final class ScriptStore: ObservableObject {
 
     // MARK: - CRUD
 
-    func add(_ script: Script) {
+    /// Adds the script and returns whether the write persisted to disk. `false`
+    /// means the JSON write failed (disk full, permissions, encode error); the
+    /// caller should surface an error with a Retry. The in-memory list is still
+    /// updated optimistically so the session is not left inconsistent.
+    @discardableResult
+    func add(_ script: Script) -> Bool {
         var s = script
         s.sortOrder = (scripts.map(\.sortOrder).max() ?? -1) + 1
         store.add(s)
         scripts = store.items.sorted { $0.sortOrder < $1.sortOrder }
+        return persisted(contains: s.id)
     }
 
-    func update(_ script: Script) {
-        guard scripts.contains(where: { $0.id == script.id }) else { return }
+    /// Updates the script and returns whether the write persisted to disk.
+    @discardableResult
+    func update(_ script: Script) -> Bool {
+        guard scripts.contains(where: { $0.id == script.id }) else { return false }
         var updated = script
         updated.updatedAt = Date()
         store.update(updated)
         scripts = store.items.sorted { $0.sortOrder < $1.sortOrder }
+        return persisted(contains: updated.id)
     }
 
     func delete(id: UUID) {
@@ -69,6 +84,18 @@ final class ScriptStore: ObservableObject {
 
     func script(id: UUID) -> Script? {
         scripts.first { $0.id == id }
+    }
+
+    /// Re-reads the JSON file and confirms the given id round-tripped. This is a
+    /// post-condition check on the just-completed write; scripts are tiny so the
+    /// extra read is negligible. Returns false on any decode/IO failure so callers
+    /// can surface a real error instead of assuming success.
+    private func persisted(contains id: UUID) -> Bool {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: fileURL),
+              let decoded = try? decoder.decode([Script].self, from: data) else { return false }
+        return decoded.contains { $0.id == id }
     }
 
     /// Reorder: move the script identified by `draggedID` to just before the

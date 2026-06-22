@@ -11,6 +11,10 @@ struct SelectAllTextField: NSViewRepresentable {
     let initialText: String
     var font: NSFont
     var textColor: NSColor
+    // Optional accessibility label so VoiceOver announces the field's purpose
+    // (e.g. "Rename clip") instead of only the selected text. Defaults to nil
+    // so existing callers that do not pass a label compile unchanged.
+    var accessibilityLabel: String? = nil
     var onCommit: (String) -> Void
     var onCancel: () -> Void
 
@@ -22,12 +26,19 @@ struct SelectAllTextField: NSViewRepresentable {
         field.textColor = textColor
         field.delegate = context.coordinator
         field.isBordered = false
-        field.focusRingType = .none
+        // Keep the system focus ring so focus is always visible (WCAG 2.4.7)
+        // even when a caller forgets to add an accent overlay. Callers that
+        // draw their own accent ring can still do so on top; the native ring
+        // guarantees a baseline visible-focus affordance.
+        field.focusRingType = .default
         field.drawsBackground = false   // the SwiftUI background provides contrast
         field.lineBreakMode = .byTruncatingTail
         field.cell?.usesSingleLineMode = true
         field.cell?.wraps = false
         field.cell?.isScrollable = true
+        if let label = accessibilityLabel {
+            field.setAccessibilityLabel(label)
+        }
         Task { @MainActor [weak field] in
             guard let field, field.window != nil else { return }
             field.window?.makeFirstResponder(field)

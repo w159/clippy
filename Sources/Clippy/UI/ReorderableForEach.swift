@@ -195,3 +195,65 @@ extension View {
         modifier(ReorderDropDestinationModifier(id: id, kind: kind, draggingOver: draggingOver, onMove: onMove))
     }
 }
+
+// MARK: - Trailing drop destination
+//
+// Audit finding: drag-to-reorder cannot drop at the end of a list. The per-row
+// destination only inserts before a target row, so the slot after the last row
+// is unreachable. This modifier is a full-width drop target placed AFTER the
+// last row; it appends the dragged item to the end. The hover indicator is a
+// 2pt accent line at the top of the trailing zone, mirroring the per-row line.
+
+struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Equatable>: ViewModifier {
+    let kind: String?
+    @Binding var isTargeted: Bool
+    let onMove: (ID) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            // Insertion line at the top of the trailing zone == "after the last row".
+            .overlay(alignment: .top) {
+                if isTargeted {
+                    Rectangle()
+                        .fill(Color.accentColor)
+                        .frame(height: 2)
+                        .padding(.horizontal, 4)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isTargeted)
+                }
+            }
+            .dropDestination(for: String.self) { items, _ in
+                isTargeted = false
+                guard let token = items.first,
+                      let raw = parseReorderToken(token, expectedKind: kind),
+                      let draggedID = ID(raw)
+                else { return false }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                    onMove(draggedID)
+                }
+                return true
+            } isTargeted: { isOver in
+                isTargeted = isOver
+            }
+    }
+}
+
+extension View {
+    /// Trailing drop target for a reorderable list. Attach this AFTER the last
+    /// row (e.g. on a full-width spacer below the `ForEach`) so a drag can land
+    /// past the end. `onMove` receives only the dragged id; the caller appends it.
+    ///
+    /// - Parameters:
+    ///   - kind:       Must match the `kind` passed to `.reorderDraggable` on the
+    ///     source rows. Defaults to `nil`.
+    ///   - isTargeted: Binding for the insertion-line indicator.
+    ///   - onMove:     Called with the dragged id when the drop lands. Append it.
+    func reorderTrailingDropDestination<ID: LosslessStringConvertible & Equatable>(
+        kind: String? = nil,
+        isTargeted: Binding<Bool>,
+        onMove: @escaping (ID) -> Void
+    ) -> some View {
+        modifier(ReorderTrailingDropDestinationModifier(kind: kind, isTargeted: isTargeted, onMove: onMove))
+    }
+}

@@ -7,6 +7,16 @@ final class EditorWindowController {
     private var window: NSWindow?
 
     func open(clip: Clip, store: ClipStore) {
+        // Close and release any existing editor window before creating a new
+        // one. The previous implementation unconditionally reassigned
+        // self.window, dropping the prior NSWindow without orderOut/close,
+        // which leaked it (isReleasedWhenClosed=false means AppKit will not
+        // release it on its own).
+        if let existing = window {
+            existing.orderOut(nil)
+            window = nil
+        }
+
         let editor = ClipEditorView(clip: clip, store: store, onClose: { [weak self] in
             self?.close()
         })

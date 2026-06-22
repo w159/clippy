@@ -103,9 +103,21 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// synthetic key events would otherwise land nowhere and beep. Re-activating
     /// the app forces its text field back to first responder before we type.
     func restoreFocusToPreviousApp() {
+        // Re-resolve the target each time: a long-lived panel may hold a stale
+        // previousApp (captured only at show()), and a nonactivating panel does
+        // not steal frontmost, so the live frontmost is still the app we want to
+        // send into. Prefer it when it is a real, running, non-Clippy app.
+        if let front = NSWorkspace.shared.frontmostApplication,
+           front.bundleIdentifier != Bundle.main.bundleIdentifier,
+           !front.isTerminated {
+            previousApp = front
+        }
         guard let previousApp,
-              previousApp.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
-        previousApp.activate()
+              previousApp.bundleIdentifier != Bundle.main.bundleIdentifier,
+              !previousApp.isTerminated else { return }
+        // activate(options:) replaces the deprecated no-arg activate(); the
+        // options set brings the app's windows forward reliably.
+        previousApp.activate(options: [.activateAllWindows])
     }
 
     /// Debug aid for UI smoke tests: render the panel's content into a PNG.
@@ -127,6 +139,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         // panelPinned suppresses all auto-hide triggers, including this one.
         // Default (hideOnClickAway=false) preserves the original persistent behavior.
         guard settings.hideOnClickAway, !settings.panelPinned else { return }
+        // Opening a Clippy-owned window (Settings, editor) from the panel takes
+        // key away from the panel. Treat that as same-app focus and keep the
+        // panel visible, instead of dismissing it contrary to intent.
+        if let key = NSApp.keyWindow, key !== (panel as NSWindow?) {
+            return
+        }
         hide()
     }
 
@@ -176,6 +194,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .managed]
         panel.animationBehavior = .utilityWindow
         panel.delegate = self
+        // Route Escape through hide() so the origin and remembered size are
+        // preserved (cancelOperation used to orderOut(nil) and skip the save).
+        panel.onCancel = { [weak self] in self?.hide() }
         self.panel = panel
         return panel
     }
@@ -263,6 +284,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func screen(containing point: CGPoint) -> NSScreen {
         NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
             ?? NSScreen.main
-            ?? NSScreen.screens[0]
+            ?? NSScreen.screens.first
+            ?? NSScreen.main!
     }
 }

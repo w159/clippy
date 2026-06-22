@@ -1,21 +1,44 @@
 import AppKit
 
-// The menu bar icon: the system `paperclip` SF Symbol. AppKit renders SF Symbols
-// as template images with correct optical sizing at every scale, so they cannot
-// clip or appear "cut off" the way a hand-drawn path could. The paused state
-// overlays a diagonal slash to show capture is off.
+// The menu bar icon: the system `paperclip` SF Symbol. Rendered with a text-style
+// symbol configuration so the system picks the correct optical weight/scale for
+// the menu bar, and centered in an image sized to the status button so it
+// cannot read as top-cropped. The paused state overlays a diagonal slash to
+// show capture is off.
 enum StatusBarIcon {
-    /// The paperclip symbol as a template image. `paused` adds a slash overlay.
+    /// The paperclip symbol as a template image, centered in a square canvas
+    /// the height of the menu bar button so the glyph is vertically aligned.
+    /// `paused` adds a slash overlay.
     static func image(paused: Bool = false) -> NSImage {
-        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        let symbol = NSImage(systemSymbolName: "paperclip",
-                             accessibilityDescription: paused ? "Clippy (paused)" : "Clippy")?
+        // Use a text-style configuration so AppKit sizes the symbol for the menu
+        // bar context (correct optical weight and baseline), rather than a fixed
+        // pointSize that can read as top-cropped inside the button.
+        let config = NSImage.SymbolConfiguration(textStyle: .body, scale: .small)
+        let raw = NSImage(systemSymbolName: "paperclip",
+                          accessibilityDescription: paused ? "Clippy (paused)" : "Clippy")?
             .withSymbolConfiguration(config) ?? NSImage()
-        symbol.isTemplate = true
-        guard paused else { return symbol }
 
-        // Paused: draw the symbol and a diagonal slash across it.
-        let slashed = NSImage(size: symbol.size, flipped: false) { rect in
+        // Center the glyph in a canvas the height of a status bar button so the
+        // symbol is vertically centered, not pinned to the top of its bbox.
+        let canvas = CGSize(width: 22, height: 22)
+        let centered = NSImage(size: canvas, flipped: false) { rect in
+            let drawRect = NSRect(
+                x: (rect.width - raw.size.width) / 2,
+                y: (rect.height - raw.size.height) / 2,
+                width: raw.size.width,
+                height: raw.size.height
+            )
+            raw.draw(in: drawRect)
+            return true
+        }
+        centered.isTemplate = true
+        guard !paused else { return Self.applySlash(to: centered, canvas: canvas) }
+        return centered
+    }
+
+    /// Paused: draw the symbol and a diagonal slash across it.
+    private static func applySlash(to symbol: NSImage, canvas: CGSize) -> NSImage {
+        let slashed = NSImage(size: canvas, flipped: false) { rect in
             symbol.draw(in: rect)
             NSColor.black.set()
             let slash = NSBezierPath()
@@ -34,7 +57,12 @@ enum StatusBarIcon {
     /// Called in sync with the capture sound so icon and sound fire together.
     static func bounce(_ button: NSStatusBarButton) {
         button.wantsLayer = true
+        // Do NOT clip the layer bounds: the bounce overshoot (1.14x) is meant to
+        // extend past the button's resting frame, and masksToBounds would crop
+        // the top of the paperclip exactly the way the audit reported. The icon
+        // always snaps back to its resting spot via isRemovedOnCompletion.
         guard let layer = button.layer else { return }
+        layer.masksToBounds = false
 
         // Scale about the button's center by baking the pivot into the transform
         // matrix (translate to center, scale, translate back). The layer's model
