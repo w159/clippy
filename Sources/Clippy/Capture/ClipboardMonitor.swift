@@ -18,6 +18,16 @@ final class ClipboardMonitor {
     private var skipNextChange = false
     private var cancellables = Set<AnyCancellable>()
 
+    /// Serial queue for the heavy capture work (DB write, FTS reindex, eviction,
+    /// media file copy, thumbnail encoding). The poll timer fires on the main
+    /// run loop, so doing this work inline froze the UI on every copy; under DB
+    /// queue contention (e.g. a background iCloud export holding the shared
+    /// DatabaseQueue) the main thread could stall until the write committed.
+    /// The pasteboard is still read on the main thread (AppKit-affined), then
+    /// the save is dispatched here. Serial to preserve capture order and keep
+    /// concurrent evictions from racing on the shared DatabaseQueue.
+    private let captureQueue = DispatchQueue(label: "com.bytesavvy.clippy.capture-save", qos: .userInitiated)
+
     var isPaused = false
 
     /// Pasteboard types that mean "do not record this". ConcealedType is the
@@ -100,6 +110,8 @@ final class ClipboardMonitor {
     }
 
     private func captureText(_ text: String, from frontApp: NSRunningApplication?) {
+        // Snapshot the pasteboard on the main thread (AppKit-affined), then
+        // dispatch the DB write off-main so a copy never blocks the UI.
         let rtf = pasteboard.data(forType: .rtf)
         let html = pasteboard.data(forType: .html)
         let typeIdentifier: String
@@ -110,25 +122,36 @@ final class ClipboardMonitor {
         } else {
             typeIdentifier = "public.utf8-plain-text"
         }
+        let bundleID = frontApp?.bundleIdentifier
+        let appName = frontApp?.localizedName
+        let createdAt = Date()
+        let cap = AppSettings.shared.maxHistoryItems
+        let database = self.database
 
-        var clip = Clip(
-            id: nil,
-            contentText: text,
-            contentRTF: rtf,
-            contentHTML: html,
-            typeIdentifier: typeIdentifier,
-            sourceAppBundleID: frontApp?.bundleIdentifier,
-            sourceAppName: frontApp?.localizedName,
-            createdAt: Date()
-        )
-        do {
-            try database.saveCapturedClip(&clip, cap: AppSettings.shared.maxHistoryItems)
-            // Sound fires only after a confirmed save; duplicates or DB errors
-            // get no feedback. NSSound.play() is async and never blocks here.
-            playCaptureSound()
-            maybeAutoSuggestTitle(forText: text, clipID: clip.id)
-        } catch {
-            ClippyLog.error("Failed to save clip: \(error)", category: ClippyLog.capture)
+        captureQueue.async { [weak self] in
+            var clip = Clip(
+                id: nil,
+                contentText: text,
+                contentRTF: rtf,
+                contentHTML: html,
+                typeIdentifier: typeIdentifier,
+                sourceAppBundleID: bundleID,
+                sourceAppName: appName,
+                createdAt: createdAt
+            )
+            do {
+                try database.saveCapturedClip(&clip, cap: cap)
+                let savedID = clip.id
+                // Sound/title fire only after a confirmed save; duplicates or DB
+                // errors get no feedback. Hop back to main for AppKit + the
+                // .clippyDidCapture notification the status item observes.
+                DispatchQueue.main.async { [weak self] in
+                    self?.playCaptureSound()
+                    self?.maybeAutoSuggestTitle(forText: text, clipID: savedID)
+                }
+            } catch {
+                ClippyLog.error("Failed to save clip: \(error)", category: ClippyLog.capture)
+            }
         }
     }
 
@@ -182,46 +205,58 @@ final class ClipboardMonitor {
         guard !viable.isEmpty else { return false }
 
         let thresholdBytes = settings.maxFileSizeMB * 1_000_000
-        var capturedAny = false
-        for fileURL in viable {
-            let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
-            let fileSize = (attributes?[.size] as? Int) ?? 0
-            let displayName = fileURL.lastPathComponent
+        let bundleID = frontApp?.bundleIdentifier
+        let appName = frontApp?.localizedName
+        let cap = settings.maxHistoryItems
+        let database = self.database
+        let urlsToStore = viable
 
-            do {
-                var mediaFilename: String? = nil
-                var storedByteSize: Int = fileSize
+        // The "handled" decision is made on the main thread from the viable URL
+        // list so the caller can skip the text/image fall-through immediately;
+        // the byte copy + DB write run off-main so a multi-file Finder copy
+        // cannot freeze the UI.
+        captureQueue.async { [weak self] in
+            var capturedAny = false
+            for fileURL in urlsToStore {
+                let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+                let fileSize = (attributes?[.size] as? Int) ?? 0
+                let displayName = fileURL.lastPathComponent
 
-                if fileSize <= thresholdBytes {
-                    // Copy bytes into the media store.
-                    let stored = try database.media.storeFile(at: fileURL)
-                    mediaFilename = stored.mediaFilename
-                    storedByteSize = stored.byteSize
+                do {
+                    var mediaFilename: String? = nil
+                    var storedByteSize: Int = fileSize
+
+                    if fileSize <= thresholdBytes {
+                        // Copy bytes into the media store.
+                        let stored = try database.media.storeFile(at: fileURL)
+                        mediaFilename = stored.mediaFilename
+                        storedByteSize = stored.byteSize
+                    }
+
+                    var clip = Clip(
+                        id: nil,
+                        contentText: displayName,
+                        contentRTF: nil,
+                        contentHTML: nil,
+                        typeIdentifier: "public.file-url",
+                        sourceAppBundleID: bundleID,
+                        sourceAppName: appName,
+                        createdAt: Date(),
+                        contentKind: .file,
+                        mediaFilename: mediaFilename,
+                        byteSize: storedByteSize
+                    )
+                    clip.filePath = fileURL.path
+
+                    try database.saveCapturedFileClip(&clip, cap: cap)
+                    capturedAny = true
+                } catch {
+                    ClippyLog.error("Failed to save file clip: \(error)", category: ClippyLog.capture)
                 }
-
-                var clip = Clip(
-                    id: nil,
-                    contentText: displayName,
-                    contentRTF: nil,
-                    contentHTML: nil,
-                    typeIdentifier: "public.file-url",
-                    sourceAppBundleID: frontApp?.bundleIdentifier,
-                    sourceAppName: frontApp?.localizedName,
-                    createdAt: Date(),
-                    contentKind: .file,
-                    mediaFilename: mediaFilename,
-                    byteSize: storedByteSize
-                )
-                clip.filePath = fileURL.path
-
-                try database.saveCapturedFileClip(&clip, cap: settings.maxHistoryItems)
-                capturedAny = true
-            } catch {
-                ClippyLog.error("Failed to save file clip: \(error)", category: ClippyLog.capture)
             }
-        }
-        if capturedAny {
-            playCaptureSound()
+            if capturedAny {
+                DispatchQueue.main.async { [weak self] in self?.playCaptureSound() }
+            }
         }
         // Return true whenever viable file URLs were on the pasteboard, even if
         // every save threw, so the caller does not fall through to text/image
@@ -240,28 +275,39 @@ final class ClipboardMonitor {
         else { return }
         guard pngData.count <= AppSettings.shared.maxImageSizeMB * 1_048_576 else { return }
 
-        do {
-            let stored = try database.media.store(pngData: pngData)
-            var clip = Clip(
-                id: nil,
-                contentText: "",
-                contentRTF: nil,
-                contentHTML: nil,
-                typeIdentifier: "public.png",
-                sourceAppBundleID: frontApp?.bundleIdentifier,
-                sourceAppName: frontApp?.localizedName,
-                createdAt: Date(),
-                contentKind: .image,
-                mediaFilename: stored.mediaFilename,
-                thumbFilename: stored.thumbFilename,
-                pixelWidth: stored.pixelWidth,
-                pixelHeight: stored.pixelHeight,
-                byteSize: stored.byteSize
-            )
-            try database.saveCapturedImageClip(&clip, cap: AppSettings.shared.maxHistoryItems)
-            playCaptureSound()
-        } catch {
-            ClippyLog.error("Failed to save image clip: \(error)", category: ClippyLog.capture)
+        // Decode the pasteboard to PNG on the main thread (AppKit image path),
+        // then dispatch the file write + DB insert off-main so a screenshot
+        // capture cannot block the UI.
+        let bundleID = frontApp?.bundleIdentifier
+        let appName = frontApp?.localizedName
+        let createdAt = Date()
+        let cap = AppSettings.shared.maxHistoryItems
+        let database = self.database
+
+        captureQueue.async { [weak self] in
+            do {
+                let stored = try database.media.store(pngData: pngData)
+                var clip = Clip(
+                    id: nil,
+                    contentText: "",
+                    contentRTF: nil,
+                    contentHTML: nil,
+                    typeIdentifier: "public.png",
+                    sourceAppBundleID: bundleID,
+                    sourceAppName: appName,
+                    createdAt: createdAt,
+                    contentKind: .image,
+                    mediaFilename: stored.mediaFilename,
+                    thumbFilename: stored.thumbFilename,
+                    pixelWidth: stored.pixelWidth,
+                    pixelHeight: stored.pixelHeight,
+                    byteSize: stored.byteSize
+                )
+                try database.saveCapturedImageClip(&clip, cap: cap)
+                DispatchQueue.main.async { [weak self] in self?.playCaptureSound() }
+            } catch {
+                ClippyLog.error("Failed to save image clip: \(error)", category: ClippyLog.capture)
+            }
         }
     }
 

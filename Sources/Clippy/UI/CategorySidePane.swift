@@ -29,10 +29,9 @@ struct CategorySidePane: View {
     /// Category pending deletion, presented via a confirmation alert.
     @State private var categoryToDelete: Category?
 
-    /// AI Actions has no PanelSelection case (that enum lives in PanelSelection.swift,
-    /// outside this file's scope), so the row fires this placeholder callback. The
-    /// host that owns the panel is expected to route it (e.g. open Settings > AI
-    /// Actions). Defaults to a no-op so the row renders harmlessly when unwired.
+    /// Legacy hook kept for external callers/tests that route AI Actions
+    /// themselves. The row now drives `selection` directly (see `aiActionsRow`),
+    /// so this is unused from the panel and defaults to a no-op.
     var onNavigateAIActions: () -> Void = {}
 
     /// Sentinel target ID for end-of-list category moves. `store.moveCategory`
@@ -253,20 +252,19 @@ struct CategorySidePane: View {
         .accessibilityLabel("AI Assistant")
     }
 
-    /// Audit finding: AI Actions had no side-pane nav row, breaking the
-    /// four-collection symmetry with Scripts/Assistant. PanelSelection has no
-    /// `.aiActions` case (that file is out of scope), so this row drives a
-    /// placeholder callback (`onNavigateAIActions`) instead of a selection.
+    /// Side-pane nav row for the AI Actions manager. Drives `selection`
+    /// directly so the main pane swaps to AIActionsManagerView, matching the
+    /// Scripts/Assistant rows.
     private var aiActionsRow: some View {
         sidePaneRow(
-            isSelected: false,
+            isSelected: selection == .aiActions,
             tint: Color(nsColor: .systemIndigo),
             icon: { Image(systemName: "wand.and.stars").font(.system(size: 12, weight: .semibold)) },
             title: "AI Actions",
             count: nil,
             help: "Manage AI actions"
         ) {
-            onNavigateAIActions()
+            selection = selection == .aiActions ? .history : .aiActions
         }
         .accessibilityLabel("AI Actions")
     }

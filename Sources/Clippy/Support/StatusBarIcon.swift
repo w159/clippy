@@ -1,44 +1,33 @@
 import AppKit
 
-// The menu bar icon: the system `paperclip` SF Symbol. Rendered with a text-style
-// symbol configuration so the system picks the correct optical weight/scale for
-// the menu bar, and centered in an image sized to the status button so it
-// cannot read as top-cropped. The paused state overlays a diagonal slash to
-// show capture is off.
+// The menu bar icon: the system `paperclip` SF Symbol as a template image. The
+// paused state overlays a diagonal slash to show capture is off.
+//
+// Sizing: a standalone menu bar glyph uses the point-size configuration
+// `init(pointSize:weight:scale:)` (see Apple's NSImage.SymbolConfiguration docs:
+// scale variants are defined relative to the SF font's cap height, and the
+// default scale is .medium). A text-style configuration (`init(textStyle:scale:)`)
+// is for symbols sitting inline with Dynamic Type text; pairing it with
+// `.small` shrinks the glyph to the small cap-height variant, which is what
+// previously made the menu bar paperclip read at roughly half size. The status
+// button centers a template image itself, so no manual canvas sizing is needed;
+// the earlier top-crop was the bounce animation's masksToBounds, fixed below.
 enum StatusBarIcon {
-    /// The paperclip symbol as a template image, centered in a square canvas
-    /// the height of the menu bar button so the glyph is vertically aligned.
-    /// `paused` adds a slash overlay.
+    /// The paperclip symbol as a template image. `paused` adds a slash overlay.
     static func image(paused: Bool = false) -> NSImage {
-        // Use a text-style configuration so AppKit sizes the symbol for the menu
-        // bar context (correct optical weight and baseline), rather than a fixed
-        // pointSize that can read as top-cropped inside the button.
-        let config = NSImage.SymbolConfiguration(textStyle: .body, scale: .small)
-        let raw = NSImage(systemSymbolName: "paperclip",
-                          accessibilityDescription: paused ? "Clippy (paused)" : "Clippy")?
+        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular, scale: .medium)
+        let symbol = NSImage(systemSymbolName: "paperclip",
+                             accessibilityDescription: paused ? "Clippy (paused)" : "Clippy")?
             .withSymbolConfiguration(config) ?? NSImage()
-
-        // Center the glyph in a canvas the height of a status bar button so the
-        // symbol is vertically centered, not pinned to the top of its bbox.
-        let canvas = CGSize(width: 22, height: 22)
-        let centered = NSImage(size: canvas, flipped: false) { rect in
-            let drawRect = NSRect(
-                x: (rect.width - raw.size.width) / 2,
-                y: (rect.height - raw.size.height) / 2,
-                width: raw.size.width,
-                height: raw.size.height
-            )
-            raw.draw(in: drawRect)
-            return true
-        }
-        centered.isTemplate = true
-        guard !paused else { return Self.applySlash(to: centered, canvas: canvas) }
-        return centered
+        symbol.isTemplate = true
+        guard paused else { return symbol }
+        return Self.applySlash(to: symbol)
     }
 
-    /// Paused: draw the symbol and a diagonal slash across it.
-    private static func applySlash(to symbol: NSImage, canvas: CGSize) -> NSImage {
-        let slashed = NSImage(size: canvas, flipped: false) { rect in
+    /// Paused: draw the symbol and a diagonal slash across it, in a canvas the
+    /// size of the symbol itself so the paused glyph matches the active one.
+    private static func applySlash(to symbol: NSImage) -> NSImage {
+        let slashed = NSImage(size: symbol.size, flipped: false) { rect in
             symbol.draw(in: rect)
             NSColor.black.set()
             let slash = NSBezierPath()

@@ -9,4 +9,7 @@ enum PanelSelection: Hashable {
     case onePassword
     case scripts
     case assistant
+    /// Manage built-in and custom AI actions. Routed to AIActionsManagerView
+    /// in the main pane, mirroring the Scripts/Assistant side-pane rows.
+    case aiActions
 }

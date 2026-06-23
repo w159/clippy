@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-06-23 - UI-freeze fixes (capture/search off main thread), status-bar icon, AI Actions panel nav, duplicate-file cleanup
+
+### Fixed
+- Clipboard capture no longer blocks the UI: text/file/image DB writes moved off the
+  main thread onto a serial `captureQueue` (DispatchQueue .userInitiated). Sources/Clippy/Capture/ClipboardMonitor.swift:21
+  (queue declaration), :125/:216/:283 (async dispatch sites). Thread-safety holds:
+  all four DB methods touch only the serial GRDB DatabaseQueue
+  (Sources/Clippy/Storage/ClipDatabase.swift:122); @Published hops back to MainActor.
+- FTS search no longer blocks the UI: `searchClips` now runs on a background queue with
+  a monotonic `refilterToken` that discards stale results when the query changes mid-flight.
+  Sources/Clippy/UI/ClipStore.swift:33 (token), :386-414 (background dispatch),
+  :374 (MainActor.run hop). Closes the 2026-06-22 audit finding at
+  docs/audits/2026-06-22-clippy-uiux-audit.md:56.
+- Status bar icon no longer renders at half size: switched to a point-size symbol
+  configuration so the paperclip fills the status-item cell. Sources/Clippy/Support/StatusBarIcon.swift:19.
+  Addresses docs/audits/2026-06-22-clippy-uiux-audit.md:22 and :515.
+- `swift test` no longer fails with duplicate `XCTestCase` redeclarations: removed three
+  untracked iCloud-collision ` 2` files (Tests/ClippyTests/AppDefaultTests 2.swift,
+  Tests/ClippyTests/ReorderIDsTests 2.swift, integrations/clippy-mcp/node_modules 2
+  symlink). Tracked originals are unchanged.
+
+### Added
+- New `.aiActions` panel nav row, wired end-to-end: enum case
+  (Sources/Clippy/UI/PanelSelection.swift:12), side-pane row
+  (Sources/Clippy/UI/CategorySidePane.swift:255-268), main-pane render and empty-state
+  (Sources/Clippy/UI/ClipListView.swift:118, :440, :1083).
+
+### Note
+- `swift test` under iCloud Drive fails codesign with "resource fork / Finder information
+  detritus" until extended attributes are stripped. Run `xattr -cr .build` before invoking
+  `swift test`. Recorded as a lesson; no docs/lessons/ folder exists yet.
+
+### Verification
+- `swift build` -> Build complete! (3.87s).
+- `swift test` (after `xattr -cr .build`) -> Executed 301 tests, with 0 failures (exit 0),
+  2026-06-23.
+
 ## 2026-06-16 - Overhaul wave (settings regression, themes, sounds, logging, drag/drop, AI, SwiftUI modernization)
 
 ### Fixed

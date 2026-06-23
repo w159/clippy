@@ -30,6 +30,11 @@ final class ClipStore: ObservableObject {
         didSet { refilter() }
     }
     private var searchDebounce: Task<Void, Never>?
+    /// Monotonic generation for the async FTS search. Incremented on every
+    /// refilter that kicks off a background read; the completion discards
+    /// results from any earlier generation so a fast-typed query or a DB pulse
+    /// mid-search cannot overwrite the current results with stale ones.
+    private var refilterToken = 0
     private var clipsCancellable: AnyDatabaseCancellable?
     private var categoriesCancellable: AnyDatabaseCancellable?
     private let database: ClipDatabase
@@ -366,7 +371,9 @@ final class ClipStore: ObservableObject {
         searchDebounce = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 180_000_000)
             guard !Task.isCancelled, let self else { return }
-            self.refilter()
+            // refilter touches @Published state; route it through the main
+            // thread so SwiftUI observes the change on the right queue.
+            await MainActor.run { self.refilter() }
         }
     }
 
@@ -377,14 +384,33 @@ final class ClipStore: ObservableObject {
             clips = recents
             return
         }
-        do {
-            clips = try database.searchClips(matching: trimmed, limit: displayLimit)
-            searchError = nil
-        } catch {
-            ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
-            // Keep the last results on screen rather than wiping to empty; the
-            // banner carries the failure and a Retry action.
-            searchError = error.localizedDescription
+        // Run the FTS read off the main thread. The shared DatabaseQueue
+        // serializes access, so a background read no longer blocks the main
+        // thread while a capture write or iCloud export holds the queue.
+        refilterToken &+= 1
+        let token = refilterToken
+        let database = self.database
+        let limit = displayLimit
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let outcome: Result<[Clip], Error>
+            do {
+                outcome = .success(try database.searchClips(matching: trimmed, limit: limit))
+            } catch {
+                outcome = .failure(error)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.refilterToken == token else { return }
+                switch outcome {
+                case .success(let found):
+                    self.clips = found
+                    self.searchError = nil
+                case .failure(let error):
+                    ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
+                    // Keep the last results on screen rather than wiping to empty; the
+                    // banner carries the failure and a Retry action.
+                    self.searchError = error.localizedDescription
+                }
+            }
         }
     }
 }

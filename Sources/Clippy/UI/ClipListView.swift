@@ -116,6 +116,8 @@ struct ClipListView: View {
             return []
         case .assistant:
             return []
+        case .aiActions:
+            return []
         }
     }
 
@@ -436,6 +438,8 @@ struct ClipListView: View {
             OnePasswordView()
         } else if selection == .assistant {
             AIAssistantPanelView(store: store, onOpenSettings: onOpenSettings)
+        } else if selection == .aiActions {
+            AIActionsManagerView()
         } else if visibleClips.isEmpty {
             emptyState
         } else {
@@ -1076,8 +1080,8 @@ struct ClipListView: View {
                     "No secrets shared to Clippy yet",
                     systemImage: "key.fill"
                 )
-            // .scripts and .assistant route to their own views; unreachable here.
-            case .scripts, .assistant:
+            // .scripts, .assistant, and .aiActions route to their own views; unreachable here.
+            case .scripts, .assistant, .aiActions:
                 ContentUnavailableView("", systemImage: "tray")
             }
         }
