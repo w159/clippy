@@ -12,30 +12,35 @@ final class EditorDirtyStateBridge {
     var save: () -> Bool = { true }
 }
 
-/// The clip editor lives in a normal activating window (unlike the panel):
-/// editing is a deliberate action where stealing focus is fine.
+/// Clip editors live in normal activating windows (unlike the panel): editing
+/// is a deliberate action where stealing focus is fine. Each clip gets its own
+/// window; windows share a tabbing identifier and are explicitly tabbed
+/// together, so concurrent edits present as native macOS window tabs. Opening
+/// a clip that is already being edited focuses its existing window/tab.
 final class EditorWindowController: NSObject, NSWindowDelegate {
-    private var window: NSWindow?
-    private var bridge: EditorDirtyStateBridge?
+    /// One live editor: its window, the dirty-state bridge for close prompts,
+    /// and the edited clip's id (nil ids never coalesce onto the same window).
+    private struct Session {
+        let window: NSWindow
+        let bridge: EditorDirtyStateBridge
+        let clipID: Int64?
+    }
+
+    private var sessions: [Session] = []
+
+    /// Shared tab group for all clip editors.
+    private static let tabbingIdentifier = "com.clippy.editor"
 
     func open(clip: Clip, store: ClipStore) {
-        // Close and release any existing editor window before creating a new
-        // one. The previous implementation unconditionally reassigned
-        // self.window, dropping the prior NSWindow without orderOut/close,
-        // which leaked it (isReleasedWhenClosed=false means AppKit will not
-        // release it on its own).
-        if let existing = window {
-            existing.delegate = nil
-            existing.orderOut(nil)
-            window = nil
+        // Re-opening a clip that already has an editor focuses it instead of
+        // spawning a duplicate window over the same row.
+        if let id = clip.id, let existing = sessions.first(where: { $0.clipID == id }) {
+            NSApp.activate()
+            existing.window.makeKeyAndOrderFront(nil)
+            return
         }
 
         let bridge = EditorDirtyStateBridge()
-        self.bridge = bridge
-        let editor = ClipEditorView(clip: clip, store: store, dirtyBridge: bridge, onClose: { [weak self] in
-            self?.close()
-        })
-
         let isImage = clip.contentKind == .image
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: isImage ? 640 : 560, height: isImage ? 540 : 420),
@@ -43,23 +48,39 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = isImage ? "Edit Image" : "Edit Clip"
+        // Per-clip titles so tabs are tellable apart; displayTitle falls back
+        // to the source app name when the user has not named the clip.
+        window.title = clip.displayTitle.isEmpty
+            ? (isImage ? "Edit Image" : "Edit Clip")
+            : clip.displayTitle
         window.isReleasedWhenClosed = false
+        window.tabbingMode = .preferred
+        window.tabbingIdentifier = Self.tabbingIdentifier
+
+        let editor = ClipEditorView(clip: clip, store: store, dirtyBridge: bridge, onClose: { [weak self, weak window] in
+            guard let self, let window else { return }
+            self.close(window)
+        })
         window.contentView = NSHostingView(rootView: editor)
         window.delegate = self
-        window.center()
-        self.window = window
+
+        // Tab into the newest existing editor; a lone editor centers instead.
+        if let host = sessions.last?.window, host.isVisible {
+            host.addTabbedWindow(window, ordered: .above)
+        } else {
+            window.center()
+        }
+        sessions.append(Session(window: window, bridge: bridge, clipID: clip.id))
 
         // NSApp.activate(ignoringOtherApps:) deprecated in macOS 14; use activate().
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 
-    private func close() {
-        window?.delegate = nil
-        window?.orderOut(nil)
-        window = nil
-        bridge = nil
+    private func close(_ window: NSWindow) {
+        window.delegate = nil
+        window.orderOut(nil)
+        sessions.removeAll { $0.window === window }
     }
 
     // MARK: - NSWindowDelegate
@@ -68,7 +89,9 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
     /// dirty one prompts Save / Discard / Keep Editing so edits are never
     /// silently thrown away.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard let bridge, bridge.isDirty() else { return true }
+        guard let session = sessions.first(where: { $0.window === sender }),
+              session.bridge.isDirty()
+        else { return true }
 
         let alert = NSAlert()
         alert.messageText = "Save changes to this clip?"
@@ -80,7 +103,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         case .alertFirstButtonReturn:
             // Only close if the save actually landed; on failure the editor
             // stays open and shows the error inline.
-            return bridge.save()
+            return session.bridge.save()
         case .alertSecondButtonReturn:
             return true
         default:
@@ -92,7 +115,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         // Close came from the title bar rather than Cancel/Save; drop our
         // strong reference so the window (isReleasedWhenClosed=false) and the
         // hosted SwiftUI tree are released.
-        window = nil
-        bridge = nil
+        guard let window = notification.object as? NSWindow else { return }
+        sessions.removeAll { $0.window === window }
     }
 }

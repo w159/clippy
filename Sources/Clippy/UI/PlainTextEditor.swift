@@ -47,6 +47,10 @@ struct PlainTextEditor: NSViewRepresentable {
             scrollView.backgroundColor = backgroundColor
         }
         textView.allowsUndo = true
+        // Built-in find bar: Cmd+F (via the Edit > Find menu items) opens
+        // incremental find/replace over the text without any custom search UI.
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.autoresizingMask = [.width]
         textView.delegate = context.coordinator

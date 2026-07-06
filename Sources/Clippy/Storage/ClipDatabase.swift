@@ -507,12 +507,17 @@ final class ClipDatabase {
     }
 
     /// Searches clips with the `#`-token grammar (see ClipQueryParser). Free text
-    /// goes through FTS5; `#app` filters match sourceAppName/bundleID; a `#duration`
-    /// token bounds createdAt. Filter-only queries (no free text) are supported and
-    /// ordered newest-first instead of by FTS rank.
+    /// goes through FTS5; `#kind` tokens filter contentKind (derived kinds like
+    /// `#link` finish in Swift); `#app` filters match sourceAppName/bundleID; a
+    /// `#duration` token bounds createdAt. Filter-only queries (no free text) are
+    /// supported and ordered newest-first instead of by FTS rank.
     func searchClips(matching query: String, limit: Int) throws -> [Clip] {
         let parsed = ClipQueryParser.parse(query)
-        return try dbQueue.read { db in
+        // Derived kinds (#link/#email/#color/#path) match a subset of the text
+        // rows the SQL narrows to, so over-fetch and trim after the Swift pass.
+        let needsKindPostFilter = parsed.kinds.contains(where: \.isDerived)
+        let fetchLimit = needsKindPostFilter ? limit * 4 : limit
+        let fetched = try dbQueue.read { db -> [Clip] in
             var clauses: [String] = []
             var args: [DatabaseValueConvertible] = []
             var joinFTS = false
@@ -523,6 +528,13 @@ final class ClipDatabase {
                 orderByRank = true
                 clauses.append("clips_fts MATCH ?")
                 args.append(pattern)
+            }
+
+            if !parsed.kinds.isEmpty {
+                let stored = Set(parsed.kinds.map { $0.storedContentKind.rawValue }).sorted()
+                let placeholders = stored.map { _ in "?" }.joined(separator: ", ")
+                clauses.append("clips.contentKind IN (\(placeholders))")
+                args.append(contentsOf: stored)
             }
 
             if !parsed.sourceApps.isEmpty {
@@ -554,10 +566,17 @@ final class ClipDatabase {
             sql += " WHERE " + clauses.joined(separator: " AND ")
             sql += orderByRank ? " ORDER BY rank" : " ORDER BY clips.createdAt DESC, clips.id DESC"
             sql += " LIMIT ?"
-            args.append(limit)
+            args.append(fetchLimit)
 
             return try Clip.fetchAll(db, sql: sql, arguments: StatementArguments(args))
         }
+        guard !parsed.kinds.isEmpty else { return fetched }
+        // OR semantics across kind tokens, mirroring the app-filter behavior.
+        return Array(
+            fetched
+                .filter { clip in parsed.kinds.contains { $0.matches(clip) } }
+                .prefix(limit)
+        )
     }
 
     // MARK: - Category state

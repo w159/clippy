@@ -468,6 +468,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         editMenu.addItem(selectAllItem)
 
+        // Find submenu: routes Cmd+F/Cmd+G to the focused NSTextView's find
+        // bar (usesFindBar). Key equivalents only dispatch through the main
+        // menu, so without these items the editor's find bar is unreachable.
+        editMenu.addItem(.separator())
+        let findItem = NSMenuItem(title: "Find", action: nil, keyEquivalent: "")
+        let findMenu = NSMenu(title: "Find")
+        let findActions: [(String, String, NSTextFinder.Action)] = [
+            ("Find...", "f", .showFindInterface),
+            ("Find Next", "g", .nextMatch),
+            ("Find Previous", "G", .previousMatch),
+            ("Find and Replace...", "F", .showReplaceInterface)
+        ]
+        for (title, key, action) in findActions {
+            let item = NSMenuItem(
+                title: title,
+                action: #selector(NSResponder.performTextFinderAction(_:)),
+                keyEquivalent: key.lowercased()
+            )
+            if key.first?.isUppercase == true {
+                item.keyEquivalentModifierMask = [.command, .shift]
+            }
+            item.tag = action.rawValue
+            findMenu.addItem(item)
+        }
+        findItem.submenu = findMenu
+        editMenu.addItem(findItem)
+
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
 

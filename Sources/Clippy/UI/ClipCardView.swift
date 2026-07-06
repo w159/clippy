@@ -235,23 +235,29 @@ struct ClipCardView: View {
             // reduced opacity so they do not fight the hover actions for
             // attention but are still readable. (Audit: hover swaps out dots
             // and rich indicator, losing persistent context.)
-            ZStack(alignment: .trailing) {
-                HStack(spacing: 6) {
-                    categoryDots
-                    kindIndicator
-                    richIndicator
-                    pinBadge
-                    timestampText
-                        .opacity(showsActions ? 0 : 1)
-                }
-                .opacity(showsActions ? 0.35 : 1)
-                hoverActions
-                    .opacity(showsActions ? 1 : 0)
-                    .allowsHitTesting(showsActions)
+            HStack(spacing: 6) {
+                categoryDots
+                kindIndicator
+                richIndicator
+                pinBadge
+                timestampText
+                    .opacity(showsActions ? 0 : 1)
             }
+            .opacity(showsActions ? 0.35 : 1)
         }
         // minHeight lets the row grow with larger fonts instead of clipping.
         .frame(minHeight: 20)
+        // Quick actions render as a trailing overlay instead of a layout
+        // sibling: the old ZStack kept the (hidden) action row in the size
+        // calculation, giving every card a ~200pt minimum width that made
+        // 3-4 column grids overflow their cells and collide. An overlay costs
+        // zero layout width, and ViewThatFits swaps in a compact variant when
+        // the card is narrower than the full button row.
+        .overlay(alignment: .trailing) {
+            fittingHoverActions
+                .opacity(showsActions ? 1 : 0)
+                .allowsHitTesting(showsActions)
+        }
     }
 
     /// Icon slot: shows the pinned category's icon when the clip is categorized,
@@ -477,6 +483,70 @@ struct ClipCardView: View {
             .font(PanelTypography.metadata(settings))
             .foregroundStyle(tokens.textSecondary)
             .monospacedDigit()
+    }
+
+    /// Width-adaptive action row: the full button strip when the card is wide
+    /// enough, a pin/delete pair plus overflow menu when it is not, and a lone
+    /// overflow menu as the last resort on very narrow cards.
+    private var fittingHoverActions: some View {
+        ViewThatFits(in: .horizontal) {
+            hoverActions
+            compactHoverActions
+            overflowMenu(includePinAndDelete: true)
+        }
+    }
+
+    /// Compact variant for narrow grid cards: keeps the two highest-traffic
+    /// actions as direct buttons and folds the rest into an overflow menu.
+    private var compactHoverActions: some View {
+        HStack(spacing: 6) {
+            overflowMenu(includePinAndDelete: false)
+            cardActionButton(
+                isPinned ? "pin.slash" : "pin",
+                help: isPinned ? "Unpin" : "Pin",
+                action: onTogglePin
+            )
+            cardActionButton("trash", help: "Delete", role: .destructive, action: onDelete)
+        }
+    }
+
+    /// Overflow menu carrying the actions that lost their dedicated buttons in
+    /// the compact layouts. Mirrors hoverActions item-for-item so nothing is
+    /// unreachable at any card width.
+    private func overflowMenu(includePinAndDelete: Bool) -> some View {
+        Menu {
+            if isFile {
+                Button("Paste (Copy)", action: filePasteAction)
+                Button("Reveal in Finder", action: fileRevealAction)
+                if clip.contentText.lowercased().hasSuffix(".zip") {
+                    Button("Extract", action: fileExtractAction)
+                }
+            } else if !isImage {
+                if let aiMenu = aiMenuContent {
+                    Menu("AI Actions") { aiMenu() }
+                }
+                Button("Send as Keystrokes", action: onSendKeystrokes)
+                Button("Edit", action: onEdit)
+            }
+            Button("Rename", action: beginRename)
+            if includePinAndDelete {
+                Button(isPinned ? "Unpin" : "Pin", action: onTogglePin)
+                Divider()
+                Button("Delete", role: .destructive, action: onDelete)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: iconSize, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .foregroundStyle(tokens.textSecondary)
+        .help("More actions")
+        .accessibilityLabel("More actions")
     }
 
     private var hoverActions: some View {

@@ -485,11 +485,30 @@ final class ClipStore: ObservableObject {
 }
 
 extension Clip {
-    /// Case-insensitive in-memory substring match against the clip's text and
-    /// title, used to scope the search field to the active category pane (FTS5
-    /// only runs against the global history window).
+    /// In-memory match used to scope the search field to the active category
+    /// pane (FTS5 only runs against the global history window). Understands the
+    /// same `#`-token grammar as ClipDatabase.searchClips: kind, app, and
+    /// duration tokens filter; the remaining free text is a case-insensitive
+    /// substring match against text, title, and source app name.
     func matchesLocally(query: String) -> Bool {
-        let needle = query.lowercased()
+        let parsed = ClipQueryParser.parse(query)
+
+        if !parsed.kinds.isEmpty, !parsed.kinds.contains(where: { $0.matches(self) }) {
+            return false
+        }
+        if !parsed.sourceApps.isEmpty {
+            let name = sourceAppName?.lowercased() ?? ""
+            let bundle = sourceAppBundleID?.lowercased() ?? ""
+            guard parsed.sourceApps.contains(where: { name.contains($0) || bundle.contains($0) }) else {
+                return false
+            }
+        }
+        if let since = parsed.since, createdAt < since {
+            return false
+        }
+
+        let needle = parsed.text.lowercased()
+        guard !needle.isEmpty else { return true }
         if contentText.lowercased().contains(needle) { return true }
         if let title = userTitle, title.lowercased().contains(needle) { return true }
         if let app = sourceAppName, app.lowercased().contains(needle) { return true }

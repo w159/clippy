@@ -89,6 +89,19 @@ struct ClipListView: View {
     /// The clip ID currently being hovered over during a within-category reorder drag.
     /// Shared across all category-section rows so the insertion line can track the target.
     @State private var draggingOverClipID: Int64?
+    /// Clip awaiting a "Show in Timeline" reveal. Set by the context-menu
+    /// action, consumed once the target pane's clips contain it (the query
+    /// clear and pane switch land on separate view updates).
+    @State private var pendingRevealClipID: Int64?
+    /// Live width of the clip list, used to cap the user's column choice so
+    /// grid cards never drop below a readable minimum width (cards used to
+    /// overflow their cells and collide at 3-4 columns in a narrow panel).
+    @State private var listWidth: CGFloat = 0
+    /// Narrowest a grid card may get before the effective column count drops.
+    /// 140 clears the card's worst-case incompressible header (icon + category
+    /// dots + kind/rich/pin badges ~125pt) and still allows 3 columns at the
+    /// default 640pt panel width.
+    private static let minCardWidth: CGFloat = 140
 
     /// Hover state for the end-of-list clip reorder target. The per-row
     /// `.reorderDropDestination` only inserts before a target row, so the slot
@@ -201,6 +214,7 @@ struct ClipListView: View {
                 selectedIndex = 0
                 anchoredClipID = visibleClips.first?.id
             }
+            attemptPendingReveal()
         }
         .onChange(of: selection) { oldValue, newValue in
             // Opening the assistant carries the anchored text clip in as the
@@ -220,6 +234,7 @@ struct ClipListView: View {
             }
             selectedIndex = 0
             selectedClipIDs = []
+            attemptPendingReveal()
         }
         // AI action sheet, shown when a context-menu AI action produces a proposal.
         .sheet(isPresented: Binding(
@@ -545,12 +560,30 @@ struct ClipListView: View {
                     selection = .category(categoryID)
                     return .handled
                 }
+            // Filter-grammar cheat sheet, surfaced the moment the user types a
+            // '#' so the token vocabulary is discoverable without docs.
+            if store.query.contains("#") {
+                Image(systemName: "number.circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(tokens.accent)
+                    .help(Self.searchGrammarHint)
+                    .accessibilityLabel("Search filter help")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(tokens.headerBar.opacity(settings.panelOpacity))
         .onAppear { searchFocused = true }
+        .help(Self.searchGrammarHint)
     }
+
+    /// Tooltip describing the `#`-token search grammar (see ClipQueryParser).
+    private static let searchGrammarHint = """
+    Filters: #image #text #file #link #email #color #path match the clip kind; \
+    #safari (any other word) matches the source app; #today #yesterday #3d #2w \
+    #1m #1y limit how far back to look. Combine freely: "invoice #image #2weeks".
+    """
 
     // MARK: - Sectioned list
 
@@ -622,8 +655,10 @@ struct ClipListView: View {
 
     private var sectionedList: some View {
         // 1 = single-column rows (default). 2-4 = card grid filled left-to-right
-        // in reading order (LazyVGrid is row-major).
-        let columns = max(1, min(4, settings.clipColumns))
+        // in reading order (LazyVGrid is row-major). The user's choice is a
+        // ceiling: the count is capped by what the current list width can hold
+        // at minCardWidth per card, so cards never overflow their grid cells.
+        let columns = effectiveColumnCount(requested: max(1, min(4, settings.clipColumns)))
         let gridItems = Array(repeating: GridItem(.flexible(), spacing: 6), count: columns)
         // Snapshot the visible clips once per body evaluation: sections,
         // metadata, the trailing-drop guard, and the footer all previously
@@ -674,6 +709,11 @@ struct ClipListView: View {
                 }
                 .padding(10)
             }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                listWidth = width
+            }
             .onChange(of: selectedIndex) { _, newIndex in
                 guard visibleClips.indices.contains(newIndex) else { return }
                 // Keep the anchor id in sync so a DB pulse can re-index onto the
@@ -682,6 +722,18 @@ struct ClipListView: View {
                 proxy.scrollTo(visibleClips[newIndex].id, anchor: nil)
             }
         }
+    }
+
+    /// Responsive cap on the grid column count. The user can request up to 4
+    /// columns, but a narrow panel cannot hold them without cards compressing
+    /// below their readable minimum and colliding. Each column must clear
+    /// minCardWidth after subtracting the list padding and inter-column gaps.
+    private func effectiveColumnCount(requested: Int) -> Int {
+        guard requested > 1, listWidth > 0 else { return requested }
+        let usable = listWidth - 20 // .padding(10) on each side of the LazyVStack
+        let spacing: CGFloat = 6
+        let fit = Int((usable + spacing) / (Self.minCardWidth + spacing))
+        return max(1, min(requested, fit))
     }
 
     /// Per-clip lookups derived once per redraw so the card builder can do O(1)
@@ -863,6 +915,11 @@ struct ClipListView: View {
                     Button("Paste as Plain Text") { onPaste(clip, true) }
                     Divider()
                     Button("Edit...") { onEdit(clip) }
+                    // Round-trip through Sublime Text (or the default text
+                    // editor): saves in the external app write back to the clip.
+                    Button(ExternalEditorService.shared.menuTitle) {
+                        ExternalEditorService.shared.edit(clip: clip, store: store)
+                    }
                 }
                 if clip.contentKind == .image {
                     Divider()
@@ -875,6 +932,13 @@ struct ClipListView: View {
                 // "Rename..." works for all clip kinds, not just text.
                 Button("Rename...") { renamingClipID = clip.id }
                 Button(store.isPinned(clip) ? "Unpin" : "Pin") { store.togglePin(clip) }
+                // Jump from a search result to the clip's chronological home
+                // (History date bucket, or its category pane when pinned).
+                Button {
+                    revealInTimeline(clip)
+                } label: {
+                    Label("Show in Timeline", systemImage: "clock.arrow.circlepath")
+                }
                 if clip.contentKind == .text {
                     aiActionsMenu(for: clip)
                 }
@@ -1087,6 +1151,50 @@ struct ClipListView: View {
                 bannerMessage = nil
                 bannerRetry = nil
             }
+        }
+    }
+
+    // MARK: - Timeline reveal
+
+    /// "Show in Timeline": jump from a search result (or any pane) to the
+    /// clip's chronological home. Unpinned clips live in History under their
+    /// date bucket; pinned clips never appear in History, so they reveal in
+    /// their first category pane instead. Clearing the query refilters the
+    /// store synchronously; the pane switch lands on the next view update, so
+    /// the actual select-and-scroll is deferred to attemptPendingReveal.
+    private func revealInTimeline(_ clip: Clip) {
+        pendingRevealClipID = clip.id
+        store.query = ""
+        if store.isPinned(clip), let categoryID = store.firstCategory(for: clip)?.id {
+            selection = .category(categoryID)
+        } else {
+            selection = .history
+        }
+        // Same-pane reveal (e.g. searching within History): neither store.clips
+        // nor selection changes, so neither onChange fires. Defer one turn so
+        // the query-clear refilter has applied, then resolve directly.
+        Task { @MainActor in
+            attemptPendingReveal()
+        }
+    }
+
+    /// Completes a pending reveal once the target clip is present in the
+    /// visible pane: selects it, anchors it (so DB pulses keep it in place),
+    /// and lets the selectedIndex onChange scroll it into view. A clip that is
+    /// no longer visible (older than the history window) surfaces a banner
+    /// instead of failing silently.
+    private func attemptPendingReveal() {
+        guard let target = pendingRevealClipID else { return }
+        if let index = visibleClips.firstIndex(where: { $0.id == target }) {
+            pendingRevealClipID = nil
+            selectedClipIDs = []
+            anchoredClipID = target
+            selectedIndex = index
+        } else if store.query.isEmpty {
+            // Query already cleared and the pane still lacks the clip: it fell
+            // out of the visible history window. Stop waiting and say so.
+            pendingRevealClipID = nil
+            showStatusBanner("Clip is older than the \(Self.displayLimit) most recent shown in History")
         }
     }
 

@@ -118,4 +118,75 @@ final class ClipSearchQueryTests: XCTestCase {
         let results = try db.searchClips(matching: "invoice #edge", limit: 50)
         XCTAssertEqual(results.map(\.contentText), ["invoice march"])
     }
+
+    // MARK: - Kind tokens
+
+    func testKindTokenParsing() {
+        let p = ClipQueryParser.parse("#image #url receipts", now: now, calendar: cal)
+        XCTAssertEqual(p.kinds, [.image, .link])
+        XCTAssertEqual(p.text, "receipts")
+        XCTAssertTrue(p.sourceApps.isEmpty)
+        XCTAssertNil(p.since)
+    }
+
+    func testUnrecognizedTokenStillFallsThroughToApp() {
+        let p = ClipQueryParser.parse("#slack", now: now, calendar: cal)
+        XCTAssertEqual(p.sourceApps, ["slack"])
+        XCTAssertTrue(p.kinds.isEmpty)
+    }
+
+    func testSearchFiltersByStoredKind() throws {
+        let db = try makeTestDatabase(self)
+        var text = makeTextClip("some words")
+        var image = makeTextClip("")
+        image.contentKind = .image
+        image.typeIdentifier = "public.png"
+        image.mediaFilename = "distinct-image.png"
+        try db.saveCapturedClip(&text, cap: 1000)
+        try db.saveCapturedClip(&image, cap: 1000)
+
+        let results = try db.searchClips(matching: "#image", limit: 50)
+        XCTAssertEqual(results.map(\.contentKind), [.image])
+    }
+
+    func testSearchFiltersByDerivedLinkKind() throws {
+        let db = try makeTestDatabase(self)
+        var url = makeTextClip("https://example.com/report")
+        var plain = makeTextClip("plain words only")
+        try db.saveCapturedClip(&url, cap: 1000)
+        try db.saveCapturedClip(&plain, cap: 1000)
+
+        let results = try db.searchClips(matching: "#link", limit: 50)
+        XCTAssertEqual(results.map(\.contentText), ["https://example.com/report"])
+    }
+
+    func testSearchCombinesKindAndApp() throws {
+        let db = try makeTestDatabase(self)
+        var edgeURL = makeTextClip("https://example.com/a")
+        edgeURL.sourceAppName = "Microsoft Edge"
+        var notesURL = makeTextClip("https://example.com/b")
+        notesURL.sourceAppName = "Notes"
+        try db.saveCapturedClip(&edgeURL, cap: 1000)
+        try db.saveCapturedClip(&notesURL, cap: 1000)
+
+        let results = try db.searchClips(matching: "#link #edge", limit: 50)
+        XCTAssertEqual(results.map(\.contentText), ["https://example.com/a"])
+    }
+
+    // MARK: - Local (category-pane) matching honors the token grammar
+
+    func testMatchesLocallyKindToken() {
+        var image = makeTextClip("")
+        image.contentKind = .image
+        XCTAssertTrue(image.matchesLocally(query: "#image"))
+        XCTAssertFalse(makeTextClip("words").matchesLocally(query: "#image"))
+    }
+
+    func testMatchesLocallyAppAndTextTokens() {
+        var clip = makeTextClip("quarterly invoice")
+        clip.sourceAppName = "Microsoft Edge"
+        XCTAssertTrue(clip.matchesLocally(query: "invoice #edge"))
+        XCTAssertFalse(clip.matchesLocally(query: "invoice #notes"))
+        XCTAssertFalse(clip.matchesLocally(query: "recipe #edge"))
+    }
 }
