@@ -2,7 +2,7 @@
   "mcpServers": {
     "clippy": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/../clippy-mcp/build/index.js"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/index.mjs"]
     }
   }
 }

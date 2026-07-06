@@ -73,6 +73,20 @@ extension AITool {
 enum AIToolHelpers {
     static let maxResultBytes = 4096
 
+    /// Decode an integer tool argument. JSONSerialization surfaces numbers as
+    /// Int, Int64, Double, or NSNumber depending on the payload, and some models
+    /// send ids as strings; accept all of them.
+    static func int64Value(_ any: Any?) -> Int64? {
+        switch any {
+        case let v as Int64:  return v
+        case let v as Int:    return Int64(v)
+        case let v as Double: return v.truncatingRemainder(dividingBy: 1) == 0 ? Int64(v) : nil
+        case let v as String: return Int64(v)
+        case let v as NSNumber: return v.int64Value
+        default: return nil
+        }
+    }
+
     static func truncate(_ s: String) -> String {
         guard s.utf8.count > maxResultBytes else { return s }
         // Slice to maxResultBytes UTF-8 units. Using Data -> String avoids the
@@ -99,7 +113,7 @@ enum AIToolHelpers {
 /// texts, separated by a numbered list.
 struct SearchClipsTool: AITool {
     let name = "search_clips"
-    let description = "Search the Clippy clipboard history by text. Returns up to 10 matching snippets."
+    let description = "Search the Clippy clipboard history by text. Returns up to 10 matching snippets with their clip ids; pass an id to get_clip for the full content."
 
     let parametersSchema: [String: Any] = [
         "type": "object",
@@ -118,8 +132,11 @@ struct SearchClipsTool: AITool {
         }
         let clips = try ClipDatabase.shared.searchClips(matching: query, limit: 10)
         if clips.isEmpty { return "No clips found matching \"\(query)\"." }
-        return clips.enumerated().map { (i, clip) in
-            "\(i + 1). \(AIService.clamp(clip.contentText, 200))"
+        return clips.enumerated().map { (i, clip) -> String in
+            // Surface the id so follow-up tools (get_clip, set_clip_category)
+            // can address the exact clip instead of re-searching.
+            let idTag = clip.id.map { "[id \($0)] " } ?? ""
+            return "\(i + 1). \(idTag)\(AIService.clamp(clip.contentText, 200))"
         }.joined(separator: "\n")
     }
 }
@@ -152,6 +169,102 @@ struct CreateClipTool: AITool {
         }
         let id = try ClipDatabase.shared.insertTextClip(text)
         return "Clip created with id \(id)."
+    }
+}
+
+// MARK: get_clip
+
+/// Fetch one clip by id and return its full content plus basic metadata.
+/// Complements search_clips, whose results are clamped to 200-character snippets.
+struct GetClipTool: AITool {
+    let name = "get_clip"
+    let description = "Fetch a single clip from the Clippy clipboard history by its id and return its full content. Use the ids returned by search_clips."
+
+    let parametersSchema: [String: Any] = [
+        "type": "object",
+        "properties": [
+            "clip_id": [
+                "type": "integer",
+                "description": "The id of the clip to fetch.",
+            ] as [String: Any],
+        ] as [String: Any],
+        "required": ["clip_id"],
+    ]
+
+    func execute(args: [String: Any]) async throws -> String {
+        guard let clipID = AIToolHelpers.int64Value(args["clip_id"]) else {
+            return "Error: clip_id parameter is required and must be an integer."
+        }
+        guard let clip = try ClipDatabase.shared.allClips().first(where: { $0.id == clipID }) else {
+            return "Error: no clip with id \(clipID)."
+        }
+        let header = "Clip \(clipID): \"\(clip.displayTitle)\" (\(clip.contentKind.rawValue), created \(clip.createdAt.formatted()))"
+        return AIToolHelpers.truncate("\(header)\n\(clip.contentText)")
+    }
+}
+
+// MARK: set_clip_category
+
+/// Assign an existing clip to a category by name. Creates the category only
+/// when the model explicitly asks via create_if_missing (i.e. the user asked).
+struct SetClipCategoryTool: AITool {
+    let name = "set_clip_category"
+    let description = "Assign a clip in the Clippy clipboard history to a category by name. The category must already exist unless create_if_missing is true."
+
+    let parametersSchema: [String: Any] = [
+        "type": "object",
+        "properties": [
+            "clip_id": [
+                "type": "integer",
+                "description": "The id of the clip to categorize.",
+            ] as [String: Any],
+            "category": [
+                "type": "string",
+                "description": "The name of the category to assign the clip to.",
+            ] as [String: Any],
+            "create_if_missing": [
+                "type": "boolean",
+                "description": "Create the category when it does not exist. Set true only when the user explicitly asked to create it.",
+            ] as [String: Any],
+        ] as [String: Any],
+        "required": ["clip_id", "category"],
+    ]
+
+    func execute(args: [String: Any]) async throws -> String {
+        guard let clipID = AIToolHelpers.int64Value(args["clip_id"]) else {
+            return "Error: clip_id parameter is required and must be an integer."
+        }
+        guard let rawName = args["category"] as? String,
+              !rawName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "Error: category parameter is required."
+        }
+        let categoryName = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard try ClipDatabase.shared.allClips().contains(where: { $0.id == clipID }) else {
+            return "Error: no clip with id \(clipID)."
+        }
+
+        let existing = try ClipDatabase.shared.categories()
+        let category: Category
+        if let match = existing.first(where: { $0.name.caseInsensitiveCompare(categoryName) == .orderedSame }) {
+            category = match
+        } else if args["create_if_missing"] as? Bool == true {
+            // Same defaults the editor uses when creating from a suggestion.
+            category = try ClipDatabase.shared.createCategory(
+                named: categoryName,
+                colorHex: CategoryPalette.hexes[0],
+                iconKind: .symbol,
+                iconValue: "pin.fill"
+            )
+        } else {
+            let names = existing.map(\.name).joined(separator: ", ")
+            return "Error: no category named \"\(categoryName)\". Existing categories: \(names.isEmpty ? "none" : names)."
+        }
+
+        guard let categoryID = category.id else {
+            return "Error: category \"\(category.name)\" has no id."
+        }
+        try ClipDatabase.shared.setClip(clipID, inCategory: categoryID, true)
+        return "Clip \(clipID) assigned to category \"\(category.name)\"."
     }
 }
 
@@ -432,6 +545,8 @@ extension AIToolRegistry {
         let registry = AIToolRegistry()
         registry.register(SearchClipsTool())
         registry.register(CreateClipTool())
+        registry.register(GetClipTool())
+        registry.register(SetClipCategoryTool())
         registry.register(WebSearchTool())
         registry.register(ListScriptsTool(scriptStore: .shared))
         registry.register(RunScriptTool(scriptStore: .shared, confirmHook: confirmHook))
@@ -451,6 +566,8 @@ extension AIToolRegistry {
         let registry = AIToolRegistry()
         registry.register(SearchClipsTool())
         registry.register(CreateClipTool())
+        registry.register(GetClipTool())
+        registry.register(SetClipCategoryTool())
         if allowWebSearch {
             registry.register(WebSearchTool())
         }

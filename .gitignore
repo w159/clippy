@@ -41,6 +41,8 @@
 !img/**
 !integrations/
 !integrations/**
+!.claude-plugin/
+!.claude-plugin/**
 
 # Re-exclude generated artifacts (must come after allowlist)
 .build/

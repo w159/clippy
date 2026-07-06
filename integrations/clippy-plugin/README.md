@@ -1,37 +1,72 @@
 # clippy (Claude Code plugin)
 
-Registers the [`clippy-mcp`](../clippy-mcp) server and adds slash commands so Claude Code can drive the Clippy macOS clipboard manager.
+Drive the [Clippy](../../README.md) macOS clipboard manager from Claude Code. The plugin is self-contained: it ships a bundled MCP server (no install step beyond Node 22+), slash commands, two skills, and a curator agent.
 
 ## Layout
 
 ```
 clippy-plugin/
-├── .claude-plugin/plugin.json   # manifest (name, version, description)
-├── .mcp.json                    # registers the clippy MCP server
-└── commands/
-    ├── clippy-search.md         # /clippy-search <terms>
-    ├── clippy-add.md            # /clippy-add <text>
-    └── clippy-recent.md         # /clippy-recent [count]
+├── .claude-plugin/plugin.json   # manifest
+├── .mcp.json                    # registers the bundled MCP server (stdio)
+├── mcp/index.mjs                # vendored clippy-mcp bundle (built from ../clippy-mcp)
+├── commands/
+│   ├── clippy-search.md         # /clippy-search <terms>
+│   ├── clippy-add.md            # /clippy-add <text>
+│   └── clippy-recent.md         # /clippy-recent [count]
+├── skills/
+│   ├── clipboard-triage/        # organize and categorize clipboard history
+│   └── clip-capture/            # save conversation artifacts into Clippy
+└── agents/
+    └── clip-curator.md          # autonomous dedupe/organize agent
 ```
 
-## Prerequisites
+## Install
 
-Build the MCP server first (it must sit next to this plugin under `integrations/`):
+From this repository:
 
 ```bash
-cd ../clippy-mcp
-npm install
-npm run build
+claude plugin marketplace add /path/to/clippy   # or the git URL
+claude plugin install clippy@clippy
 ```
 
-`.mcp.json` points at `${CLAUDE_PLUGIN_ROOT}/../clippy-mcp/build/index.js`, which resolves when `clippy-mcp` and `clippy-plugin` are siblings (as they are in this repo). If you relocate the plugin, edit `.mcp.json` to an absolute path to `clippy-mcp/build/index.js`, or set `CLIPPY_DB_PATH` and point at an installed copy.
+Requires Node 22.13+ on PATH (the server uses the built-in `node:sqlite`).
 
-## Commands
+## MCP tools
 
-| Command | Tool used |
+The `clippy` server exposes eight tools:
+
+| Tool | Purpose |
 |---|---|
-| `/clippy-search <terms>` | `clippy_search` |
-| `/clippy-add <text>` | `clippy_add` |
-| `/clippy-recent [count]` | `clippy_list_recent` |
+| `clippy_search` | Full-text search over clips |
+| `clippy_list_recent` | Newest clips first, optional `limit` |
+| `clippy_get` | Full content of one clip by id |
+| `clippy_add` | Add a text clip (optional `title`) |
+| `clippy_delete` | Delete a clip by id |
+| `clippy_list_categories` | List categories |
+| `clippy_set_category` | Add/remove a clip's category membership |
+| `clippy_create_category` | Create a category |
 
-The plugin also exposes every `clippy_*` tool (get, delete, categories, set/create category) for Claude to call directly. See [`../clippy-mcp/README.md`](../clippy-mcp/README.md) for the full tool list and the live-refresh caveat.
+## Commands, skills, agent
+
+- `/clippy-search`, `/clippy-add`, `/clippy-recent` are thin wrappers over the tools above.
+- `clipboard-triage` skill: survey recent clips, propose a categorization plan, apply it after approval. Never deletes without confirmation.
+- `clip-capture` skill: save commands, snippets, and URLs from the conversation into Clippy with useful titles.
+- `clip-curator` agent: autonomous dedupe and organization pass; always lists deletion candidates with reasons before any delete.
+
+## Database path
+
+The server reads Clippy's SQLite database directly at `~/Library/Application Support/Clippy/clippy.sqlite`. Set `CLIPPY_DB_PATH` to point elsewhere (useful for testing). The running Clippy app shows externally added or changed clips on its next capture or relaunch.
+
+## Refreshing the vendored server
+
+`mcp/index.mjs` is a build artifact copied from [`../clippy-mcp`](../clippy-mcp). After changing the server source, refresh it with:
+
+```bash
+../scripts/sync-mcp.sh
+```
+
+or manually:
+
+```bash
+cd ../clippy-mcp && npm run build && cp build/index.mjs ../clippy-plugin/mcp/index.mjs
+```

@@ -33,6 +33,11 @@ final class AIAssistantViewModel: ObservableObject {
     @Published private(set) var messages: [AssistantMessage] = []
     @Published private(set) var state: State = .ready
     @Published var inputText: String = ""
+    /// The clip attached as conversation context ("Ask about this clip"). Set by
+    /// the view from the panel's selection; nil after the user detaches the chip.
+    /// While attached, each outgoing turn carries the clip content as a system
+    /// preamble so the model does not have to re-search for it.
+    @Published var contextClip: Clip?
 
     /// The in-flight streaming turn, so it can be cancelled by `stop()`.
     private var runningTask: Task<Void, Never>?
@@ -86,7 +91,20 @@ final class AIAssistantViewModel: ObservableObject {
         messages.append(userMessage)
         let assistantIndex = messages.count - 1
 
-        let history = buildHistory()
+        var history = buildHistory()
+        // Attached-clip context: prepend a system preamble carrying the clip
+        // content so "this clip" questions work without a search round-trip.
+        // All four providers route .system messages into their system slot.
+        if let clip = contextClip {
+            let idPart = clip.id.map { " (clip id \($0))" } ?? ""
+            let preamble = """
+            The user attached a clipboard item\(idPart) titled "\(clip.displayTitle)" as context. \
+            When they say "this clip" or "the clip", they mean this item. Its content:
+
+            \(AIService.clamp(clip.contentText, 4000))
+            """
+            history.insert(AIMessage(role: .system, content: preamble), at: 0)
+        }
 
         let registry = AIToolRegistry.makeFiltered(
             allowScripts: settings.aiAgentAllowScripts,
@@ -243,6 +261,10 @@ final class AIAssistantViewModel: ObservableObject {
 /// The AI Assistant pane shown when `.assistant` is selected in the sidebar.
 struct AIAssistantPanelView: View {
     @ObservedObject var store: ClipStore
+    /// The clip selected when the panel was opened (or re-selected while open).
+    /// Shown as a dismissible context chip above the input; latest selection
+    /// wins, and detaching only affects the current attachment.
+    var contextClip: Clip? = nil
     let onOpenSettings: () -> Void
 
     @StateObject private var vm = AIAssistantViewModel()
@@ -260,7 +282,19 @@ struct AIAssistantPanelView: View {
                 Divider()
                 content
                 Divider()
+                if let clip = vm.contextClip {
+                    contextChip(clip)
+                    Divider()
+                }
                 inputBar
+            }
+            // Adopt the selection-driven context clip. onAppear covers the
+            // initial mount; onChange covers a new selection while the panel is
+            // open. A detach (vm.contextClip = nil) sticks until the selection
+            // actually changes, because equal values do not refire onChange.
+            .onAppear { if let clip = contextClip { vm.contextClip = clip } }
+            .onChange(of: contextClip) { _, newClip in
+                if let newClip { vm.contextClip = newClip }
             }
             // Audit [LOW]: announce turn start/finish to VoiceOver so a user
             // relying on accessibility knows when the assistant begins and ends.
@@ -417,7 +451,8 @@ struct AIAssistantPanelView: View {
                                     && message.role == .assistant,
                                 onRetry: message.isError
                                     ? { vm.retryTurn(forError: message.id) }
-                                    : nil
+                                    : nil,
+                                onSaveAsClip: { store.saveScriptOutput($0) }
                             )
                                 .id(message.id)
                         }
@@ -442,10 +477,13 @@ struct AIAssistantPanelView: View {
             }
             // Audit [HIGH]: the live bubble mutates `messages.last.text` without
             // changing count/state, so scroll on text change too. Throttled by
-            // the ~50ms flush cadence in send(); debounce slightly to stay smooth.
+            // the ~50ms flush cadence in send(). No withAnimation here: layering
+            // an animated scroll on every delta made each flush restart the
+            // previous scroll animation (micro-jank); the message-boundary
+            // scrolls above stay animated.
             .onChange(of: vm.messages.last?.text) { _, _ in
                 guard vm.state == .streaming, let last = vm.messages.last else { return }
-                withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                proxy.scrollTo(last.id, anchor: .bottom)
             }
         }
     }
@@ -503,6 +541,47 @@ struct AIAssistantPanelView: View {
         .background(tokens.scrollBackground.opacity(settings.panelOpacity))
     }
 
+    // MARK: Context chip
+
+    /// Compact, dismissible strip above the input showing the attached clip.
+    /// The X detaches the clip from the conversation without touching the clip.
+    private func contextChip(_ clip: Clip) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "paperclip")
+                .font(.system(size: 11, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tokens.accent)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(clip.displayTitle)
+                    .font(PanelTypography.metadata(settings).weight(.semibold))
+                    .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(1)
+                Text(clip.previewText)
+                    .font(PanelTypography.micro(settings))
+                    .foregroundStyle(tokens.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button {
+                vm.contextClip = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(tokens.textSecondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Detach clip")
+            .accessibilityLabel("Detach clip from conversation")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(tokens.headerBar.opacity(settings.panelOpacity))
+        .help("This clip is attached as context for your messages")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Attached clip: \(clip.displayTitle)")
+    }
+
     // MARK: Input bar
 
     private var inputBar: some View {
@@ -557,7 +636,13 @@ private struct MessageBubble: View {
     /// Re-send the preceding user message when the user activates Retry on an
     /// error bubble (audit [HIGH]). nil for non-error bubbles.
     let onRetry: (() -> Void)?
+    /// Save the assistant reply as a new history clip. nil hides the action.
+    let onSaveAsClip: ((String) -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovering = false
+    /// Brief checkmark feedback after Copy / Save as clip.
+    @State private var justCopied = false
+    @State private var justSaved = false
 
     var body: some View {
         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
@@ -637,6 +722,12 @@ private struct MessageBubble: View {
                 .accessibilityLabel(accessibilityText)
                 if message.role == .assistant { Spacer(minLength: 40) }
             }
+            // Per-message actions under finished assistant replies, revealed on
+            // hover. The row is always mounted (opacity swap, ClipCardView's
+            // pattern) so hovering never reflows the transcript.
+            if showsReplyActions {
+                replyActionRow
+            }
             // Audit [HIGH]: Retry CTA under error bubbles, re-sending the
             // preceding user message. Lives outside the bubble background.
             if message.isError, let onRetry = onRetry {
@@ -655,6 +746,68 @@ private struct MessageBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
+        .onHover { isHovering = $0 }
+    }
+
+    // MARK: Reply actions
+
+    /// Finished, non-error assistant replies get a Copy / Save-as-clip row.
+    private var showsReplyActions: Bool {
+        message.role == .assistant && !message.isError && !isLive && !message.text.isEmpty
+    }
+
+    private var replyActionRow: some View {
+        HStack(spacing: 2) {
+            replyActionButton(
+                symbol: justCopied ? "checkmark" : "doc.on.doc",
+                help: justCopied ? "Copied" : "Copy reply"
+            ) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(message.text, forType: .string)
+                flash($justCopied)
+            }
+            if let onSaveAsClip {
+                replyActionButton(
+                    symbol: justSaved ? "checkmark" : "square.and.arrow.down",
+                    help: justSaved ? "Saved" : "Save as clip"
+                ) {
+                    onSaveAsClip(message.text)
+                    flash($justSaved)
+                }
+            }
+            Spacer()
+        }
+        .padding(.leading, 4)
+        // Opacity swap keeps the row mounted so hover never reflows the thread.
+        .opacity(isHovering ? 1 : 0)
+        .allowsHitTesting(isHovering)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovering)
+        .frame(height: 18)
+    }
+
+    private func replyActionButton(symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: 24, height: 18)
+                .contentShape(Rectangle())
+                // Cross-fade the glyph when it swaps to the feedback checkmark.
+                .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(tokens.textSecondary)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+
+    /// Show the checkmark feedback for a moment, then restore the glyph.
+    private func flash(_ flag: Binding<Bool>) {
+        flag.wrappedValue = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            flag.wrappedValue = false
+        }
     }
 
     /// VoiceOver-friendly description of the bubble contents.

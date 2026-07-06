@@ -356,6 +356,55 @@ final class AIToolRegistryTests: XCTestCase {
         let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         XCTAssertEqual(obj?["type"] as? String, "object")
     }
+
+    func testGetClipSchemaIsSerializable() throws {
+        let tool = GetClipTool()
+        XCTAssertEqual(tool.name, "get_clip")
+        let data = try JSONSerialization.data(withJSONObject: tool.parametersSchema)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["type"] as? String, "object")
+        XCTAssertEqual(obj?["required"] as? [String], ["clip_id"])
+    }
+
+    func testSetClipCategorySchemaIsSerializable() throws {
+        let tool = SetClipCategoryTool()
+        XCTAssertEqual(tool.name, "set_clip_category")
+        let data = try JSONSerialization.data(withJSONObject: tool.parametersSchema)
+        let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(obj?["type"] as? String, "object")
+        XCTAssertEqual(obj?["required"] as? [String], ["clip_id", "category"])
+        let props = obj?["properties"] as? [String: Any]
+        XCTAssertNotNil(props?["create_if_missing"], "Category creation must be opt-in via a schema flag.")
+    }
+
+    func testFilteredRegistryIncludesClipTools() {
+        // Clip tools are the same risk class as search/create: always registered,
+        // even with every safety toggle off.
+        let registry = AIToolRegistry.makeFiltered(
+            allowScripts: false,
+            allowCodeExecution: false,
+            allowWebSearch: false,
+            confirmHook: { _ in false }
+        )
+        XCTAssertNotNil(registry.tool(named: "get_clip"))
+        XCTAssertNotNil(registry.tool(named: "set_clip_category"))
+        XCTAssertNotNil(registry.tool(named: "search_clips"))
+        XCTAssertNotNil(registry.tool(named: "create_clip"))
+        XCTAssertNil(registry.tool(named: "run_script"))
+        XCTAssertNil(registry.tool(named: "execute_code"))
+        XCTAssertNil(registry.tool(named: "web_search"))
+    }
+
+    func testInt64ValueDecodesCommonJSONNumberShapes() {
+        XCTAssertEqual(AIToolHelpers.int64Value(7), 7)
+        XCTAssertEqual(AIToolHelpers.int64Value(Int64(9_000_000_000)), 9_000_000_000)
+        XCTAssertEqual(AIToolHelpers.int64Value(42.0), 42)
+        XCTAssertEqual(AIToolHelpers.int64Value("13"), 13)
+        XCTAssertEqual(AIToolHelpers.int64Value(NSNumber(value: 5)), 5)
+        XCTAssertNil(AIToolHelpers.int64Value(42.5), "Fractional numbers are not valid ids.")
+        XCTAssertNil(AIToolHelpers.int64Value("not a number"))
+        XCTAssertNil(AIToolHelpers.int64Value(nil))
+    }
 }
 
 // MARK: - Tool result sentinel tests
@@ -635,7 +684,8 @@ final class AIToolRegistryFilteredTests: XCTestCase {
             confirmHook: { _ in true }
         )
         let names = Set(registry.all.map(\.name))
-        XCTAssertEqual(names, ["search_clips", "create_clip", "web_search", "list_scripts", "run_script", "execute_code"])
+        XCTAssertEqual(names, ["search_clips", "create_clip", "get_clip", "set_clip_category",
+                               "web_search", "list_scripts", "run_script", "execute_code"])
     }
 }
 

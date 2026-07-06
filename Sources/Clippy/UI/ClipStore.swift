@@ -27,8 +27,18 @@ final class ClipStore: ObservableObject {
     @Published var observationError: String?
 
     private var recents: [Clip] = [] {
-        didSet { refilter() }
+        didSet {
+            // Rebuilt once per observation pulse instead of once per
+            // clipsForCategory call: the id lookup is hit several times per
+            // redraw (sections, metadata, keyboard handling all query it).
+            recentsByID = Dictionary(uniqueKeysWithValues: recents.compactMap { clip in
+                clip.id.map { ($0, clip) }
+            })
+            refilter()
+        }
     }
+    /// id -> clip lookup over `recents`, kept in sync by `recents.didSet`.
+    private var recentsByID: [Int64: Clip] = [:]
     private var searchDebounce: Task<Void, Never>?
     /// Monotonic generation for the async FTS search. Incremented on every
     /// refilter that kicks off a background read; the completion discards
@@ -39,6 +49,14 @@ final class ClipStore: ObservableObject {
     private var categoriesCancellable: AnyDatabaseCancellable?
     private let database: ClipDatabase
     private let displayLimit = 300
+    /// Serial lane for mutation writes. The shared DatabaseQueue serializes all
+    /// access, so a synchronous write from the main thread stalls the UI while
+    /// a capture write or iCloud export holds the queue (reads already moved
+    /// off-main in refilter). One serial queue, not .global, so rapid mutations
+    /// such as successive drag-reorders apply in the order they were issued.
+    /// The GRDB ValueObservation republishes state after each write, so the UI
+    /// never needs to wait on the write itself.
+    private let writeQueue = DispatchQueue(label: "com.clippy.ClipStore.writes", qos: .userInitiated)
 
     init(database: ClipDatabase) {
         self.database = database
@@ -184,33 +202,57 @@ final class ClipStore: ObservableObject {
 
     // MARK: - Actions
 
+    /// Enqueue a DB mutation on the serial write lane. Failures were previously
+    /// swallowed with try?; log them so background writes are not silent.
+    private func performWrite(_ label: String, _ body: @escaping () throws -> Void) {
+        writeQueue.async {
+            do {
+                try body()
+            } catch {
+                ClippyLog.error("\(label) failed: \(error)", category: ClippyLog.storage)
+            }
+        }
+    }
+
     /// Toggles membership in the starter category (the Cmd+P fast path).
     func togglePin(_ clip: Clip) {
         guard let id = clip.id else { return }
-        try? database.toggleStarterMembership(clipID: id)
+        performWrite("togglePin") { [database] in
+            try database.toggleStarterMembership(clipID: id)
+        }
     }
 
     func setClip(_ clip: Clip, inCategory categoryID: Int64, _ isMember: Bool) {
         guard let id = clip.id else { return }
-        try? database.setClip(id, inCategory: categoryID, isMember)
+        performWrite("setClip") { [database] in
+            try database.setClip(id, inCategory: categoryID, isMember)
+        }
     }
 
     func addClip(id clipID: Int64, toCategory categoryID: Int64) {
-        try? database.setClip(clipID, inCategory: categoryID, true)
+        performWrite("addClip") { [database] in
+            try database.setClip(clipID, inCategory: categoryID, true)
+        }
     }
 
     /// Files a clip into `categoryID`, honoring the single-vs-multiple setting.
     /// When multiple categories are disallowed (default), the clip is first
     /// removed from every other category so it lives in exactly one.
     func fileClip(id clipID: Int64, intoCategory categoryID: Int64) {
-        if !AppSettings.shared.allowMultipleCategories {
+        // Snapshot the memberships on the main thread (`membership` is
+        // @Published), then run removals + add as one enqueued unit so another
+        // mutation cannot interleave between them.
+        let others = AppSettings.shared.allowMultipleCategories
+            ? []
+            : (membership[clipID] ?? []).subtracting([categoryID])
+        performWrite("fileClip") { [database] in
             // Mirror the removal path used by setClip(... false): clear the clip
             // from each other category before adding it to the target.
-            for existing in (membership[clipID] ?? []) where existing != categoryID {
-                try? database.setClip(clipID, inCategory: existing, false)
+            for existing in others {
+                try database.setClip(clipID, inCategory: existing, false)
             }
+            try database.setClip(clipID, inCategory: categoryID, true)
         }
-        addClip(id: clipID, toCategory: categoryID)
     }
 
     @discardableResult
@@ -229,7 +271,9 @@ final class ClipStore: ObservableObject {
 
     /// Move one category so it sits just before another (drag-to-reorder).
     func moveCategory(id: Int64, beforeCategoryID: Int64) {
-        try? database.moveCategory(id: id, before: beforeCategoryID)
+        performWrite("moveCategory") { [database] in
+            try database.moveCategory(id: id, before: beforeCategoryID)
+        }
     }
 
     /// Clips for a category in user-defined sortOrder. Uses the categoryClipOrder
@@ -243,11 +287,7 @@ final class ClipStore: ObservableObject {
         // vanish from their own category pane.
         let ordered: [Clip]
         if let orderedIDs = categoryClipOrder[categoryID] {
-            let clipByID = Dictionary(uniqueKeysWithValues: recents.compactMap { c -> (Int64, Clip)? in
-                guard let id = c.id else { return nil }
-                return (id, c)
-            })
-            ordered = orderedIDs.compactMap { clipByID[$0] }
+            ordered = orderedIDs.compactMap { recentsByID[$0] }
         } else {
             ordered = recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
         }
@@ -260,17 +300,37 @@ final class ClipStore: ObservableObject {
     /// `targetClipID` is the clip the dragged one is dropped onto; pass nil to
     /// move to the end of the list.
     func moveClip(_ clipID: Int64, inCategory categoryID: Int64, before targetClipID: Int64?) {
-        try? database.moveClip(clipID, inCategory: categoryID, before: targetClipID)
+        // Optimistic: republish the reordered ids immediately so the drop
+        // animates without waiting on the DB write. The observation pulse that
+        // follows the write recomputes the identical order (same reorderIDs
+        // applied to the same list), so no visible correction occurs.
+        if let current = categoryClipOrder[categoryID], current.contains(clipID) {
+            categoryClipOrder[categoryID] = reorderIDs(current, draggedID: clipID, before: targetClipID)
+        }
+        performWrite("moveClip") { [database] in
+            try database.moveClip(clipID, inCategory: categoryID, before: targetClipID)
+        }
     }
 
     func delete(_ clip: Clip) {
         guard let id = clip.id else { return }
-        try? database.deleteClip(id: id)
+        performWrite("deleteClip") { [database] in
+            try database.deleteClip(id: id)
+        }
     }
 
-    func updateText(of clip: Clip, to newText: String) {
-        guard let id = clip.id else { return }
-        try? database.updateClipText(id: id, newText: newText)
+    /// Save edited clip text. Returns true on success so the editor can keep
+    /// its window open and surface the failure instead of silently discarding.
+    @discardableResult
+    func updateText(of clip: Clip, to newText: String) -> Bool {
+        guard let id = clip.id else { return false }
+        do {
+            try database.updateClipText(id: id, newText: newText)
+            return true
+        } catch {
+            ClippyLog.error("failed to update clip text: \(error)", category: ClippyLog.storage)
+            return false
+        }
     }
 
     /// Save an edited image clip: store the new PNG, repoint the row, free the
@@ -341,11 +401,20 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    func renameClip(_ clip: Clip, userTitle: String?) {
-        guard let id = clip.id else { return }
+    /// Set or clear a clip's custom title. Returns true on success so the
+    /// editor can keep its window open and surface the failure.
+    @discardableResult
+    func renameClip(_ clip: Clip, userTitle: String?) -> Bool {
+        guard let id = clip.id else { return false }
         // Treat empty string the same as nil (clear the custom title).
         let trimmed = userTitle.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        try? database.updateClipTitle(id: id, userTitle: trimmed?.isEmpty == true ? nil : trimmed)
+        do {
+            try database.updateClipTitle(id: id, userTitle: trimmed?.isEmpty == true ? nil : trimmed)
+            return true
+        } catch {
+            ClippyLog.error("failed to rename clip: \(error)", category: ClippyLog.storage)
+            return false
+        }
     }
 
     /// The first category this clip belongs to, ordered by (sortOrder, createdAt).

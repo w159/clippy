@@ -1,6 +1,7 @@
 {
   "name": "clippy",
-  "version": "0.1.0",
-  "description": "Control the Clippy macOS clipboard manager from Claude Code: search, add, get, and delete clips and manage categories via the clippy-mcp server.",
-  "author": { "name": "jmorg83" }
+  "version": "0.2.0",
+  "description": "Drive the Clippy macOS clipboard manager from Claude Code. Ships a self-contained MCP server (search, add, get, delete clips; manage categories), slash commands, clipboard-triage and clip-capture skills, and a clip-curator agent for organizing clipboard history.",
+  "author": { "name": "W159" },
+  "keywords": ["clipboard", "clippy", "macos", "mcp", "clipboard-manager", "snippets"]
 }

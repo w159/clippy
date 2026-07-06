@@ -79,6 +79,13 @@ struct ClipListView: View {
     @State private var aiInstructionClip: Clip?
     /// The text the user types into the instruction prompt.
     @State private var aiInstructionText: String = ""
+    /// The clip handed to the AI Assistant as conversation context. Captured
+    /// from the anchored selection when the pane switches to .assistant, or set
+    /// explicitly by "Open AI Assistant" in a clip's AI menu.
+    @State private var assistantContextClip: Clip?
+    /// True while an explicit "Open AI Assistant" set the context clip, so the
+    /// selection-change handler does not overwrite it with the anchored clip.
+    @State private var assistantContextExplicit = false
     /// The clip ID currently being hovered over during a within-category reorder drag.
     /// Shared across all category-section rows so the insertion line can track the target.
     @State private var draggingOverClipID: Int64?
@@ -104,7 +111,12 @@ struct ClipListView: View {
     ///
     /// Category panes return clips in user-defined sortOrder (drag-reorderable).
     /// History stays createdAt DESC (a live recency feed, not reorderable).
-    private var visibleClips: [Clip] {
+    private var visibleClips: [Clip] { clips(for: selection) }
+
+    /// Clips for an arbitrary pane selection. Split from `visibleClips` so the
+    /// selection-change handler can resolve the outgoing pane's anchored clip
+    /// (for the assistant context chip) after `selection` has already changed.
+    private func clips(for selection: PanelSelection) -> [Clip] {
         switch selection {
         case .history:
             return store.clips.filter { !store.isPinned($0) }
@@ -190,7 +202,25 @@ struct ClipListView: View {
                 anchoredClipID = visibleClips.first?.id
             }
         }
-        .onChange(of: selection) { _, _ in selectedIndex = 0; selectedClipIDs = [] }
+        .onChange(of: selection) { oldValue, newValue in
+            // Opening the assistant carries the anchored text clip in as the
+            // context chip. Resolve against the OUTGOING pane's clips because
+            // `selection` (and thus visibleClips) has already switched. An
+            // explicit "Open AI Assistant" set the clip itself; do not clobber it.
+            if newValue == .assistant {
+                if assistantContextExplicit {
+                    assistantContextExplicit = false
+                } else {
+                    let outgoing = clips(for: oldValue)
+                    if outgoing.indices.contains(selectedIndex),
+                       outgoing[selectedIndex].contentKind == .text {
+                        assistantContextClip = outgoing[selectedIndex]
+                    }
+                }
+            }
+            selectedIndex = 0
+            selectedClipIDs = []
+        }
         // AI action sheet, shown when a context-menu AI action produces a proposal.
         .sheet(isPresented: Binding(
             get: { aiRunner.isPresenting },
@@ -203,26 +233,13 @@ struct ClipListView: View {
             }
         }
         // Instruction prompt for AI actions whose template needs {instruction}.
-        .alert(aiInstructionAction?.name ?? "AI Action",
-               isPresented: Binding(
-                get: { aiInstructionAction != nil },
-                set: { if !$0 { aiInstructionAction = nil; aiInstructionClip = nil } }
-               )) {
-            TextField("Instruction", text: $aiInstructionText)
-            Button("Run") {
-                let trimmed = aiInstructionText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if let action = aiInstructionAction, let clip = aiInstructionClip, !trimmed.isEmpty {
-                    runAIActionNow(action, on: clip, instruction: trimmed)
-                }
-                aiInstructionAction = nil
-                aiInstructionClip = nil
-            }
-            Button("Cancel", role: .cancel) {
-                aiInstructionAction = nil
-                aiInstructionClip = nil
-            }
-        } message: {
-            Text(aiInstructionPromptMessage)
+        // A sheet with a multi-line field, not an alert: instructions like
+        // "rewrite this as a polite decline, keep the dates" need room to type.
+        .sheet(isPresented: Binding(
+            get: { aiInstructionAction != nil },
+            set: { if !$0 { aiInstructionAction = nil; aiInstructionClip = nil } }
+        )) {
+            instructionSheet
         }
         // Single confirmation gate for every delete path. The button is marked
         // destructive so it reads red and is not the default action.
@@ -437,7 +454,7 @@ struct ClipListView: View {
         } else if selection == .onePassword {
             OnePasswordView()
         } else if selection == .assistant {
-            AIAssistantPanelView(store: store, onOpenSettings: onOpenSettings)
+            AIAssistantPanelView(store: store, contextClip: assistantContextClip, onOpenSettings: onOpenSettings)
         } else if selection == .aiActions {
             AIActionsManagerView()
         } else if visibleClips.isEmpty {
@@ -543,8 +560,10 @@ struct ClipListView: View {
         let rows: [(index: Int, clip: Clip)]
     }
 
-    private var sections: [Section] {
-        let rows = Array(visibleClips.enumerated()).map { (index: $0.offset, clip: $0.element) }
+    /// Takes the clip snapshot from `sectionedList` so `visibleClips` (a store
+    /// filter/join) is evaluated once per redraw, not once per consumer.
+    private func sections(for clips: [Clip]) -> [Section] {
+        let rows = Array(clips.enumerated()).map { (index: $0.offset, clip: $0.element) }
         // Date headers only make sense for the chronological history.
         guard settings.showSectionHeaders, selection == .history else {
             return [Section(id: "all", title: "", rows: rows)]
@@ -606,15 +625,19 @@ struct ClipListView: View {
         // in reading order (LazyVGrid is row-major).
         let columns = max(1, min(4, settings.clipColumns))
         let gridItems = Array(repeating: GridItem(.flexible(), spacing: 6), count: columns)
+        // Snapshot the visible clips once per body evaluation: sections,
+        // metadata, the trailing-drop guard, and the footer all previously
+        // re-ran the visibleClips filter/join within a single redraw.
+        let clips = visibleClips
         // Precompute per-clip membership/pinned/category lookups once per redraw
         // and pass into each card, instead of re-running store.isPinned /
         // store.categories.filter / store.firstCategory per card per body
         // (audit: per-card store membership queries re-run every redraw).
-        let metadata = cardMetadata
+        let metadata = cardMetadata(for: clips)
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 6, pinnedViews: []) {
-                    ForEach(sections) { section in
+                    ForEach(sections(for: clips)) { section in
                         if !section.title.isEmpty {
                             sectionHeader(section.title)
                         }
@@ -635,14 +658,14 @@ struct ClipListView: View {
                     // only inserts before a target). This trailing target lands
                     // drops past the end and appends via moveClip(before: nil).
                     // History pane has no within-list reorder, so it is excluded.
-                    if let categoryID = activeCategoryID, !visibleClips.isEmpty {
+                    if let categoryID = activeCategoryID, !clips.isEmpty {
                         trailingClipDropZone(inCategory: categoryID)
                     }
                     // Surface the history cap so the user knows older clips are
                     // being truncated (audit: history hard-capped at 300 with no
                     // indication).
                     if selection == .history, store.clips.count >= Self.displayLimit {
-                        Text("Showing \(visibleClips.count) most recent")
+                        Text("Showing \(clips.count) most recent")
                             .font(PanelTypography.micro(settings))
                             .foregroundStyle(tokens.textSecondary)
                             .frame(maxWidth: .infinity)
@@ -669,18 +692,24 @@ struct ClipListView: View {
         let pinnedCategory: Category?
     }
 
-    private var cardMetadata: [Int64: CardMetadata] {
+    private func cardMetadata(for clips: [Clip]) -> [Int64: CardMetadata] {
         var map: [Int64: CardMetadata] = [:]
-        for clip in visibleClips {
+        for clip in clips {
             guard let id = clip.id else { continue }
+            // One membership lookup per clip. The previous shape re-fetched the
+            // Set inside the filter closure (per category, per clip) and then
+            // again for isPinned and firstCategory: O(clips x categories) Set
+            // copies per redraw.
+            let memberIDs = store.categoryIDs(for: clip)
             let memberCats = store.categories.filter { category in
-                guard let cid = category.id else { return false }
-                return store.categoryIDs(for: clip).contains(cid)
+                category.id.map(memberIDs.contains) ?? false
             }
             map[id] = CardMetadata(
-                isPinned: store.isPinned(clip),
+                isPinned: !memberIDs.isEmpty,
                 categoryColors: memberCats.map { Color(hexString: $0.colorHex) },
-                pinnedCategory: store.firstCategory(for: clip)
+                // categories is already (sortOrder, createdAt) ordered, so the
+                // first member matches store.firstCategory(for:).
+                pinnedCategory: memberCats.first
             )
         }
         return map
@@ -746,7 +775,13 @@ struct ClipListView: View {
             onDelete: { requestDelete(clip) },
             onRename: { store.renameClip(clip, userTitle: $0) },
             onPasteFile: { onPasteFile(clip, false) },
-            onMoveFile: { onPasteFile(clip, true) }
+            onMoveFile: { onPasteFile(clip, true) },
+            // Hover sparkles menu on text clips, gated on the same aiEnabled
+            // check as the context-menu AI submenu. Shares aiMenuItems so both
+            // entry points dispatch through identical action paths.
+            aiMenuContent: settings.aiEnabled && clip.contentKind == .text
+                ? { AnyView(aiMenuItems(for: clip)) }
+                : nil
         )
         .id(clip.id)
         // Drag payload is managed entirely by CategoryReorderModifier so that
@@ -869,7 +904,6 @@ struct ClipListView: View {
 
     @ViewBuilder
     private func aiActionsMenu(for clip: Clip) -> some View {
-        let actions = AIActionStore.shared.actions
         if !settings.aiEnabled {
             Menu {
                 Text("Enable AI in Settings to use AI actions.")
@@ -878,27 +912,44 @@ struct ClipListView: View {
             }
         } else {
             Menu {
-                ForEach(actions) { action in
-                    Button {
-                        runAIAction(action, on: clip)
-                    } label: {
-                        // Use ActionIconView so emoji/appLogo icons render correctly.
-                        // SwiftUI menus accept any label content, not just Label().
-                        HStack {
-                            ActionIconView(kind: action.iconKind, value: action.symbolName)
-                            Text(action.name)
-                        }
-                    }
-                }
-                if actions.isEmpty {
-                    Text("No actions configured.")
-                }
-                Divider()
-                Button("Open AI Assistant") { selection = .assistant }
+                aiMenuItems(for: clip)
             } label: {
                 Label("AI", systemImage: "sparkles")
             }
         }
+    }
+
+    /// The AI menu body, shared between the context-menu "AI" submenu and the
+    /// clip card's hover sparkles menu so both dispatch through the same paths.
+    @ViewBuilder
+    private func aiMenuItems(for clip: Clip) -> some View {
+        let actions = AIActionStore.shared.actions
+        ForEach(actions) { action in
+            Button {
+                runAIAction(action, on: clip)
+            } label: {
+                // Use ActionIconView so emoji/appLogo icons render correctly.
+                // SwiftUI menus accept any label content, not just Label().
+                HStack {
+                    ActionIconView(kind: action.iconKind, value: action.symbolName)
+                    Text(action.name)
+                }
+            }
+        }
+        if actions.isEmpty {
+            Text("No actions configured.")
+        }
+        Divider()
+        Button("Open AI Assistant") { openAssistant(with: clip) }
+    }
+
+    /// Switch the pane to the assistant with `clip` attached as context. The
+    /// explicit flag stops the selection-change handler from re-deriving the
+    /// context from the anchored row (the right-clicked clip may differ).
+    private func openAssistant(with clip: Clip) {
+        assistantContextExplicit = true
+        assistantContextClip = clip.contentKind == .text ? clip : nil
+        selection = .assistant
     }
 
     private func runAIAction(_ action: AIAction, on clip: Clip) {
@@ -923,6 +974,43 @@ struct ClipListView: View {
             return
         }
         runAIActionNow(action, on: clip, instruction: "")
+    }
+
+    /// Small sheet asking for the {instruction} an AI action needs before it
+    /// runs. Multi-line so real instructions fit; Return runs, Escape cancels.
+    private var instructionSheet: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(aiInstructionAction?.name ?? "AI Action", systemImage: "sparkles")
+                .font(PanelTypography.body(settings).weight(.semibold))
+                .foregroundStyle(tokens.textPrimary)
+            TextField(aiInstructionPromptMessage, text: $aiInstructionText, axis: .vertical)
+                .lineLimit(3...5)
+                .textFieldStyle(.roundedBorder)
+                .font(PanelTypography.body(settings))
+                .accessibilityLabel("Instruction for \(aiInstructionAction?.name ?? "AI action")")
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    aiInstructionAction = nil
+                    aiInstructionClip = nil
+                }
+                .keyboardShortcut(.cancelAction)
+                .help("Close without running the action")
+                Button("Run") {
+                    let trimmed = aiInstructionText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let action = aiInstructionAction, let clip = aiInstructionClip, !trimmed.isEmpty {
+                        runAIActionNow(action, on: clip, instruction: trimmed)
+                    }
+                    aiInstructionAction = nil
+                    aiInstructionClip = nil
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(aiInstructionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("Run \(aiInstructionAction?.name ?? "the action") with this instruction")
+            }
+        }
+        .padding(16)
+        .frame(width: 380)
     }
 
     /// Tailored prompt copy per built-in so the field reads naturally

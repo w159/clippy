@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "clippy",
+  "description": "Marketplace for the Clippy macOS clipboard manager integrations.",
+  "version": "0.2.0",
+  "owner": {
+    "name": "W159"
+  },
+  "plugins": [
+    {
+      "name": "clippy",
+      "source": "./integrations/clippy-plugin",
+      "description": "Drive the Clippy macOS clipboard manager from Claude Code: self-contained MCP server (search, add, get, delete clips; manage categories), slash commands, clipboard-triage and clip-capture skills, and a clip-curator agent.",
+      "category": "productivity",
+      "keywords": ["clipboard", "clippy", "macos", "mcp", "clipboard-manager", "snippets"]
+    }
+  ]
+}

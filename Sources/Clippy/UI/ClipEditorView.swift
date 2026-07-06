@@ -8,13 +8,16 @@ import SwiftUI
 struct ClipEditorView: View {
     let clip: Clip
     let store: ClipStore
+    /// Registered with dirty/save callbacks so the hosting window can prompt
+    /// before the title-bar close button discards unsaved edits.
+    var dirtyBridge: EditorDirtyStateBridge? = nil
     let onClose: () -> Void
 
     var body: some View {
         if clip.contentKind == .image {
-            ImageClipEditor(clip: clip, store: store, onClose: onClose)
+            ImageClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, onClose: onClose)
         } else {
-            TextClipEditor(clip: clip, store: store, onClose: onClose)
+            TextClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, onClose: onClose)
         }
     }
 }
@@ -24,6 +27,7 @@ struct ClipEditorView: View {
 private struct TextClipEditor: View {
     let clip: Clip
     let store: ClipStore
+    let dirtyBridge: EditorDirtyStateBridge?
     let onClose: () -> Void
 
     @ObservedObject private var settings = AppSettings.shared
@@ -32,19 +36,48 @@ private struct TextClipEditor: View {
     @State private var text: String
     @State private var title: String
     @State private var statusMessage: String?
+    /// Shown in red in the footer when a save fails; the window stays open.
+    @State private var saveError: String?
+    /// Cancel pressed while dirty: Save / Discard / Keep Editing.
+    @State private var showingDiscardPrompt = false
     /// The action awaiting an instruction (for {instruction} templates).
     @State private var instructionAction: AIAction?
     /// The instruction the user types into the prompt.
     @State private var instructionText: String = ""
+    // Cached stats for the footer. Recomputing these on every keystroke costs
+    // several full-document scans per render (statsSummary plus the
+    // accessibility label), so they are refreshed by a debounced task instead.
+    @State private var unicodeCount: Int
+    @State private var wordCount: Int
+    @State private var lineCount: Int
 
     private var tokens: ThemeTokens { settings.theme }
 
-    init(clip: Clip, store: ClipStore, onClose: @escaping () -> Void) {
+    /// NSFont matching PanelTypography.body for the AppKit-backed text view.
+    /// PanelTypography exposes only a SwiftUI Font for the body role, so this
+    /// mirrors its family/size resolution (and nsTitleFont's fallback) at
+    /// .regular weight.
+    private var editorFont: NSFont {
+        let size = CGFloat(settings.fontSizeBase)
+        if let family = settings.fontFamily.familyName,
+           settings.fontFamily.isAvailable,
+           let custom = NSFont(name: family, size: size) {
+            return custom
+        }
+        return NSFont.systemFont(ofSize: size, weight: .regular)
+    }
+
+    init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?, onClose: @escaping () -> Void) {
         self.clip = clip
         self.store = store
+        self.dirtyBridge = dirtyBridge
         self.onClose = onClose
         _text = State(initialValue: clip.contentText)
         _title = State(initialValue: clip.userTitle ?? "")
+        let stats = Self.stats(for: clip.contentText)
+        _unicodeCount = State(initialValue: stats.unicode)
+        _wordCount = State(initialValue: stats.words)
+        _lineCount = State(initialValue: stats.lines)
     }
 
     var body: some View {
@@ -58,33 +91,88 @@ private struct TextClipEditor: View {
             }
             .padding(10)
             Divider()
-            PlainTextEditor(text: $text)
-                // Editor content honors the user's panel typography and text color
-                // so it reads the same as the card the editor opened from.
-                .font(PanelTypography.body(settings))
-                .foregroundStyle(tokens.textPrimary)
+            // Editor content honors the user's panel typography and theme.
+            // SwiftUI .font/.foregroundStyle never reach the wrapped
+            // NSTextView, so the values are passed as AppKit types instead.
+            PlainTextEditor(
+                text: $text,
+                font: editorFont,
+                textColor: NSColor(tokens.textPrimary),
+                backgroundColor: NSColor(tokens.cardSurface),
+                focusesOnAppear: true
+            )
             Divider()
             HStack {
                 Text(statsSummary)
                     .font(PanelTypography.metadata(settings))
                     .foregroundStyle(tokens.textSecondary)
-                    .accessibilityLabel("\(text.unicodeScalars.count) Unicode scalars, \(wordCount) words, \(lineCount) lines")
+                    .accessibilityLabel("\(unicodeCount) Unicode scalars, \(wordCount) words, \(lineCount) lines")
                 if let statusMessage {
                     Text(statusMessage)
                         .font(PanelTypography.metadata(settings))
                         .foregroundStyle(tokens.accent)
                         .transition(.opacity)
                 }
+                if let saveError {
+                    // System red for the error state, mirroring the image editor;
+                    // ThemeTokens has no dedicated danger token.
+                    Text(saveError)
+                        .font(PanelTypography.metadata(settings))
+                        .foregroundStyle(Color(nsColor: .systemRed))
+                }
                 Spacer()
-                Button("Cancel", role: .cancel) { onClose() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") { save() }
+                Button("Cancel", role: .cancel) {
+                    if isDirty {
+                        showingDiscardPrompt = true
+                    } else {
+                        onClose()
+                    }
+                }
+                .keyboardShortcut(.cancelAction)
+                Button("Save") { if save() { onClose() } }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!isDirty)
+                // Cmd-S save path. The NSTextView swallows Return, so the
+                // .defaultAction shortcut above is unreachable while the body
+                // editor has focus; the window still resolves this key
+                // equivalent regardless of first responder.
+                Button("") { if save() { onClose() } }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!isDirty)
+                    .hidden()
+                    .frame(width: 0, height: 0)
             }
             .padding(12)
         }
         .frame(minWidth: 480, minHeight: 360)
         .background(tokens.cardSurface)
+        // Debounce the O(n) footer stats: one recompute ~200ms after the last
+        // keystroke instead of several full-document scans per keystroke.
+        // .task(id:) cancels the in-flight sleep whenever text changes.
+        .task(id: text) {
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled else { return }
+            let stats = Self.stats(for: text)
+            unicodeCount = stats.unicode
+            wordCount = stats.words
+            lineCount = stats.lines
+        }
+        .onAppear {
+            // Wire the title-bar close button to the same dirty/save logic as
+            // the Cancel button (see EditorWindowController.windowShouldClose).
+            dirtyBridge?.isDirty = { isDirty }
+            dirtyBridge?.save = { save() }
+        }
+        .confirmationDialog(
+            "Save changes to this clip?",
+            isPresented: $showingDiscardPrompt
+        ) {
+            Button("Save") { if save() { onClose() } }
+            Button("Discard Changes", role: .destructive) { onClose() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your edits will be lost if you don't save them.")
+        }
         .sheet(isPresented: aiSheetBinding) {
             AIActionSheet(runner: ai) { proposal in apply(proposal) }
         }
@@ -245,25 +333,41 @@ private struct TextClipEditor: View {
         Binding(get: { ai.isPresenting }, set: { if !$0 { ai.reset() } })
     }
 
-    private func save() {
-        if text != clip.contentText {
-            store.updateText(of: clip, to: text)
+    /// Unsaved edits exist: body text or title differs from the stored clip.
+    /// String equality short-circuits on length, so this is cheap per render
+    /// in the common case.
+    private var isDirty: Bool {
+        text != clip.contentText || title != (clip.userTitle ?? "")
+    }
+
+    /// Persist the edits. Returns true when both writes landed so callers
+    /// (Save button, Cmd-S, window close prompt) know whether to close the
+    /// window; on failure the error shows inline and the window stays open.
+    private func save() -> Bool {
+        if text != clip.contentText, !store.updateText(of: clip, to: text) {
+            saveError = "Could not save the text."
+            return false
         }
-        store.renameClip(clip, userTitle: title)
-        onClose()
+        if !store.renameClip(clip, userTitle: title) {
+            saveError = "Could not save the title."
+            return false
+        }
+        saveError = nil
+        return true
     }
 
     private var statsSummary: String {
-        "\(pluralize(text.unicodeScalars.count, "Unicode scalar"))  |  \(pluralize(wordCount, "word"))  |  \(pluralize(lineCount, "line"))"
+        "\(pluralize(unicodeCount, "Unicode scalar"))  |  \(pluralize(wordCount, "word"))  |  \(pluralize(lineCount, "line"))"
     }
 
-    /// Counts runs of non-whitespace, so multiple/Unicode whitespace between
-    /// words is collapsed rather than producing empty tokens.
-    private var wordCount: Int {
-        text.split(whereSeparator: { $0.isWhitespace }).count
-    }
-    private var lineCount: Int {
-        text.isEmpty ? 0 : text.split(separator: "\n", omittingEmptySubsequences: false).count
+    /// One pass each over the text for the footer counts. Word count counts
+    /// runs of non-whitespace, so multiple/Unicode whitespace between words is
+    /// collapsed rather than producing empty tokens.
+    private static func stats(for text: String) -> (unicode: Int, words: Int, lines: Int) {
+        let unicode = text.unicodeScalars.count
+        let words = text.split(whereSeparator: { $0.isWhitespace }).count
+        let lines = text.isEmpty ? 0 : text.split(separator: "\n", omittingEmptySubsequences: false).count
+        return (unicode, words, lines)
     }
 
     /// "1 line" / "2 lines": appends "s" only when the count is not 1.
@@ -277,6 +381,7 @@ private struct TextClipEditor: View {
 private struct ImageClipEditor: View {
     let clip: Clip
     let store: ClipStore
+    let dirtyBridge: EditorDirtyStateBridge?
     let onClose: () -> Void
 
     @ObservedObject private var settings = AppSettings.shared
@@ -287,12 +392,22 @@ private struct ImageClipEditor: View {
     @State private var dragCurrent: CGPoint?
     @State private var saveError: String?
     @State private var canvasSize: CGSize = .zero
+    /// A rotate/flip/crop was applied since the editor opened.
+    @State private var imageEdited = false
+    /// Cancel pressed while dirty: Save / Discard / Keep Editing.
+    @State private var showingDiscardPrompt = false
 
     private var tokens: ThemeTokens { settings.theme }
 
-    init(clip: Clip, store: ClipStore, onClose: @escaping () -> Void) {
+    /// Unsaved edits exist: the image was transformed or the title changed.
+    private var isDirty: Bool {
+        imageEdited || title != (clip.userTitle ?? "")
+    }
+
+    init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?, onClose: @escaping () -> Void) {
         self.clip = clip
         self.store = store
+        self.dirtyBridge = dirtyBridge
         self.onClose = onClose
         _title = State(initialValue: clip.userTitle ?? "")
         _working = State(initialValue: store.imageURL(for: clip).flatMap { NSImage(contentsOf: $0) })
@@ -314,6 +429,22 @@ private struct ImageClipEditor: View {
         }
         .frame(minWidth: 520, minHeight: 460)
         .background(tokens.cardSurface)
+        .onAppear {
+            // Wire the title-bar close button to the same dirty/save logic as
+            // the Cancel button (see EditorWindowController.windowShouldClose).
+            dirtyBridge?.isDirty = { isDirty }
+            dirtyBridge?.save = { save() }
+        }
+        .confirmationDialog(
+            "Save changes to this image?",
+            isPresented: $showingDiscardPrompt
+        ) {
+            Button("Save") { if save() { onClose() } }
+            Button("Discard Changes", role: .destructive) { onClose() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("Your edits will be lost if you don't save them.")
+        }
     }
 
     private var toolbar: some View {
@@ -418,11 +549,17 @@ private struct ImageClipEditor: View {
             }
             Button("Save a copy...") { saveCopy() }
             Spacer()
-            Button("Cancel", role: .cancel) { onClose() }
-                .keyboardShortcut(.cancelAction)
-            Button("Save") { save() }
+            Button("Cancel", role: .cancel) {
+                if isDirty {
+                    showingDiscardPrompt = true
+                } else {
+                    onClose()
+                }
+            }
+            .keyboardShortcut(.cancelAction)
+            Button("Save") { if save() { onClose() } }
                 .keyboardShortcut(.defaultAction)
-                .disabled(working == nil)
+                .disabled(working == nil || !isDirty)
         }
         .padding(12)
     }
@@ -432,6 +569,7 @@ private struct ImageClipEditor: View {
     private func transform(_ op: (NSImage) -> NSImage?) {
         guard let working, let result = op(working) else { return }
         self.working = result
+        imageEdited = true
         resetSelection()
     }
 
@@ -439,21 +577,29 @@ private struct ImageClipEditor: View {
         guard let working, let pixelRect = selectionRectInImage,
               let cropped = ImageEditing.cropped(working, to: pixelRect) else { return }
         self.working = cropped
+        imageEdited = true
         cropping = false
         resetSelection()
     }
 
-    private func save() {
+    /// Persist the edits. Returns true when both writes landed so callers
+    /// (Save button, window close prompt) know whether to close the window;
+    /// on failure the error shows inline and the window stays open.
+    private func save() -> Bool {
         guard let working, let data = ImageEditing.pngData(working) else {
             saveError = "Could not encode the image."
-            return
+            return false
         }
-        if store.updateImage(of: clip, to: data) {
-            store.renameClip(clip, userTitle: title)
-            onClose()
-        } else {
+        guard store.updateImage(of: clip, to: data) else {
             saveError = "Could not save the image."
+            return false
         }
+        guard store.renameClip(clip, userTitle: title) else {
+            saveError = "Could not save the title."
+            return false
+        }
+        saveError = nil
+        return true
     }
 
     private func saveCopy() {

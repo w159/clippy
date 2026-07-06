@@ -34,9 +34,18 @@ struct ClipCardView: View {
     let onRevealInFinder: (() -> Void)?
     let onExtractZip: (() -> Void)?
 
+    /// Menu items for the hover sparkles button. Supplied by the parent (which
+    /// owns the AI action dispatch) so the card shares the exact context-menu
+    /// items; nil hides the button (AI off, or non-text clip). Type-erased to
+    /// keep the card non-generic.
+    let aiMenuContent: (() -> AnyView)?
+
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
+    /// Thumbnail decoded off the main thread on a cache miss. Body shows the
+    /// placeholder until this lands; subsequent appearances hit the NSCache.
+    @State private var decodedThumbnail: NSImage?
 
     /// When the quick-action buttons are visible and hit-testable. Basing this
     /// on selection (not just hover) makes the actions reachable for keyboard
@@ -77,7 +86,8 @@ struct ClipCardView: View {
         onPasteFile: (() -> Void)? = nil,
         onMoveFile: (() -> Void)? = nil,
         onRevealInFinder: (() -> Void)? = nil,
-        onExtractZip: (() -> Void)? = nil
+        onExtractZip: (() -> Void)? = nil,
+        aiMenuContent: (() -> AnyView)? = nil
     ) {
         self.clip = clip
         self.isSelected = isSelected
@@ -97,6 +107,7 @@ struct ClipCardView: View {
         self.onMoveFile = onMoveFile
         self.onRevealInFinder = onRevealInFinder
         self.onExtractZip = onExtractZip
+        self.aiMenuContent = aiMenuContent
     }
 
     private var kind: ClipKind { clip.kind }
@@ -478,6 +489,25 @@ struct ClipCardView: View {
                     cardActionButton("archivebox", help: "Extract", action: fileExtractAction)
                 }
             } else if !isImage {
+                // AI actions menu, same items as the right-click AI submenu.
+                // Menu content comes from the parent so dispatch stays in one place.
+                if let aiMenu = aiMenuContent {
+                    Menu {
+                        aiMenu()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: iconSize, weight: .medium))
+                            .symbolRenderingMode(.hierarchical)
+                            .frame(width: 28, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .menuIndicator(.hidden)
+                    .foregroundStyle(tokens.textSecondary)
+                    .help("AI actions")
+                    .accessibilityLabel("AI actions")
+                }
                 // "Paste as plain text" is still reachable via the context menu;
                 // this slot is now the quicker "send as keystrokes" action.
                 cardActionButton("keyboard", help: "Send as keystrokes", action: onSendKeystrokes)
@@ -523,7 +553,9 @@ struct ClipCardView: View {
 
     /// Body re-evaluates often (hover, selection); thumbnails come from this
     /// cache instead of disk after the first load.
-    private static let thumbnailCache: NSCache<NSString, NSImage> = {
+    // nonisolated(unsafe): NSCache is documented thread-safe; the decode task
+    // writes from off-main while body reads on the main actor.
+    private nonisolated(unsafe) static let thumbnailCache: NSCache<NSString, NSImage> = {
         let c = NSCache<NSString, NSImage>()
         // Cap entry count so scrolling through a large history can't accumulate
         // hundreds of decompressed bitmaps in RAM (was the primary 4 GB cause).
@@ -541,14 +573,40 @@ struct ClipCardView: View {
 
     // Max pixel size for thumbnail decode. Cards render at maxHeight 72 @2x,
     // so 300 px is ample and avoids decompressing full-resolution originals.
-    private static let thumbnailMaxPixelSize = 300
+    private nonisolated static let thumbnailMaxPixelSize = 300
 
-    private static func thumbnail(for filename: String) -> NSImage? {
-        let key = filename as NSString
-        if let cached = thumbnailCache.object(forKey: key) {
-            return cached
+    /// Cache-only lookup so body stays cheap; never touches disk.
+    private static func cachedThumbnail(for filename: String) -> NSImage? {
+        thumbnailCache.object(forKey: filename as NSString)
+    }
+
+    /// In-flight decode tasks keyed by filename, so several cards appearing at
+    /// once for the same image share one decode instead of racing. MainActor
+    /// confined: every request originates from a view `.task` block.
+    @MainActor
+    private static var inflightDecodes: [String: Task<NSImage?, Never>] = [:]
+
+    /// Async thumbnail load: cache hit, or join the in-flight decode, or start
+    /// a new one. The synchronous ImageIO decode (ShouldCacheImmediately) used
+    /// to run inside body on first appearance and stalled scrolling; it now
+    /// runs on a detached background task.
+    @MainActor
+    private static func thumbnail(for filename: String) async -> NSImage? {
+        if let cached = cachedThumbnail(for: filename) { return cached }
+        if let inflight = inflightDecodes[filename] { return await inflight.value }
+        let decode = Task<NSImage?, Never>.detached(priority: .userInitiated) {
+            decodeThumbnail(filename)
         }
+        inflightDecodes[filename] = decode
+        let image = await decode.value
+        inflightDecodes[filename] = nil
+        return image
+    }
 
+    // nonisolated: runs on the detached decode task, never on the main actor.
+    // NSCache and ImageIO are thread-safe, so no isolation is needed.
+    private nonisolated static func decodeThumbnail(_ filename: String) -> NSImage? {
+        let key = filename as NSString
         let url = ClipDatabase.shared.media.url(for: filename)
 
         // Downsample at decode time via ImageIO so the decompressed bitmap is
@@ -580,7 +638,7 @@ struct ClipCardView: View {
         HStack(alignment: .bottom, spacing: 8) {
             Group {
                 if let filename = clip.thumbFilename,
-                   let nsImage = Self.thumbnail(for: filename) {
+                   let nsImage = Self.cachedThumbnail(for: filename) ?? decodedThumbnail {
                     Image(nsImage: nsImage)
                         .resizable()
                         .scaledToFill()
@@ -593,6 +651,15 @@ struct ClipCardView: View {
                         .foregroundStyle(tokens.textSecondary)
                         .frame(width: 72, height: 48)
                 }
+            }
+            // Cache miss: decode off-main and publish into @State to re-render.
+            // Keyed by filename so an image edit that repoints the clip's thumb
+            // refires the decode instead of showing the stale bitmap.
+            .task(id: clip.thumbFilename) {
+                guard let filename = clip.thumbFilename,
+                      Self.cachedThumbnail(for: filename) == nil else { return }
+                decodedThumbnail = nil
+                decodedThumbnail = await Self.thumbnail(for: filename)
             }
             if let width = clip.pixelWidth, let height = clip.pixelHeight {
                 Text("\(width)\u{00D7}\(height) PNG")
