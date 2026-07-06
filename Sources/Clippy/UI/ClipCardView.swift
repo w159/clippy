@@ -197,8 +197,9 @@ struct ClipCardView: View {
                 }
             }
         // Whole card area hit-testable so taps land anywhere on the card.
+        // No whole-card .help: a tooltip popping over the preview text on
+        // every hover added clutter; the kind label now tips on its icon.
         .contentShape(Rectangle())
-        .help(kind.label)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
         .accessibilityAddTraits(.isButton)
@@ -229,21 +230,20 @@ struct ClipCardView: View {
 
             Spacer(minLength: 4)
 
-            // Keep category dots and rich-text/pin badges mounted during hover
-            // so the card never loses context; only the timestamp moves out of
-            // the way for the quick-action buttons. The badges stay visible at
-            // reduced opacity so they do not fight the hover actions for
-            // attention but are still readable. (Audit: hover swaps out dots
-            // and rich indicator, losing persistent context.)
+            // Trailing metadata fully yields to the quick-action buttons: the
+            // earlier keep-at-0.35-opacity treatment left ghosted badges
+            // bleeding through the overlaid buttons, which read as visual
+            // noise. Badges stay mounted (no layout churn) but go fully
+            // transparent while the actions are shown; the opaque action chip
+            // below guarantees the buttons never mix with card content.
             HStack(spacing: 6) {
                 categoryDots
                 kindIndicator
                 richIndicator
                 pinBadge
                 timestampText
-                    .opacity(showsActions ? 0 : 1)
             }
-            .opacity(showsActions ? 0.35 : 1)
+            .opacity(showsActions ? 0 : 1)
         }
         // minHeight lets the row grow with larger fonts instead of clipping.
         .frame(minHeight: 20)
@@ -254,7 +254,21 @@ struct ClipCardView: View {
         // zero layout width, and ViewThatFits swaps in a compact variant when
         // the card is narrower than the full button row.
         .overlay(alignment: .trailing) {
+            // Opaque backing chip: the buttons sit on a solid themed surface
+            // instead of floating translucently over whatever card content is
+            // underneath, so they stay legible even when the row is narrow
+            // enough that the overlay reaches into the title.
             fittingHoverActions
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(tokens.cardSurface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(tokens.cardBorder, lineWidth: 1)
+                )
                 .opacity(showsActions ? 1 : 0)
                 .allowsHitTesting(showsActions)
         }
@@ -451,6 +465,7 @@ struct ClipCardView: View {
             .font(.system(size: iconSize, weight: .semibold))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(kind.tint)
+            .help(kind.label)
     }
 
     private var richIndicator: some View {
