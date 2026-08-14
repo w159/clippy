@@ -3,15 +3,15 @@
     <channel>
         <title>Clippy</title>
         <item>
-            <title>Version 1.8.1</title>
-            <pubDate>Mon, 06 Jul 2026 13:35:08 +0000</pubDate>
-            <sparkle:version>1.8.1</sparkle:version>
-            <sparkle:shortVersionString>1.8.1</sparkle:shortVersionString>
+            <title>Version 1.8.2</title>
+            <pubDate>Fri, 14 Aug 2026 18:14:17 +0000</pubDate>
+            <sparkle:version>1.8.2</sparkle:version>
+            <sparkle:shortVersionString>1.8.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <link>https://github.com/w159/clippy/releases/tag/v1.8.1</link>
+            <link>https://github.com/w159/clippy/releases/tag/v1.8.2</link>
             <enclosure
-                url="https://github.com/w159/clippy/releases/download/v1.8.1/Clippy-1.8.1.zip"
-                sparkle:edSignature="wVRQTEfe5dZoqFS4VhmPKjktLz6/kdygRxkUONm2EjwS1gBpqM6fFqkMukWWQUcAJ61lMVWURaAnI9aebYEpDw==" length="6744977"
+                url="https://github.com/w159/clippy/releases/download/v1.8.2/Clippy-1.8.2.zip"
+                sparkle:edSignature="oJD2Qqv3F/Bg5cu9nMCSrHU5v+ifX7+dWEXMZFJec+8KYdlV8halLUAT7KkyRRsG5h/Kt7jGsHVAzC3QGjvVDQ==" length="6745310"
                 type="application/octet-stream" />
         </item>
     </channel>
