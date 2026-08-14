@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-08-14 - Dropped copies from slow multi-flavor pasteboard writers
+
+### Fixed
+- Copies from apps that fill the pasteboard in stages are no longer dropped. An app
+  bumps `changeCount` on `clearContents()` and writes the data up to a few hundred ms
+  later; the poll retired the change on that first empty look, so the copy was lost for
+  good - no clip, no mascot bounce, no capture sound. `tick()` now retires a change only
+  once the pasteboard actually resolved, with a 2s grace so an unsupported flavor cannot
+  spin the poll. Sources/Clippy/Capture/ClipboardMonitor.swift:90 (`tick`), :121 (`retire`),
+  :135 (`captureCurrentPasteboard` now returns resolved/not-yet).
+  - Deliberate skips (`org.nspasteboard.ConcealedType`, ignored source bundle IDs, images
+    over the size cap) still retire immediately and are never re-read. Retrying one would
+    re-examine it after the frontmost app changed, which is how a password copy would end
+    up in history.
+  - `ClipboardMonitor` takes an injectable `NSPasteboard` (defaults to `.general`) and
+    `tick()` is internal, so the capture path is drivable headlessly.
+    Tests/ClippyTests/ClipboardMonitorRaceTests.swift.
+- Evidence, measured against a 300ms fill gap with the 600ms poll interval:
+  before 5 of 6 copies dropped, after 0 of 6. A 1.2s gap is captured; a concealed-type
+  write is still never captured. docs/evidence/capture-race-2026-08-14.md.
+
+### Known, not fixed here
+- `captureFileIfPresent` retires the change even when every file save throws, so a failed
+  file copy is silent (no clip, no sound). Pre-existing.
+- `skipNextChange` is consumed by whichever change the next tick observes. A user copy
+  landing in the same poll window as Clippy's own paste-write is swallowed. Pre-existing.
+
 ## 2026-06-23 - UI-freeze fixes (capture/search off main thread), status-bar icon, AI Actions panel nav, duplicate-file cleanup
 
 ### Fixed
