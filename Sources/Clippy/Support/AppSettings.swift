@@ -351,7 +351,7 @@ final class AppSettings: ObservableObject {
 
     /// Which backend to talk to. The API key (when needed) lives in the keychain,
     /// never here.
-    @AppDefault(Keys.aiProvider, default: AIProviderKind.ollama)
+    @AppDefault(Keys.aiProvider, default: AIProviderKind.appleIntelligence)
     var aiProvider: AIProviderKind
 
     /// Model id / Azure deployment name. Empty falls back to the provider default.
@@ -370,6 +370,19 @@ final class AppSettings: ObservableObject {
     /// (still reversible; the only auto-applied action).
     @AppDefault(Keys.aiAutoSuggestTitles, default: false)
     var aiAutoSuggestTitles: Bool
+
+    /// Whether auto-titling may actually run right now.
+    ///
+    /// Auto-titling is the one feature that sends content the user never chose to
+    /// send: it fires on *every* copy. With a hosted provider selected that means
+    /// every password, account number, and client record that passes through the
+    /// clipboard is posted to a third party. So the feature is gated on a provider
+    /// that keeps the text on this Mac - Apple Intelligence or a local Ollama -
+    /// regardless of how the toggle is set. Settings explains the gate rather than
+    /// silently doing nothing.
+    var canAutoSuggestTitles: Bool {
+        aiEnabled && aiAutoSuggestTitles && aiProvider.runsLocally
+    }
 
     /// When on, the AI assistant may run saved scripts via the run_script tool.
     /// Off by default; user must explicitly opt in.
@@ -728,7 +741,7 @@ final class AppSettings: ObservableObject {
             Keys.customSuccessHex: "",
             Keys.customDangerHex: "",
             Keys.aiEnabled: false,
-            Keys.aiProvider: AIProviderKind.ollama.rawValue,
+            Keys.aiProvider: AIProviderKind.appleIntelligence.rawValue,
             Keys.aiModel: "",
             Keys.aiBaseURL: "",
             Keys.aiAzureAPIVersion: "2024-10-21",

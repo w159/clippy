@@ -33,9 +33,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/ajv/dist/compile/codegen/code.js
+// node_modules.nosync.noindex/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/code.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -187,9 +187,9 @@ var require_code = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/scope.js
+// node_modules.nosync.noindex/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
@@ -332,9 +332,9 @@ var require_scope = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/index.js
+// node_modules.nosync.noindex/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
@@ -1052,9 +1052,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/util.js
+// node_modules.nosync.noindex/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "node_modules/ajv/dist/compile/util.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/util.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
@@ -1219,9 +1219,9 @@ var require_util = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/names.js
+// node_modules.nosync.noindex/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "node_modules/ajv/dist/compile/names.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/names.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1258,9 +1258,9 @@ var require_names = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/errors.js
+// node_modules.nosync.noindex/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "node_modules/ajv/dist/compile/errors.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/errors.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
@@ -1380,9 +1380,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/boolSchema.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
@@ -1431,9 +1431,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/rules.js
+// node_modules.nosync.noindex/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "node_modules/ajv/dist/compile/rules.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/rules.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
@@ -1462,9 +1462,9 @@ var require_rules = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/applicability.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
@@ -1485,9 +1485,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/dataType.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
@@ -1669,9 +1669,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/defaults.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
@@ -1706,9 +1706,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/code.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/code.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
@@ -1763,7 +1763,7 @@ var require_code2 = __commonJS({
       return allSchemaProperties(schemaMap).filter((p) => !(0, util_1.alwaysValidSchema)(it, schemaMap[p]));
     }
     exports.schemaProperties = schemaProperties;
-    function callValidateCode({ schemaCode, data, it: { gen, topSchemaRef, schemaPath, errorPath }, it }, func, context, passSchema) {
+    function callValidateCode({ schemaCode, data, it: { gen, topSchemaRef, schemaPath, errorPath }, it }, func, context2, passSchema) {
       const dataAndSchema = passSchema ? (0, codegen_1._)`${schemaCode}, ${data}, ${topSchemaRef}${schemaPath}` : data;
       const valCxt = [
         [names_1.default.instancePath, (0, codegen_1.strConcat)(names_1.default.instancePath, errorPath)],
@@ -1774,7 +1774,7 @@ var require_code2 = __commonJS({
       if (it.opts.dynamicRef)
         valCxt.push([names_1.default.dynamicAnchors, names_1.default.dynamicAnchors]);
       const args = (0, codegen_1._)`${dataAndSchema}, ${gen.object(...valCxt)}`;
-      return context !== codegen_1.nil ? (0, codegen_1._)`${func}.call(${context}, ${args})` : (0, codegen_1._)`${func}(${args})`;
+      return context2 !== codegen_1.nil ? (0, codegen_1._)`${func}.call(${context2}, ${args})` : (0, codegen_1._)`${func}(${args})`;
     }
     exports.callValidateCode = callValidateCode;
     var newRegExp = (0, codegen_1._)`new RegExp`;
@@ -1839,9 +1839,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/keyword.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
@@ -1957,9 +1957,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/subschema.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
@@ -2040,9 +2040,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// node_modules/fast-deep-equal/index.js
+// node_modules.nosync.noindex/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "node_modules/fast-deep-equal/index.js"(exports, module) {
+  "node_modules.nosync.noindex/fast-deep-equal/index.js"(exports, module) {
     "use strict";
     module.exports = function equal(a, b) {
       if (a === b) return true;
@@ -2075,9 +2075,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// node_modules/json-schema-traverse/index.js
+// node_modules.nosync.noindex/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "node_modules/json-schema-traverse/index.js"(exports, module) {
+  "node_modules.nosync.noindex/json-schema-traverse/index.js"(exports, module) {
     "use strict";
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2163,9 +2163,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/resolve.js
+// node_modules.nosync.noindex/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "node_modules/ajv/dist/compile/resolve.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
@@ -2319,9 +2319,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/index.js
+// node_modules.nosync.noindex/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "node_modules/ajv/dist/compile/validate/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
@@ -2827,9 +2827,9 @@ var require_validate = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/validation_error.js
+// node_modules.nosync.noindex/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "node_modules/ajv/dist/runtime/validation_error.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2843,9 +2843,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/ref_error.js
+// node_modules.nosync.noindex/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "node_modules/ajv/dist/compile/ref_error.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2860,9 +2860,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/index.js
+// node_modules.nosync.noindex/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "node_modules/ajv/dist/compile/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/compile/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
@@ -3084,9 +3084,9 @@ var require_compile = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/data.json
+// node_modules.nosync.noindex/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "node_modules/ajv/dist/refs/data.json"(exports, module) {
+  "node_modules.nosync.noindex/ajv/dist/refs/data.json"(exports, module) {
     module.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3103,9 +3103,9 @@ var require_data = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/utils.js
+// node_modules.nosync.noindex/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "node_modules/fast-uri/lib/utils.js"(exports, module) {
+  "node_modules.nosync.noindex/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3229,8 +3229,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path3) {
-      let input = path3;
+    function removeDotSegments(path4) {
+      let input = path4;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3416,9 +3416,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/schemes.js
+// node_modules.nosync.noindex/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "node_modules/fast-uri/lib/schemes.js"(exports, module) {
+  "node_modules.nosync.noindex/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3482,8 +3482,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path3, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
+        const [path4, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -3626,9 +3626,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// node_modules/fast-uri/index.js
+// node_modules.nosync.noindex/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "node_modules/fast-uri/index.js"(exports, module) {
+  "node_modules.nosync.noindex/fast-uri/index.js"(exports, module) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3912,9 +3912,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/uri.js
+// node_modules.nosync.noindex/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "node_modules/ajv/dist/runtime/uri.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3923,9 +3923,9 @@ var require_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/core.js
+// node_modules.nosync.noindex/ajv/dist/core.js
 var require_core = __commonJS({
-  "node_modules/ajv/dist/core.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/core.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
@@ -4534,9 +4534,9 @@ var require_core = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/id.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
@@ -4549,9 +4549,9 @@ var require_id = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/ref.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
@@ -4671,9 +4671,9 @@ var require_ref = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/index.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4692,9 +4692,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4724,9 +4724,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4752,9 +4752,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/ucs2length.js
+// node_modules.nosync.noindex/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4778,9 +4778,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4810,9 +4810,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/pattern.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4847,9 +4847,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4876,9 +4876,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/required.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4958,9 +4958,9 @@ var require_required = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4987,9 +4987,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/equal.js
+// node_modules.nosync.noindex/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "node_modules/ajv/dist/runtime/equal.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -4998,9 +4998,9 @@ var require_equal = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -5065,9 +5065,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/const.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5094,9 +5094,9 @@ var require_const = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/enum.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5143,9 +5143,9 @@ var require_enum = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/index.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5181,9 +5181,9 @@ var require_validation = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
@@ -5234,9 +5234,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
@@ -5291,9 +5291,9 @@ var require_items = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5308,9 +5308,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5343,9 +5343,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/contains.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5437,9 +5437,9 @@ var require_contains = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
@@ -5531,9 +5531,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5574,9 +5574,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5680,9 +5680,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/properties.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5738,9 +5738,9 @@ var require_properties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5812,9 +5812,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/not.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5843,9 +5843,9 @@ var require_not = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5860,9 +5860,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5918,9 +5918,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5945,9 +5945,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/if.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6014,9 +6014,9 @@ var require_if = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -6032,9 +6032,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/index.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -6080,9 +6080,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/format.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6170,9 +6170,9 @@ var require_format = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/index.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6181,9 +6181,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/metadata.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
@@ -6204,9 +6204,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/draft7.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6226,9 +6226,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/types.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
@@ -6240,9 +6240,9 @@ var require_types = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/index.js
+// node_modules.nosync.noindex/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
+  "node_modules.nosync.noindex/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6345,9 +6345,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/json-schema-draft-07.json
+// node_modules.nosync.noindex/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
+  "node_modules.nosync.noindex/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
     module.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6502,9 +6502,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/ajv.js
+// node_modules.nosync.noindex/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "node_modules/ajv/dist/ajv.js"(exports, module) {
+  "node_modules.nosync.noindex/ajv/dist/ajv.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
@@ -6572,9 +6572,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/formats.js
+// node_modules.nosync.noindex/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "node_modules/ajv-formats/dist/formats.js"(exports) {
+  "node_modules.nosync.noindex/ajv-formats/dist/formats.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -6775,9 +6775,9 @@ var require_formats = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/limit.js
+// node_modules.nosync.noindex/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "node_modules/ajv-formats/dist/limit.js"(exports) {
+  "node_modules.nosync.noindex/ajv-formats/dist/limit.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
@@ -6847,9 +6847,9 @@ var require_limit = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/index.js
+// node_modules.nosync.noindex/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "node_modules/ajv-formats/dist/index.js"(exports, module) {
+  "node_modules.nosync.noindex/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6876,12 +6876,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs, exportName) {
+    function addFormats(ajv, list, fs2, exportName) {
       var _a;
       var _b;
       (_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 ? _a : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs[f]);
+        ajv.addFormat(f, fs2[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -6891,9 +6891,9 @@ var require_dist = __commonJS({
 
 // src/index.ts
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
 
-// node_modules/zod/v3/external.js
+// node_modules.nosync.noindex/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -7005,7 +7005,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// node_modules/zod/v3/helpers/util.js
+// node_modules.nosync.noindex/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -7139,7 +7139,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/zod/v3/ZodError.js
+// node_modules.nosync.noindex/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -7257,7 +7257,7 @@ ZodError.create = (issues) => {
   return error2;
 };
 
-// node_modules/zod/v3/locales/en.js
+// node_modules.nosync.noindex/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -7360,7 +7360,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/zod/v3/errors.js
+// node_modules.nosync.noindex/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -7369,10 +7369,10 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// node_modules/zod/v3/helpers/parseUtil.js
+// node_modules.nosync.noindex/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path3, errorMaps, issueData } = params;
-  const fullPath = [...path3, ...issueData.path || []];
+  const { data, path: path4, errorMaps, issueData } = params;
+  const fullPath = [...path4, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7479,20 +7479,20 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// node_modules/zod/v3/helpers/errorUtil.js
+// node_modules.nosync.noindex/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/zod/v3/types.js
+// node_modules.nosync.noindex/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path3, key) {
+  constructor(parent, value, path4, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path3;
+    this._path = path4;
     this._key = key;
   }
   get path() {
@@ -9271,9 +9271,9 @@ var ZodObject = class _ZodObject extends ZodType {
   _getCached() {
     if (this._cached !== null)
       return this._cached;
-    const shape = this._def.shape();
-    const keys = util.objectKeys(shape);
-    this._cached = { shape, keys };
+    const shape2 = this._def.shape();
+    const keys = util.objectKeys(shape2);
+    this._cached = { shape: shape2, keys };
     return this._cached;
   }
   _parse(input) {
@@ -9288,7 +9288,7 @@ var ZodObject = class _ZodObject extends ZodType {
       return INVALID;
     }
     const { status, ctx } = this._processInputParams(input);
-    const { shape, keys: shapeKeys } = this._getCached();
+    const { shape: shape2, keys: shapeKeys } = this._getCached();
     const extraKeys = [];
     if (!(this._def.catchall instanceof ZodNever && this._def.unknownKeys === "strip")) {
       for (const key in ctx.data) {
@@ -9299,7 +9299,7 @@ var ZodObject = class _ZodObject extends ZodType {
     }
     const pairs = [];
     for (const key of shapeKeys) {
-      const keyValidator = shape[key];
+      const keyValidator = shape2[key];
       const value = ctx.data[key];
       pairs.push({
         key: { status: "valid", value: key },
@@ -9505,27 +9505,27 @@ var ZodObject = class _ZodObject extends ZodType {
     });
   }
   pick(mask) {
-    const shape = {};
+    const shape2 = {};
     for (const key of util.objectKeys(mask)) {
       if (mask[key] && this.shape[key]) {
-        shape[key] = this.shape[key];
+        shape2[key] = this.shape[key];
       }
     }
     return new _ZodObject({
       ...this._def,
-      shape: () => shape
+      shape: () => shape2
     });
   }
   omit(mask) {
-    const shape = {};
+    const shape2 = {};
     for (const key of util.objectKeys(this.shape)) {
       if (!mask[key]) {
-        shape[key] = this.shape[key];
+        shape2[key] = this.shape[key];
       }
     }
     return new _ZodObject({
       ...this._def,
-      shape: () => shape
+      shape: () => shape2
     });
   }
   /**
@@ -9572,27 +9572,27 @@ var ZodObject = class _ZodObject extends ZodType {
     return createZodEnum(util.objectKeys(this.shape));
   }
 };
-ZodObject.create = (shape, params) => {
+ZodObject.create = (shape2, params) => {
   return new ZodObject({
-    shape: () => shape,
+    shape: () => shape2,
     unknownKeys: "strip",
     catchall: ZodNever.create(),
     typeName: ZodFirstPartyTypeKind.ZodObject,
     ...processCreateParams(params)
   });
 };
-ZodObject.strictCreate = (shape, params) => {
+ZodObject.strictCreate = (shape2, params) => {
   return new ZodObject({
-    shape: () => shape,
+    shape: () => shape2,
     unknownKeys: "strict",
     catchall: ZodNever.create(),
     typeName: ZodFirstPartyTypeKind.ZodObject,
     ...processCreateParams(params)
   });
 };
-ZodObject.lazycreate = (shape, params) => {
+ZodObject.lazycreate = (shape2, params) => {
   return new ZodObject({
-    shape,
+    shape: shape2,
     unknownKeys: "strip",
     catchall: ZodNever.create(),
     typeName: ZodFirstPartyTypeKind.ZodObject,
@@ -10934,7 +10934,7 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// node_modules/zod/v4/core/core.js
+// node_modules.nosync.noindex/zod/v4/core/core.js
 var NEVER2 = Object.freeze({
   status: "aborted"
 });
@@ -10993,7 +10993,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/zod/v4/core/util.js
+// node_modules.nosync.noindex/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -11129,10 +11129,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11307,9 +11307,9 @@ function stringifyPrimitive(value) {
     return `"${value}"`;
   return `${value}`;
 }
-function optionalKeys(shape) {
-  return Object.keys(shape).filter((k) => {
-    return shape[k]._zod.optin === "optional" && shape[k]._zod.optout === "optional";
+function optionalKeys(shape2) {
+  return Object.keys(shape2).filter((k) => {
+    return shape2[k]._zod.optin === "optional" && shape2[k]._zod.optout === "optional";
   });
 }
 var NUMBER_FORMAT_RANGES = {
@@ -11357,14 +11357,14 @@ function omit(schema, mask) {
     checks: []
   });
 }
-function extend(schema, shape) {
-  if (!isPlainObject(shape)) {
+function extend(schema, shape2) {
+  if (!isPlainObject(shape2)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const def = {
     ...schema._zod.def,
     get shape() {
-      const _shape = { ...schema._zod.def.shape, ...shape };
+      const _shape = { ...schema._zod.def.shape, ...shape2 };
       assignProp(this, "shape", _shape);
       return _shape;
     },
@@ -11388,7 +11388,7 @@ function merge(a, b) {
 }
 function partial(Class2, schema, mask) {
   const oldShape = schema._zod.def.shape;
-  const shape = { ...oldShape };
+  const shape2 = { ...oldShape };
   if (mask) {
     for (const key in mask) {
       if (!(key in oldShape)) {
@@ -11396,14 +11396,14 @@ function partial(Class2, schema, mask) {
       }
       if (!mask[key])
         continue;
-      shape[key] = Class2 ? new Class2({
+      shape2[key] = Class2 ? new Class2({
         type: "optional",
         innerType: oldShape[key]
       }) : oldShape[key];
     }
   } else {
     for (const key in oldShape) {
-      shape[key] = Class2 ? new Class2({
+      shape2[key] = Class2 ? new Class2({
         type: "optional",
         innerType: oldShape[key]
       }) : oldShape[key];
@@ -11411,28 +11411,28 @@ function partial(Class2, schema, mask) {
   }
   return clone(schema, {
     ...schema._zod.def,
-    shape,
+    shape: shape2,
     checks: []
   });
 }
 function required(Class2, schema, mask) {
   const oldShape = schema._zod.def.shape;
-  const shape = { ...oldShape };
+  const shape2 = { ...oldShape };
   if (mask) {
     for (const key in mask) {
-      if (!(key in shape)) {
+      if (!(key in shape2)) {
         throw new Error(`Unrecognized key: "${key}"`);
       }
       if (!mask[key])
         continue;
-      shape[key] = new Class2({
+      shape2[key] = new Class2({
         type: "nonoptional",
         innerType: oldShape[key]
       });
     }
   } else {
     for (const key in oldShape) {
-      shape[key] = new Class2({
+      shape2[key] = new Class2({
         type: "nonoptional",
         innerType: oldShape[key]
       });
@@ -11440,7 +11440,7 @@ function required(Class2, schema, mask) {
   }
   return clone(schema, {
     ...schema._zod.def,
-    shape,
+    shape: shape2,
     // optional: [],
     checks: []
   });
@@ -11452,11 +11452,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a;
     (_a = iss).path ?? (_a.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -11514,7 +11514,7 @@ var Class = class {
   }
 };
 
-// node_modules/zod/v4/core/errors.js
+// node_modules.nosync.noindex/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -11589,7 +11589,7 @@ function formatError(error2, _mapper) {
   return fieldErrors;
 }
 
-// node_modules/zod/v4/core/parse.js
+// node_modules.nosync.noindex/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -11639,7 +11639,7 @@ var _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 
-// node_modules/zod/v4/core/regexes.js
+// node_modules.nosync.noindex/zod/v4/core/regexes.js
 var cuid = /^[cC][^\s-]{8,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -11697,7 +11697,7 @@ var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// node_modules/zod/v4/core/checks.js
+// node_modules.nosync.noindex/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {});
@@ -12082,7 +12082,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// node_modules.nosync.noindex/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -12118,14 +12118,14 @@ var Doc = class {
   }
 };
 
-// node_modules/zod/v4/core/versions.js
+// node_modules.nosync.noindex/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 0,
   patch: 0
 };
 
-// node_modules/zod/v4/core/schemas.js
+// node_modules.nosync.noindex/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {});
@@ -12673,10 +12673,10 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     };
   });
   defineLazy(inst._zod, "propValues", () => {
-    const shape = def.shape;
+    const shape2 = def.shape;
     const propValues = {};
-    for (const key in shape) {
-      const field = shape[key]._zod;
+    for (const key in shape2) {
+      const field = shape2[key]._zod;
       if (field.values) {
         propValues[key] ?? (propValues[key] = /* @__PURE__ */ new Set());
         for (const v of field.values)
@@ -12685,7 +12685,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const generateFastpass = (shape) => {
+  const generateFastpass = (shape2) => {
     const doc = new Doc(["shape", "payload", "ctx"]);
     const normalized = _normalized.value;
     const parseStr = (key) => {
@@ -12738,7 +12738,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     doc.write(`payload.value = newResult;`);
     doc.write(`return payload;`);
     const fn = doc.compile();
-    return (payload, ctx) => fn(shape, payload, ctx);
+    return (payload, ctx) => fn(shape2, payload, ctx);
   };
   let fastpass;
   const isObject2 = isObject;
@@ -12766,9 +12766,9 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
       payload = fastpass(payload, ctx);
     } else {
       payload.value = {};
-      const shape = value.shape;
+      const shape2 = value.shape;
       for (const key of value.keys) {
-        const el = shape[key];
+        const el = shape2[key];
         const r = el._zod.run({ value: input[key], issues: [] }, ctx);
         const isOptional = el._zod.optin === "optional" && el._zod.optout === "optional";
         if (r instanceof Promise) {
@@ -13363,7 +13363,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// node_modules/zod/v4/locales/en.js
+// node_modules.nosync.noindex/zod/v4/locales/en.js
 var parsedType = (data) => {
   const t = typeof data;
   switch (t) {
@@ -13481,7 +13481,7 @@ function en_default2() {
   };
 }
 
-// node_modules/zod/v4/core/registries.js
+// node_modules.nosync.noindex/zod/v4/core/registries.js
 var $ZodRegistry = class {
   constructor() {
     this._map = /* @__PURE__ */ new Map();
@@ -13529,7 +13529,7 @@ function registry() {
 }
 var globalRegistry = /* @__PURE__ */ registry();
 
-// node_modules/zod/v4/core/api.js
+// node_modules.nosync.noindex/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -13968,7 +13968,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -14031,7 +14031,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// node_modules/zod/v4/classic/iso.js
+// node_modules.nosync.noindex/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -14072,7 +14072,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/zod/v4/classic/errors.js
+// node_modules.nosync.noindex/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -14106,13 +14106,13 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// node_modules.nosync.noindex/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
 var safeParseAsync2 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
 
-// node_modules/zod/v4/classic/schemas.js
+// node_modules.nosync.noindex/zod/v4/classic/schemas.js
 var ZodType2 = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   inst.def = def;
@@ -14410,22 +14410,22 @@ var ZodObject2 = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
   inst.partial = (...args) => util_exports.partial(ZodOptional2, inst, args[0]);
   inst.required = (...args) => util_exports.required(ZodNonOptional, inst, args[0]);
 });
-function object2(shape, params) {
+function object2(shape2, params) {
   const def = {
     type: "object",
     get shape() {
-      util_exports.assignProp(this, "shape", { ...shape });
+      util_exports.assignProp(this, "shape", { ...shape2 });
       return this.shape;
     },
     ...util_exports.normalizeParams(params)
   };
   return new ZodObject2(def);
 }
-function looseObject(shape, params) {
+function looseObject(shape2, params) {
   return new ZodObject2({
     type: "object",
     get shape() {
-      util_exports.assignProp(this, "shape", { ...shape });
+      util_exports.assignProp(this, "shape", { ...shape2 });
       return this.shape;
     },
     catchall: unknown(),
@@ -14723,10 +14723,10 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// node_modules/zod/v4/classic/external.js
+// node_modules.nosync.noindex/zod/v4/classic/external.js
 config(en_default2());
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var DEFAULT_NEGOTIATED_PROTOCOL_VERSION = "2025-03-26";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
@@ -16247,12 +16247,12 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// node_modules/zod-to-json-schema/dist/esm/Options.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = /* @__PURE__ */ Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
@@ -16286,7 +16286,7 @@ var getDefaultOptions = (options) => typeof options === "string" ? {
   ...options
 };
 
-// node_modules/zod-to-json-schema/dist/esm/Refs.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/Refs.js
 var getRefs = (options) => {
   const _options = getDefaultOptions(options);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -16307,7 +16307,7 @@ var getRefs = (options) => {
   };
 };
 
-// node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/errorMessages.js
 function addErrorMessage(res, key, errorMessage, refs) {
   if (!refs?.errorMessages)
     return;
@@ -16323,7 +16323,7 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
   addErrorMessage(res, key, errorMessage, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/getRelativePath.js
 var getRelativePath = (pathA, pathB) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
@@ -16333,7 +16333,7 @@ var getRelativePath = (pathA, pathB) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/any.js
 function parseAnyDef(refs) {
   if (refs.target !== "openAi") {
     return {};
@@ -16349,7 +16349,7 @@ function parseAnyDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/array.js
 function parseArrayDef(def, refs) {
   const res = {
     type: "array"
@@ -16373,7 +16373,7 @@ function parseArrayDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/bigint.js
 function parseBigintDef(def, refs) {
   const res = {
     type: "integer",
@@ -16419,24 +16419,24 @@ function parseBigintDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/boolean.js
 function parseBooleanDef() {
   return {
     type: "boolean"
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/branded.js
 function parseBrandedDef(_def, refs) {
   return parseDef(_def.type._def, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/catch.js
 var parseCatchDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/date.js
 function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
@@ -16495,7 +16495,7 @@ var integerDateParser = (def, refs) => {
   return res;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/default.js
 function parseDefaultDef(_def, refs) {
   return {
     ...parseDef(_def.innerType._def, refs),
@@ -16503,12 +16503,12 @@ function parseDefaultDef(_def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/effects.js
 function parseEffectsDef(_def, refs) {
   return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : parseAnyDef(refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/enum.js
 function parseEnumDef(def) {
   return {
     type: "string",
@@ -16516,7 +16516,7 @@ function parseEnumDef(def) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/intersection.js
 var isJsonSchema7AllOfType = (type) => {
   if ("type" in type && type.type === "string")
     return false;
@@ -16558,7 +16558,7 @@ function parseIntersectionDef(def, refs) {
   } : void 0;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/literal.js
 function parseLiteralDef(def, refs) {
   const parsedType2 = typeof def.value;
   if (parsedType2 !== "bigint" && parsedType2 !== "number" && parsedType2 !== "boolean" && parsedType2 !== "string") {
@@ -16578,7 +16578,7 @@ function parseLiteralDef(def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/string.js
 var emojiRegex2 = void 0;
 var zodPatterns = {
   /**
@@ -16903,7 +16903,7 @@ function stringifyRegExpWithFlags(regex, refs) {
   return pattern;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/record.js
 function parseRecordDef(def, refs) {
   if (refs.target === "openAi") {
     console.warn("Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.");
@@ -16955,7 +16955,7 @@ function parseRecordDef(def, refs) {
   return schema;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/map.js
 function parseMapDef(def, refs) {
   if (refs.mapStrategy === "record") {
     return parseRecordDef(def, refs);
@@ -16980,7 +16980,7 @@ function parseMapDef(def, refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
 function parseNativeEnumDef(def) {
   const object3 = def.values;
   const actualKeys = Object.keys(def.values).filter((key) => {
@@ -16994,7 +16994,7 @@ function parseNativeEnumDef(def) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/never.js
 function parseNeverDef(refs) {
   return refs.target === "openAi" ? void 0 : {
     not: parseAnyDef({
@@ -17004,7 +17004,7 @@ function parseNeverDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/null.js
 function parseNullDef(refs) {
   return refs.target === "openApi3" ? {
     enum: ["null"],
@@ -17014,7 +17014,7 @@ function parseNullDef(refs) {
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/union.js
 var primitiveMappings = {
   ZodString: "string",
   ZodNumber: "number",
@@ -17082,7 +17082,7 @@ var asAnyOf = (def, refs) => {
   return anyOf.length ? { anyOf } : void 0;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/nullable.js
 function parseNullableDef(def, refs) {
   if (["ZodString", "ZodNumber", "ZodBigInt", "ZodBoolean", "ZodNull"].includes(def.innerType._def.typeName) && (!def.innerType._def.checks || !def.innerType._def.checks.length)) {
     if (refs.target === "openApi3") {
@@ -17114,7 +17114,7 @@ function parseNullableDef(def, refs) {
   return base && { anyOf: [base, { type: "null" }] };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/number.js
 function parseNumberDef(def, refs) {
   const res = {
     type: "number"
@@ -17163,7 +17163,7 @@ function parseNumberDef(def, refs) {
   return res;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/object.js
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
   const result = {
@@ -17171,9 +17171,9 @@ function parseObjectDef(def, refs) {
     properties: {}
   };
   const required2 = [];
-  const shape = def.shape();
-  for (const propName in shape) {
-    let propDef = shape[propName];
+  const shape2 = def.shape();
+  for (const propName in shape2) {
+    let propDef = shape2[propName];
     if (propDef === void 0 || propDef._def === void 0) {
       continue;
     }
@@ -17233,7 +17233,7 @@ function safeIsOptional(schema) {
   }
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/optional.js
 var parseOptionalDef = (def, refs) => {
   if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
     return parseDef(def.innerType._def, refs);
@@ -17252,7 +17252,7 @@ var parseOptionalDef = (def, refs) => {
   } : parseAnyDef(refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/pipeline.js
 var parsePipelineDef = (def, refs) => {
   if (refs.pipeStrategy === "input") {
     return parseDef(def.in._def, refs);
@@ -17272,12 +17272,12 @@ var parsePipelineDef = (def, refs) => {
   };
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/promise.js
 function parsePromiseDef(def, refs) {
   return parseDef(def.type._def, refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/set.js
 function parseSetDef(def, refs) {
   const items = parseDef(def.valueType._def, {
     ...refs,
@@ -17297,7 +17297,7 @@ function parseSetDef(def, refs) {
   return schema;
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/tuple.js
 function parseTupleDef(def, refs) {
   if (def.rest) {
     return {
@@ -17325,24 +17325,24 @@ function parseTupleDef(def, refs) {
   }
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/undefined.js
 function parseUndefinedDef(refs) {
   return {
     not: parseAnyDef(refs)
   };
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/unknown.js
 function parseUnknownDef(refs) {
   return parseAnyDef(refs);
 }
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parsers/readonly.js
 var parseReadonlyDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// node_modules/zod-to-json-schema/dist/esm/selectParser.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/selectParser.js
 var selectParser = (def, typeName, refs) => {
   switch (typeName) {
     case ZodFirstPartyTypeKind.ZodString:
@@ -17418,7 +17418,7 @@ var selectParser = (def, typeName, refs) => {
   }
 };
 
-// node_modules/zod-to-json-schema/dist/esm/parseDef.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/parseDef.js
 function parseDef(def, refs, forceResolution = false) {
   const seenItem = refs.seen.get(def);
   if (refs.override) {
@@ -17474,7 +17474,7 @@ var addMeta = (def, refs, jsonSchema) => {
   return jsonSchema;
 };
 
-// node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+// node_modules.nosync.noindex/zod-to-json-schema/dist/esm/zodToJsonSchema.js
 var zodToJsonSchema = (schema, options) => {
   const refs = getRefs(options);
   let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name2, schema2]) => ({
@@ -17536,10 +17536,10 @@ var zodToJsonSchema = (schema, options) => {
   return combined;
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function getMethodLiteral(schema) {
-  const shape = getObjectShape(schema);
-  const methodSchema = shape?.method;
+  const shape2 = getObjectShape(schema);
+  const methodSchema = shape2?.method;
   if (!methodSchema) {
     throw new Error("Schema is missing a method literal");
   }
@@ -17557,7 +17557,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -18511,7 +18511,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -18579,7 +18579,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -18792,7 +18792,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -18827,7 +18827,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -18888,8 +18888,8 @@ var Server = class extends Protocol {
    * Override request handler registration to enforce server-side validation for tools/call.
    */
   setRequestHandler(requestSchema, handler) {
-    const shape = getObjectShape(requestSchema);
-    const methodSchema = shape?.method;
+    const shape2 = getObjectShape(requestSchema);
+    const methodSchema = shape2?.method;
     if (!methodSchema) {
       throw new Error("Schema is missing a method literal");
     }
@@ -19207,10 +19207,10 @@ var Server = class extends Protocol {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -19238,7 +19238,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = process2.stdin, _stdout = process2.stdout) {
     this._stdin = _stdin;
@@ -19299,7 +19299,7 @@ var StdioServerTransport = class {
   }
 };
 
-// node_modules/@hono/node-server/dist/index.mjs
+// node_modules.nosync.noindex/@hono/node-server/dist/index.mjs
 import { Http2ServerRequest as Http2ServerRequest2, constants as h2constants } from "http2";
 import { Http2ServerRequest } from "http2";
 import { Readable } from "stream";
@@ -19920,7 +19920,7 @@ var getRequestListener = (fetchCallback, options = {}) => {
   };
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js
 var WebStandardStreamableHTTPServerTransport = class {
   constructor(options = {}) {
     this._started = false;
@@ -20522,16 +20522,16 @@ data:
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/streamableHttp.js
+// node_modules.nosync.noindex/@modelcontextprotocol/sdk/dist/esm/server/streamableHttp.js
 var StreamableHTTPServerTransport = class {
   constructor(options = {}) {
     this._requestContext = /* @__PURE__ */ new WeakMap();
     this._webStandardTransport = new WebStandardStreamableHTTPServerTransport(options);
     this._requestListener = getRequestListener(async (webRequest) => {
-      const context = this._requestContext.get(webRequest);
+      const context2 = this._requestContext.get(webRequest);
       return this._webStandardTransport.handleRequest(webRequest, {
-        authInfo: context?.authInfo,
-        parsedBody: context?.parsedBody
+        authInfo: context2?.authInfo,
+        parsedBody: context2?.parsedBody
       });
     }, { overrideGlobalObjects: false });
   }
@@ -20647,10 +20647,14 @@ function resolveDatabasePath() {
 function resolveMediaDir(dbPath2) {
   return path.join(path.dirname(dbPath2), "media");
 }
+function resolveSupportDir(dbPath2) {
+  return path.dirname(dbPath2);
+}
 function openDatabase(dbPath2) {
   const db2 = new DatabaseSync(dbPath2);
   db2.exec("PRAGMA journal_mode = WAL;");
   db2.exec("PRAGMA foreign_keys = ON;");
+  db2.exec("PRAGMA busy_timeout = 5000;");
   return db2;
 }
 function grdbNow(date3 = /* @__PURE__ */ new Date()) {
@@ -20668,86 +20672,107 @@ function buildPrefixPattern(query) {
   return tokens.map((t) => `"${t.replace(/"/g, '""')}"*`).join(" ");
 }
 
-// src/tools.ts
+// src/types.ts
+var clipID = external_exports.number().int().min(1);
+var categoryID = external_exports.number().int().min(1);
+var limitSchema = external_exports.number().int().min(1).max(500).optional();
+var uuidSchema = external_exports.string().uuid();
+
+// src/tools/clips.ts
 import path2 from "node:path";
+var PREVIEW_CHARS = 300;
 function preview(text) {
-  return text.trim().slice(0, 300);
+  const trimmed = text.trim();
+  return trimmed.length > PREVIEW_CHARS ? `${trimmed.slice(0, PREVIEW_CHARS)}...` : trimmed;
 }
 function titleFor(row) {
   return row.userTitle ?? row.sourceAppName ?? "Unknown app";
 }
-function categoriesForClip(db2, clipID) {
-  const rows = db2.prepare(
+function categoriesForClip(db2, id) {
+  return db2.prepare(
     `SELECT c.id AS id, c.name AS name
          FROM clip_category cc
          JOIN category c ON c.id = cc.categoryID
         WHERE cc.clipID = ?
         ORDER BY c.sortOrder, c.createdAt`
-  ).all(clipID);
-  return rows;
+  ).all(id);
 }
-var limitSchema = external_exports.number().int().positive().max(500).optional();
-var tools = [
+function summarize(db2, row) {
+  return {
+    id: row.id,
+    title: titleFor(row),
+    preview: preview(row.contentText),
+    kind: row.contentKind,
+    sourceApp: row.sourceAppName,
+    createdAt: grdbToIso(row.createdAt),
+    categories: categoriesForClip(db2, row.id)
+  };
+}
+var clipTools = [
   {
-    name: "clippy_search",
-    description: "Full-text search clips via the FTS5 index (same ranking as the app). Returns id, title, preview, kind, createdAt, and categories. Query terms are prefix-matched (e.g. 'foo' matches 'foobar').",
+    name: "clippy_search_clips",
+    description: "Find clips in the user's clipboard history by what they contain. This is the entry point for almost every task: search first, then act on the ids you get back with clippy_get_clip, clippy_update_clip, clippy_assign_clips, or clippy_delete_clips. Terms are prefix-matched and ANDed, so 'data conn' matches a clip containing 'database connection'. Results are 300-character previews; use clippy_get_clip for a clip's full text. Filter by kind, category, or source app to narrow a broad match. Use clippy_list_recent instead when the user means 'what did I just copy'.",
     schema: external_exports.object({
-      query: external_exports.string().min(1).describe("Search text. Prefix-matched per term."),
-      limit: limitSchema.describe("Max results (default 25).")
+      query: external_exports.string().min(1).describe("What to look for. Each word is prefix-matched; all must match."),
+      kind: external_exports.enum(["text", "image", "file"]).optional().describe("Only clips of this kind."),
+      categoryID: external_exports.number().int().min(1).optional().describe("Only clips filed in this category. Ids come from clippy_list_categories."),
+      sourceApp: external_exports.string().optional().describe("Only clips copied from this app, matched exactly (e.g. 'Microsoft Word')."),
+      limit: limitSchema.describe("Maximum results. Defaults to 25.")
     }),
-    handler: (db2, _dbPath, args) => {
-      const { query, limit } = args;
+    handler: ({ db: db2 }, args) => {
+      const { query, kind, categoryID: categoryID2, sourceApp, limit } = args;
       const pattern = buildPrefixPattern(query);
-      if (!pattern) return { results: [] };
+      if (!pattern) return { results: [], note: "Query had no searchable terms." };
+      const where = ["clips_fts MATCH ?"];
+      const params = [pattern];
+      if (kind) {
+        where.push("clips.contentKind = ?");
+        params.push(kind);
+      }
+      if (sourceApp) {
+        where.push("clips.sourceAppName = ?");
+        params.push(sourceApp);
+      }
+      if (categoryID2 !== void 0) {
+        where.push("clips.id IN (SELECT clipID FROM clip_category WHERE categoryID = ?)");
+        params.push(categoryID2);
+      }
+      params.push(limit ?? 25);
       const rows = db2.prepare(
         `SELECT clips.* FROM clips
              JOIN clips_fts ON clips_fts.rowid = clips.id
-            WHERE clips_fts MATCH ?
+            WHERE ${where.join(" AND ")}
             ORDER BY rank
             LIMIT ?`
-      ).all(pattern, limit ?? 25);
-      return {
-        results: rows.map((r) => ({
-          id: r.id,
-          title: titleFor(r),
-          preview: preview(r.contentText),
-          kind: r.contentKind,
-          createdAt: grdbToIso(r.createdAt),
-          categories: categoriesForClip(db2, r.id)
-        }))
-      };
+      ).all(...params);
+      return { results: rows.map((row) => summarize(db2, row)) };
     }
   },
   {
     name: "clippy_list_recent",
-    description: "List the most recent clips, newest first. Returns id, title, preview, kind, createdAt, and categories.",
+    description: "List the most recently copied clips, newest first. Use this for 'what did I just copy', for showing the user their recent history, or as a starting point when there is no search term to work from. Returns the same 300-character previews as clippy_search_clips.",
     schema: external_exports.object({
-      limit: limitSchema.describe("Max results (default 25).")
+      kind: external_exports.enum(["text", "image", "file"]).optional().describe("Only clips of this kind."),
+      limit: limitSchema.describe("Maximum results. Defaults to 25.")
     }),
-    handler: (db2, _dbPath, args) => {
-      const { limit } = args;
+    handler: ({ db: db2 }, args) => {
+      const { kind, limit } = args;
       const rows = db2.prepare(
-        `SELECT * FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?`
-      ).all(limit ?? 25);
-      return {
-        results: rows.map((r) => ({
-          id: r.id,
-          title: titleFor(r),
-          preview: preview(r.contentText),
-          kind: r.contentKind,
-          createdAt: grdbToIso(r.createdAt),
-          categories: categoriesForClip(db2, r.id)
-        }))
-      };
+        `SELECT * FROM clips
+            ${kind ? "WHERE contentKind = ?" : ""}
+            ORDER BY createdAt DESC, id DESC
+            LIMIT ?`
+      ).all(...kind ? [kind, limit ?? 25] : [limit ?? 25]);
+      return { results: rows.map((row) => summarize(db2, row)) };
     }
   },
   {
-    name: "clippy_get",
-    description: "Fetch one clip in full by id: contentText, title, kind, timestamps, categories, and (for image clips) the absolute media + thumbnail file paths.",
+    name: "clippy_get_clip",
+    description: "Read one clip in full: its complete text (not the truncated preview), title, kind, source app, timestamps, categories, and for image or file clips the absolute path of the stored copy on disk. Use it once you have an id from clippy_search_clips or clippy_list_recent and need the actual content, for example to rewrite it with clippy_update_clip.",
     schema: external_exports.object({
-      id: external_exports.number().int().positive().describe("Clip id.")
+      id: clipID.describe("Clip id, from a search or list result.")
     }),
-    handler: (db2, dbPath2, args) => {
+    handler: ({ db: db2, dbPath: dbPath2 }, args) => {
       const { id } = args;
       const row = db2.prepare(`SELECT * FROM clips WHERE id = ?`).get(id);
       if (!row) return { error: "not_found", id };
@@ -20763,7 +20788,7 @@ var tools = [
         userTitle: row.userTitle,
         createdAt: grdbToIso(row.createdAt),
         categories: categoriesForClip(db2, row.id),
-        media: row.contentKind === "image" && row.mediaFilename ? {
+        media: row.mediaFilename ? {
           mediaPath: path2.join(mediaDir, row.mediaFilename),
           thumbPath: row.thumbFilename ? path2.join(mediaDir, row.thumbFilename) : null,
           pixelWidth: row.pixelWidth,
@@ -20774,107 +20799,690 @@ var tools = [
     }
   },
   {
-    name: "clippy_add",
-    description: "Insert a new plain-text clip. The FTS index is kept current automatically by the app's triggers. Returns the new clip id.",
+    name: "clippy_create_clip",
+    description: "Save a new text clip into the user's history, as if they had copied it. Use it to hand the user something to paste later: a generated snippet, a reformatted version of an existing clip, a command they asked you to prepare. Give it a title so the card is readable at a glance; without one the card shows the source app instead. Returns the new id, which you can pass straight to clippy_assign_clips to file it.",
+    mutates: true,
     schema: external_exports.object({
-      text: external_exports.string().min(1).describe("The clip's text content."),
-      title: external_exports.string().optional().describe("Optional custom display title (userTitle).")
+      text: external_exports.string().min(1).describe("The clip's content."),
+      title: external_exports.string().optional().describe("Short label shown on the clip card. Strongly recommended."),
+      categoryID: external_exports.number().int().min(1).optional().describe("File the new clip into this category immediately.")
     }),
-    handler: (db2, _dbPath, args) => {
-      const { text, title } = args;
+    handler: ({ db: db2 }, args) => {
+      const { text, title, categoryID: categoryID2 } = args;
       const now = grdbNow();
       const info = db2.prepare(
         `INSERT INTO clips
              (contentText, typeIdentifier, sourceAppName, createdAt, contentKind, userTitle)
            VALUES (?, 'public.utf8-plain-text', 'clippy-mcp', ?, 'text', ?)`
       ).run(text, now, title ?? null);
-      return { id: Number(info.lastInsertRowid), createdAt: grdbToIso(now) };
-    }
-  },
-  {
-    name: "clippy_delete",
-    description: "Delete a clip by id. Cascades to remove its category memberships and FTS entry. Does not delete media files on disk.",
-    schema: external_exports.object({
-      id: external_exports.number().int().positive().describe("Clip id to delete.")
-    }),
-    handler: (db2, _dbPath, args) => {
-      const { id } = args;
-      const info = db2.prepare(`DELETE FROM clips WHERE id = ?`).run(id);
-      return { deleted: info.changes > 0, id };
-    }
-  },
-  {
-    name: "clippy_list_categories",
-    description: "List all categories (pinboards) with id, name, colorHex, icon, and whether each is the starter category.",
-    schema: external_exports.object({}),
-    handler: (db2) => {
-      const rows = db2.prepare(
-        `SELECT * FROM category ORDER BY sortOrder, createdAt`
-      ).all();
-      return {
-        categories: rows.map((c) => ({
-          id: c.id,
-          name: c.name,
-          colorHex: c.colorHex,
-          iconKind: c.iconKind,
-          iconValue: c.iconValue,
-          sortOrder: c.sortOrder,
-          isStarter: c.isStarter === 1
-        }))
-      };
-    }
-  },
-  {
-    name: "clippy_set_category",
-    description: "Add or remove a clip's membership in a category. member=true inserts the clip_category row (idempotent); member=false removes it.",
-    schema: external_exports.object({
-      clipID: external_exports.number().int().positive().describe("Clip id."),
-      categoryID: external_exports.number().int().positive().describe("Category id."),
-      member: external_exports.boolean().describe("true to add to the category, false to remove.")
-    }),
-    handler: (db2, _dbPath, args) => {
-      const { clipID, categoryID, member } = args;
-      if (member) {
+      const id = Number(info.lastInsertRowid);
+      if (categoryID2 !== void 0) {
         db2.prepare(
           `INSERT OR IGNORE INTO clip_category (clipID, categoryID, addedAt) VALUES (?, ?, ?)`
-        ).run(clipID, categoryID, grdbNow());
-      } else {
-        db2.prepare(
-          `DELETE FROM clip_category WHERE clipID = ? AND categoryID = ?`
-        ).run(clipID, categoryID);
+        ).run(id, categoryID2, now);
       }
-      return { clipID, categoryID, member };
+      return { id, createdAt: grdbToIso(now), categories: categoriesForClip(db2, id) };
+    }
+  },
+  {
+    name: "clippy_update_clip",
+    description: "Edit a clip the user already has: rewrite its text, retitle it, or both. Use it when they ask to fix, reformat, clean up, or rename something in their history rather than add a new copy of it. Read the current value with clippy_get_clip first when you are transforming existing content. Only the fields you pass change; pass title as an empty string to clear it and fall back to the source app name.",
+    mutates: true,
+    schema: external_exports.object({
+      id: clipID.describe("Clip id to edit."),
+      text: external_exports.string().min(1).optional().describe("Replacement content."),
+      title: external_exports.string().optional().describe("Replacement title. Empty string clears it.")
+    }),
+    handler: ({ db: db2 }, args) => {
+      const { id, text, title } = args;
+      if (text === void 0 && title === void 0) {
+        return { error: "nothing_to_update", id, hint: "Pass text, title, or both." };
+      }
+      const existing = db2.prepare(`SELECT id FROM clips WHERE id = ?`).get(id);
+      if (!existing) return { error: "not_found", id };
+      const sets = [];
+      const params = [];
+      if (text !== void 0) {
+        sets.push("contentText = ?");
+        params.push(text);
+      }
+      if (title !== void 0) {
+        sets.push("userTitle = ?");
+        params.push(title === "" ? null : title);
+      }
+      params.push(id);
+      db2.prepare(`UPDATE clips SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+      const row = db2.prepare(`SELECT * FROM clips WHERE id = ?`).get(id);
+      return { updated: true, ...summarize(db2, row) };
+    }
+  },
+  {
+    name: "clippy_delete_clips",
+    description: "Permanently delete clips by id, one or many in a single call. Use it to clear out junk the user points at - duplicates, test noise, anything they ask you to remove. This cannot be undone, so confirm with the user before deleting anything they did not name explicitly. Category memberships and the search index are cleaned up automatically; stored image and file payloads are swept by the app later.",
+    mutates: true,
+    schema: external_exports.object({
+      ids: external_exports.array(clipID).min(1).max(500).describe("Clip ids to delete. Batch them rather than calling once per clip.")
+    }),
+    handler: ({ db: db2 }, args) => {
+      const { ids } = args;
+      const statement = db2.prepare(`DELETE FROM clips WHERE id = ?`);
+      const deleted = [];
+      const missing = [];
+      for (const id of ids) {
+        if (statement.run(id).changes > 0) deleted.push(id);
+        else missing.push(id);
+      }
+      return { deleted, missing, deletedCount: deleted.length };
+    }
+  }
+];
+
+// src/tools/categories.ts
+var DEFAULT_COLOR = "#FF9500";
+var DEFAULT_SYMBOL = "tag.fill";
+var hexColor = external_exports.string().regex(/^#?[0-9A-Fa-f]{6}$/, "Six hex digits, with or without a leading #");
+function normalizeColor(value) {
+  return value.startsWith("#") ? value.toUpperCase() : `#${value.toUpperCase()}`;
+}
+function shape(row, clipCount) {
+  return {
+    id: row.id,
+    name: row.name,
+    colorHex: row.colorHex,
+    icon: { kind: row.iconKind, value: row.iconValue },
+    position: row.sortOrder,
+    isStarter: row.isStarter === 1,
+    clipCount,
+    createdAt: grdbToIso(row.createdAt)
+  };
+}
+var categoryTools = [
+  {
+    name: "clippy_list_categories",
+    description: "List the user's categories - the named, colored boards they file clips into - with how many clips each holds. Call this before filing anything so you reuse an existing category instead of creating a near-duplicate, and to get the ids that clippy_assign_clips and the category filter on clippy_search_clips need.",
+    schema: external_exports.object({}),
+    handler: ({ db: db2 }) => {
+      const rows = db2.prepare(`SELECT * FROM category ORDER BY sortOrder, createdAt`).all();
+      const counts = /* @__PURE__ */ new Map();
+      for (const row of db2.prepare(`SELECT categoryID, COUNT(*) AS n FROM clip_category GROUP BY categoryID`).all()) {
+        counts.set(row.categoryID, row.n);
+      }
+      return { categories: rows.map((row) => shape(row, counts.get(row.id) ?? 0)) };
     }
   },
   {
     name: "clippy_create_category",
-    description: "Create a new category (pinboard). colorHex defaults to #FF9500. sortOrder is appended after existing categories; isStarter is always 0. Returns the new category id.",
+    description: "Create a new category to file clips into. Check clippy_list_categories first - the user almost always wants an existing board rather than a new one with a similar name. Give it a real SF Symbol name (for example 'terminal.fill', 'key.fill', 'doc.text') so it is recognizable in the sidebar. Returns the new id, ready for clippy_assign_clips.",
+    mutates: true,
     schema: external_exports.object({
-      name: external_exports.string().min(1).describe("Category name."),
-      colorHex: external_exports.string().regex(/^#?[0-9A-Fa-f]{6}$/).optional().describe("Hex color like #FF9500. Defaults to #FF9500."),
-      iconKind: external_exports.enum(["symbol", "emoji", "appLogo"]).optional().describe("Icon kind. Defaults to symbol."),
-      iconValue: external_exports.string().optional().describe("SF Symbol name, emoji, or bundle id. Defaults to tag.fill.")
+      name: external_exports.string().min(1).describe("What the user calls this group of clips."),
+      colorHex: hexColor.optional().describe(`Accent color. Defaults to ${DEFAULT_COLOR}.`),
+      iconKind: external_exports.enum(["symbol", "emoji", "appLogo"]).optional().describe("symbol = SF Symbol (default), emoji = a character, appLogo = an app bundle id."),
+      iconValue: external_exports.string().optional().describe(`SF Symbol name, emoji, or bundle id. Defaults to ${DEFAULT_SYMBOL}.`)
     }),
-    handler: (db2, _dbPath, args) => {
+    handler: ({ db: db2 }, args) => {
       const { name, colorHex, iconKind, iconValue } = args;
-      const color = colorHex ? colorHex.startsWith("#") ? colorHex : `#${colorHex}` : "#FF9500";
-      const kind = iconKind ?? "symbol";
-      const value = iconValue ?? "tag.fill";
-      const maxOrder = db2.prepare(`SELECT IFNULL(MAX(sortOrder), -1) AS m FROM category`).get().m;
+      const order = db2.prepare(`SELECT IFNULL(MAX(sortOrder), -1) AS m FROM category`).get().m + 1;
       const info = db2.prepare(
-        `INSERT INTO category
-             (name, colorHex, iconKind, iconValue, sortOrder, isStarter, createdAt)
+        `INSERT INTO category (name, colorHex, iconKind, iconValue, sortOrder, isStarter, createdAt)
            VALUES (?, ?, ?, ?, ?, 0, ?)`
-      ).run(name, color, kind, value, maxOrder + 1, grdbNow());
-      return {
-        id: Number(info.lastInsertRowid),
+      ).run(
         name,
-        colorHex: color,
-        sortOrder: maxOrder + 1
+        colorHex ? normalizeColor(colorHex) : DEFAULT_COLOR,
+        iconKind ?? "symbol",
+        iconValue ?? DEFAULT_SYMBOL,
+        order,
+        grdbNow()
+      );
+      const row = db2.prepare(`SELECT * FROM category WHERE id = ?`).get(Number(info.lastInsertRowid));
+      return shape(row, 0);
+    }
+  },
+  {
+    name: "clippy_update_category",
+    description: "Rename a category, change its color or icon, or move it up or down the sidebar. Use it when the user wants an existing board adjusted rather than replaced - renaming keeps every clip filed in it. Only the fields you pass change.",
+    mutates: true,
+    schema: external_exports.object({
+      id: categoryID.describe("Category id, from clippy_list_categories."),
+      name: external_exports.string().min(1).optional().describe("New name."),
+      colorHex: hexColor.optional().describe("New accent color."),
+      iconKind: external_exports.enum(["symbol", "emoji", "appLogo"]).optional().describe("New icon kind."),
+      iconValue: external_exports.string().optional().describe("New SF Symbol name, emoji, or bundle id."),
+      position: external_exports.number().int().min(0).optional().describe("Sort position; lower sits higher in the sidebar.")
+    }),
+    handler: ({ db: db2 }, args) => {
+      const { id, name, colorHex, iconKind, iconValue, position } = args;
+      const existing = db2.prepare(`SELECT * FROM category WHERE id = ?`).get(id);
+      if (!existing) return { error: "not_found", id };
+      const sets = [];
+      const params = [];
+      const push = (column, value) => {
+        sets.push(`${column} = ?`);
+        params.push(value);
+      };
+      if (name !== void 0) push("name", name);
+      if (colorHex !== void 0) push("colorHex", normalizeColor(colorHex));
+      if (iconKind !== void 0) push("iconKind", iconKind);
+      if (iconValue !== void 0) push("iconValue", iconValue);
+      if (position !== void 0) push("sortOrder", position);
+      if (sets.length === 0) {
+        return { error: "nothing_to_update", id, hint: "Pass at least one field to change." };
+      }
+      params.push(id);
+      db2.prepare(`UPDATE category SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+      const row = db2.prepare(`SELECT * FROM category WHERE id = ?`).get(id);
+      const count = db2.prepare(`SELECT COUNT(*) AS n FROM clip_category WHERE categoryID = ?`).get(id).n;
+      return { updated: true, ...shape(row, count) };
+    }
+  },
+  {
+    name: "clippy_delete_category",
+    description: "Delete a category. The clips filed in it are NOT deleted - they stay in the history and simply lose this label, so this is the safe way to tidy up an unused board. Clippy's built-in starter category cannot be deleted. To remove the clips as well, call clippy_delete_clips separately.",
+    mutates: true,
+    schema: external_exports.object({
+      id: categoryID.describe("Category id to delete.")
+    }),
+    handler: ({ db: db2 }, args) => {
+      const { id } = args;
+      const existing = db2.prepare(`SELECT * FROM category WHERE id = ?`).get(id);
+      if (!existing) return { error: "not_found", id };
+      if (existing.isStarter === 1) {
+        return {
+          error: "starter_category_protected",
+          id,
+          hint: "Clippy's built-in starter category cannot be removed."
+        };
+      }
+      const releasedCount = db2.prepare(`SELECT COUNT(*) AS n FROM clip_category WHERE categoryID = ?`).get(id).n;
+      db2.prepare(`DELETE FROM clip_category WHERE categoryID = ?`).run(id);
+      db2.prepare(`DELETE FROM category WHERE id = ?`).run(id);
+      return { deleted: true, id, name: existing.name, clipsReleased: releasedCount };
+    }
+  },
+  {
+    name: "clippy_assign_clips",
+    description: "File clips into a category, or take them out of one - many clips per call. This is the tool for organizing: search or list to get ids, then assign them all in a single call rather than one at a time. A clip can sit in several categories at once, and adding a clip that is already there is harmless. Set member to false to unfile without deleting anything.",
+    mutates: true,
+    schema: external_exports.object({
+      clipIDs: external_exports.array(clipID).min(1).max(500).describe("Clip ids to file or unfile. Batch them."),
+      categoryID: categoryID.describe("Target category, from clippy_list_categories."),
+      member: external_exports.boolean().default(true).describe("true files the clips into the category, false removes them from it.")
+    }),
+    handler: ({ db: db2 }, args) => {
+      const { clipIDs, categoryID: target, member } = args;
+      const category = db2.prepare(`SELECT * FROM category WHERE id = ?`).get(target);
+      if (!category) return { error: "category_not_found", categoryID: target };
+      const known = new Set(
+        db2.prepare(
+          `SELECT id FROM clips WHERE id IN (${clipIDs.map(() => "?").join(",")})`
+        ).all(...clipIDs).map((row) => row.id)
+      );
+      const missing = clipIDs.filter((id) => !known.has(id));
+      const now = grdbNow();
+      const insert = db2.prepare(
+        `INSERT OR IGNORE INTO clip_category (clipID, categoryID, addedAt) VALUES (?, ?, ?)`
+      );
+      const remove = db2.prepare(`DELETE FROM clip_category WHERE clipID = ? AND categoryID = ?`);
+      for (const id of known) {
+        if (member) insert.run(id, target, now);
+        else remove.run(id, target);
+      }
+      return {
+        categoryID: target,
+        categoryName: category.name,
+        member,
+        applied: [...known],
+        missing,
+        appliedCount: known.size
+      };
+    }
+  },
+  {
+    name: "clippy_stats",
+    description: "Get the shape of the user's clipboard history before doing anything else: how many clips there are, how they break down by kind, how many are filed versus loose, which categories exist, and which apps they copy from most. Start here when the user asks something open-ended like 'help me clean this up' or 'what's in my clipboard history', so your plan fits the real data.",
+    schema: external_exports.object({}),
+    handler: ({ db: db2, dbPath: dbPath2 }) => {
+      const scalar = (sql) => db2.prepare(sql).get().n;
+      const total = scalar(`SELECT COUNT(*) AS n FROM clips`);
+      const filed = scalar(`SELECT COUNT(DISTINCT clipID) AS n FROM clip_category`);
+      return {
+        databasePath: dbPath2,
+        clips: {
+          total,
+          filed,
+          unfiled: total - filed,
+          titled: scalar(`SELECT COUNT(*) AS n FROM clips WHERE userTitle IS NOT NULL`),
+          byKind: db2.prepare(
+            `SELECT contentKind AS kind, COUNT(*) AS count FROM clips GROUP BY contentKind ORDER BY count DESC`
+          ).all(),
+          oldest: grdbToIso(
+            db2.prepare(`SELECT MIN(createdAt) AS t FROM clips`).get().t
+          ),
+          newest: grdbToIso(
+            db2.prepare(`SELECT MAX(createdAt) AS t FROM clips`).get().t
+          )
+        },
+        categories: db2.prepare(
+          `SELECT c.id, c.name, COUNT(cc.clipID) AS clipCount
+               FROM category c
+               LEFT JOIN clip_category cc ON cc.categoryID = c.id
+              GROUP BY c.id
+              ORDER BY c.sortOrder`
+        ).all(),
+        topSourceApps: db2.prepare(
+          `SELECT sourceAppName AS app, COUNT(*) AS count
+               FROM clips WHERE sourceAppName IS NOT NULL
+              GROUP BY sourceAppName ORDER BY count DESC LIMIT 10`
+        ).all()
       };
     }
   }
 ];
+
+// src/stores.ts
+import fs from "node:fs";
+import path3 from "node:path";
+import { randomUUID } from "node:crypto";
+var SCRIPT_INTERPRETERS = [
+  "zsh",
+  "bash",
+  "sh",
+  "python3",
+  "node",
+  "ruby",
+  "applescript",
+  "swift"
+];
+var OUTPUT_DISPOSITIONS = ["proposeEdit", "copyToClipboard", "newClip"];
+function swiftISODate(date3 = /* @__PURE__ */ new Date()) {
+  return date3.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+function newID() {
+  return randomUUID().toUpperCase();
+}
+function readArray(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function writeArray(filePath, items) {
+  const body = JSON.stringify(items.map(sortKeys), null, 2);
+  const temp = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, body, "utf8");
+  fs.renameSync(temp, filePath);
+}
+function sortKeys(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  const out = {};
+  for (const key of Object.keys(value).sort()) {
+    out[key] = value[key];
+  }
+  return out;
+}
+var JsonListStore = class {
+  constructor(filePath) {
+    this.filePath = filePath;
+  }
+  filePath;
+  all() {
+    return readArray(this.filePath).sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+  find(id) {
+    return this.all().find((item) => item.id === id);
+  }
+  /** Next free sortOrder, so a new entry lands after everything that exists. */
+  nextSortOrder() {
+    const orders = this.all().map((item) => item.sortOrder);
+    return orders.length === 0 ? 0 : Math.max(...orders) + 1;
+  }
+  add(item) {
+    writeArray(this.filePath, [...readArray(this.filePath), item]);
+    return item;
+  }
+  /** Shallow-merges `changes` into the stored entry. Returns the new value. */
+  update(id, changes) {
+    const items = readArray(this.filePath);
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1) return void 0;
+    const merged = { ...items[index], ...changes, id };
+    items[index] = merged;
+    writeArray(this.filePath, items);
+    return merged;
+  }
+  remove(id) {
+    const items = readArray(this.filePath);
+    const remaining = items.filter((item) => item.id !== id);
+    if (remaining.length === items.length) return false;
+    writeArray(this.filePath, remaining);
+    return true;
+  }
+};
+function scriptStore(supportDir) {
+  return new JsonListStore(path3.join(supportDir, "scripts.json"));
+}
+function aiActionStore(supportDir) {
+  return new JsonListStore(path3.join(supportDir, "ai-actions.json"));
+}
+
+// src/tools/scripts.ts
+var DISABLED_NOTICE = "Created disabled. Clippy will not run it until the user reviews the body and enables it in Settings > Scripts. Tell them that, and point them at the script by name.";
+function summarize2(script) {
+  return {
+    id: script.id,
+    name: script.name,
+    interpreter: script.interpreter,
+    isEnabled: script.isEnabled !== false,
+    feedsClipboard: script.feedsClipboard,
+    outputToClipboard: script.outputToClipboard,
+    bodyLines: script.body.split("\n").length,
+    updatedAt: script.updatedAt
+  };
+}
+var scriptTools = [
+  {
+    name: "clippy_list_scripts",
+    description: "List the user's saved Clippy scripts - the small shell/python/node snippets they run from the panel, optionally piping the current clip through. Returns names, interpreters, and whether each is enabled, but not the bodies; use clippy_get_script for one script's code. Check here before creating a script so you extend what exists instead of duplicating it.",
+    schema: external_exports.object({}),
+    handler: ({ supportDir }) => {
+      const scripts = scriptStore(supportDir).all();
+      return {
+        scripts: scripts.map(summarize2),
+        disabledCount: scripts.filter((s) => s.isEnabled === false).length
+      };
+    }
+  },
+  {
+    name: "clippy_get_script",
+    description: "Read one script in full, including its body. Use it before clippy_update_script so you edit the real code rather than guessing at it, or when the user asks what a script actually does.",
+    schema: external_exports.object({
+      id: uuidSchema.describe("Script id, from clippy_list_scripts.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id } = args;
+      const script = scriptStore(supportDir).find(id);
+      if (!script) return { error: "not_found", id };
+      return { ...summarize2(script), body: script.body, createdAt: script.createdAt };
+    }
+  },
+  {
+    name: "clippy_create_script",
+    description: "Add a new script to Clippy. Use it when the user asks for a snippet they can run on their clipboard - reformat JSON, strip tracking parameters off a URL, convert a timestamp. Set feedsClipboard when the script should receive the current clip on stdin (also in $CLIPPY_CLIP), and outputToClipboard when its stdout should be offered back as a new clip. IMPORTANT: the script is saved DISABLED and Clippy will not run it until the user enables it in Settings > Scripts - always say so when you report back. There is no way to enable it from here, by design.",
+    mutates: true,
+    schema: external_exports.object({
+      name: external_exports.string().min(1).describe("Short name shown in the scripts panel."),
+      body: external_exports.string().min(1).describe("The script source, as the interpreter will run it."),
+      interpreter: external_exports.enum(SCRIPT_INTERPRETERS).default("zsh").describe("Which interpreter runs the body."),
+      feedsClipboard: external_exports.boolean().default(false).describe("Pass the current clip to the script on stdin and in $CLIPPY_CLIP."),
+      outputToClipboard: external_exports.boolean().default(false).describe("Offer the script's stdout as a new clip when it finishes.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { name, body, interpreter, feedsClipboard, outputToClipboard } = args;
+      const store = scriptStore(supportDir);
+      const now = swiftISODate();
+      const script = {
+        id: newID(),
+        name,
+        interpreter,
+        body,
+        feedsClipboard,
+        outputToClipboard,
+        createdAt: now,
+        updatedAt: now,
+        sortOrder: store.nextSortOrder(),
+        isEnabled: false
+      };
+      store.add(script);
+      return { ...summarize2(script), notice: DISABLED_NOTICE };
+    }
+  },
+  {
+    name: "clippy_update_script",
+    description: "Change an existing script: fix a bug in its body, rename it, switch interpreter, or change how it handles the clipboard. Read it with clippy_get_script first so you are editing the current code. Only the fields you pass change. IMPORTANT: any edit re-disables the script, so the user has to re-approve the new body in Settings > Scripts before it will run. Say so when you report back.",
+    mutates: true,
+    schema: external_exports.object({
+      id: uuidSchema.describe("Script id to edit."),
+      name: external_exports.string().min(1).optional().describe("New name."),
+      body: external_exports.string().min(1).optional().describe("Replacement source."),
+      interpreter: external_exports.enum(SCRIPT_INTERPRETERS).optional().describe("New interpreter."),
+      feedsClipboard: external_exports.boolean().optional().describe("Whether it receives the current clip."),
+      outputToClipboard: external_exports.boolean().optional().describe("Whether its stdout becomes a clip.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id, ...changes } = args;
+      const store = scriptStore(supportDir);
+      if (!store.find(id)) return { error: "not_found", id };
+      const defined = Object.fromEntries(
+        Object.entries(changes).filter(([, value]) => value !== void 0)
+      );
+      if (Object.keys(defined).length === 0) {
+        return { error: "nothing_to_update", id, hint: "Pass at least one field to change." };
+      }
+      const updated = store.update(id, {
+        ...defined,
+        updatedAt: swiftISODate(),
+        // Re-disable on every edit: approval was granted for the old body.
+        isEnabled: false
+      });
+      return { updated: true, ...summarize2(updated), notice: DISABLED_NOTICE };
+    }
+  },
+  {
+    name: "clippy_delete_script",
+    description: "Remove a script from Clippy permanently. Confirm with the user first unless they named the script themselves - there is no undo.",
+    mutates: true,
+    schema: external_exports.object({
+      id: uuidSchema.describe("Script id to delete.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id } = args;
+      const store = scriptStore(supportDir);
+      const script = store.find(id);
+      if (!script) return { error: "not_found", id };
+      store.remove(id);
+      return { deleted: true, id, name: script.name };
+    }
+  }
+];
+
+// src/tools/ai-actions.ts
+var CLIP_PLACEHOLDER = "{clip}";
+function summarize3(action) {
+  return {
+    id: action.id,
+    name: action.name,
+    outputDisposition: action.outputDisposition,
+    temperature: action.temperature,
+    maxTokens: action.maxTokens,
+    icon: action.symbolName,
+    isBuiltIn: action.isBuiltIn
+  };
+}
+var dispositionDescription = "What happens to the model's answer: proposeEdit shows a diff the user accepts or rejects (safest, and the right default for rewrites), copyToClipboard replaces the clipboard contents, newClip saves the answer as a separate clip and leaves the original alone.";
+var aiActionTools = [
+  {
+    name: "clippy_list_ai_actions",
+    description: "List the user's AI actions - the one-click prompts that appear on a clip's menu, like 'Summarize' or 'Fix grammar'. Returns each action's name, what it does with the result, and its model settings, but not the prompt text. Check here before creating one so you extend an existing action instead of adding a near-duplicate.",
+    schema: external_exports.object({}),
+    handler: ({ supportDir }) => ({
+      actions: aiActionStore(supportDir).all().map(summarize3)
+    })
+  },
+  {
+    name: "clippy_get_ai_action",
+    description: "Read one AI action in full, including its prompt template. Use it before clippy_update_ai_action so you are editing the real prompt, or when the user asks why an action behaves the way it does.",
+    schema: external_exports.object({
+      id: uuidSchema.describe("Action id, from clippy_list_ai_actions.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id } = args;
+      const action = aiActionStore(supportDir).find(id);
+      if (!action) return { error: "not_found", id };
+      return { ...summarize3(action), promptTemplate: action.promptTemplate };
+    }
+  },
+  {
+    name: "clippy_create_ai_action",
+    description: `Add a new one-click AI action to the clip menu. Use it when the user describes something they keep asking for by hand - 'turn this into a bulleted list', 'rewrite this for a client email'. The prompt template must contain ${CLIP_PLACEHOLDER}, which is replaced with the clip's text. Unlike scripts, AI actions run a prompt rather than code, so they are active as soon as they are created.`,
+    mutates: true,
+    schema: external_exports.object({
+      name: external_exports.string().min(1).describe("Short label shown on the clip menu."),
+      promptTemplate: external_exports.string().min(1).describe(`The prompt. Must include ${CLIP_PLACEHOLDER} where the clip's text belongs.`),
+      outputDisposition: external_exports.enum(OUTPUT_DISPOSITIONS).default("proposeEdit").describe(dispositionDescription),
+      temperature: external_exports.number().min(0).max(2).default(0.3).describe("Model temperature. Low for extraction and formatting, higher for drafting."),
+      maxTokens: external_exports.number().int().min(16).max(8192).default(512).describe("Response ceiling."),
+      symbolName: external_exports.string().default("wand.and.sparkles").describe("SF Symbol name for the menu icon, e.g. 'text.badge.checkmark'.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { name, promptTemplate, outputDisposition, temperature, maxTokens, symbolName } = args;
+      if (!promptTemplate.includes(CLIP_PLACEHOLDER)) {
+        return {
+          error: "missing_clip_placeholder",
+          hint: `The prompt must contain ${CLIP_PLACEHOLDER}; without it the action never sees the clip.`
+        };
+      }
+      const store = aiActionStore(supportDir);
+      const action = {
+        id: newID(),
+        name,
+        promptTemplate,
+        outputDisposition,
+        temperature,
+        maxTokens,
+        symbolName,
+        iconKind: "symbol",
+        isBuiltIn: false,
+        sortOrder: store.nextSortOrder()
+      };
+      store.add(action);
+      return summarize3(action);
+    }
+  },
+  {
+    name: "clippy_update_ai_action",
+    description: "Change an existing AI action: tune its prompt, rename it, change what happens to the result, or adjust temperature and length. Read it with clippy_get_ai_action first. Only the fields you pass change. Built-in actions can be edited; they simply cannot be deleted.",
+    mutates: true,
+    schema: external_exports.object({
+      id: uuidSchema.describe("Action id to edit."),
+      name: external_exports.string().min(1).optional().describe("New label."),
+      promptTemplate: external_exports.string().min(1).optional().describe(`Replacement prompt. Must still contain ${CLIP_PLACEHOLDER}.`),
+      outputDisposition: external_exports.enum(OUTPUT_DISPOSITIONS).optional().describe(dispositionDescription),
+      temperature: external_exports.number().min(0).max(2).optional().describe("New temperature."),
+      maxTokens: external_exports.number().int().min(16).max(8192).optional().describe("New response ceiling."),
+      symbolName: external_exports.string().optional().describe("New SF Symbol name.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id, ...changes } = args;
+      const store = aiActionStore(supportDir);
+      if (!store.find(id)) return { error: "not_found", id };
+      if (changes.promptTemplate !== void 0 && !changes.promptTemplate.includes(CLIP_PLACEHOLDER)) {
+        return {
+          error: "missing_clip_placeholder",
+          hint: `The prompt must contain ${CLIP_PLACEHOLDER}; without it the action never sees the clip.`
+        };
+      }
+      const defined = Object.fromEntries(
+        Object.entries(changes).filter(([, value]) => value !== void 0)
+      );
+      if (Object.keys(defined).length === 0) {
+        return { error: "nothing_to_update", id, hint: "Pass at least one field to change." };
+      }
+      const updated = store.update(id, defined);
+      return { updated: true, ...summarize3(updated) };
+    }
+  },
+  {
+    name: "clippy_delete_ai_action",
+    description: "Remove a user-created AI action from the clip menu. Clippy's built-in actions are protected and cannot be deleted - edit those instead.",
+    mutates: true,
+    schema: external_exports.object({
+      id: uuidSchema.describe("Action id to delete.")
+    }),
+    handler: ({ supportDir }, args) => {
+      const { id } = args;
+      const store = aiActionStore(supportDir);
+      const action = store.find(id);
+      if (!action) return { error: "not_found", id };
+      if (action.isBuiltIn) {
+        return {
+          error: "builtin_action_protected",
+          id,
+          name: action.name,
+          hint: "Built-in actions cannot be deleted. Use clippy_update_ai_action to change it."
+        };
+      }
+      store.remove(id);
+      return { deleted: true, id, name: action.name };
+    }
+  }
+];
+
+// src/tools/index.ts
+function deprecatedAliases(byName) {
+  const call = (name) => byName.get(name);
+  return [
+    {
+      name: "clippy_search",
+      description: "DEPRECATED - use clippy_search_clips, which adds kind, category, and source-app filters.",
+      schema: external_exports.object({
+        query: external_exports.string().min(1).describe("Search text."),
+        limit: limitSchema.describe("Maximum results.")
+      }),
+      handler: (context2, args) => call("clippy_search_clips").handler(context2, args)
+    },
+    {
+      name: "clippy_get",
+      description: "DEPRECATED - use clippy_get_clip.",
+      schema: external_exports.object({ id: clipID.describe("Clip id.") }),
+      handler: (context2, args) => call("clippy_get_clip").handler(context2, args)
+    },
+    {
+      name: "clippy_add",
+      description: "DEPRECATED - use clippy_create_clip, which can also file the new clip.",
+      schema: external_exports.object({
+        text: external_exports.string().min(1).describe("The clip's text content."),
+        title: external_exports.string().optional().describe("Optional display title.")
+      }),
+      handler: (context2, args) => call("clippy_create_clip").handler(context2, args),
+      mutates: true
+    },
+    {
+      name: "clippy_delete",
+      description: "DEPRECATED - use clippy_delete_clips, which deletes many ids in one call.",
+      schema: external_exports.object({ id: clipID.describe("Clip id to delete.") }),
+      handler: (context2, args) => {
+        const { id } = args;
+        return call("clippy_delete_clips").handler(context2, { ids: [id] });
+      },
+      mutates: true
+    },
+    {
+      name: "clippy_set_category",
+      description: "DEPRECATED - use clippy_assign_clips, which files many clips in one call.",
+      schema: external_exports.object({
+        clipID: clipID.describe("Clip id."),
+        categoryID: categoryID.describe("Category id."),
+        member: external_exports.boolean().describe("true to add to the category, false to remove.")
+      }),
+      handler: (context2, args) => {
+        const { clipID: one, categoryID: target, member } = args;
+        return call("clippy_assign_clips").handler(context2, {
+          clipIDs: [one],
+          categoryID: target,
+          member
+        });
+      },
+      mutates: true
+    }
+  ];
+}
+var current = [...clipTools, ...categoryTools, ...scriptTools, ...aiActionTools];
+var currentByName = new Map(current.map((tool) => [tool.name, tool]));
+var tools = [...current, ...deprecatedAliases(currentByName)];
+var toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 
 // src/index.ts
 var dbPath = resolveDatabasePath();
@@ -20887,18 +21495,34 @@ try {
   );
   process.exit(1);
 }
-var toolByName = new Map(tools.map((t) => [t.name, t]));
+var context = { db, dbPath, supportDir: resolveSupportDir(dbPath) };
+function audit(name, args, outcome) {
+  const shape2 = args && typeof args === "object" ? Object.keys(args).sort().join(",") : "";
+  console.error(
+    `${(/* @__PURE__ */ new Date()).toISOString()} clippy-mcp ${outcome} ${name}${shape2 ? ` args=[${shape2}]` : ""}`
+  );
+}
 function registerTools(server) {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: zodToJsonSchema(t.schema, { target: "openApi3" })
+      // jsonSchema7, not openApi3: OpenAPI 3.0 emits the draft-04 boolean form
+      // `exclusiveMinimum: true`, which MCP clients reject outright (the tool is
+      // dropped from the client's tool list with no error). Draft-07 emits the
+      // numeric form every client accepts.
+      inputSchema: zodToJsonSchema(t.schema, { target: "jsonSchema7" }),
+      annotations: {
+        readOnlyHint: t.mutates !== true,
+        destructiveHint: t.mutates === true,
+        idempotentHint: t.mutates !== true
+      }
     }))
   }));
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = toolByName.get(request.params.name);
     if (!tool) {
+      audit(request.params.name, request.params.arguments, "error");
       return {
         isError: true,
         content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }]
@@ -20906,11 +21530,13 @@ function registerTools(server) {
     }
     try {
       const args = tool.schema.parse(request.params.arguments ?? {});
-      const result = tool.handler(db, dbPath, args);
+      const result = tool.handler(context, args);
+      audit(tool.name, args, "ok");
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
       };
     } catch (err) {
+      audit(tool.name, request.params.arguments, "error");
       return {
         isError: true,
         content: [
@@ -20936,7 +21562,7 @@ if (useHttp) {
     );
     registerTools(server);
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: () => randomUUID2(),
       onsessioninitialized: (sessionId) => {
         sessions.set(sessionId, transport);
         touchSession2(sessionId);

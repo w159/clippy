@@ -297,12 +297,23 @@ struct ScriptsView: View {
                        isOn: $editing.feedsClipboard)
                 Toggle("Offer the output as a new clip when it finishes",
                        isOn: $editing.outputToClipboard)
+                Toggle("Enabled", isOn: $editing.isEnabled)
+
+                // Scripts created over MCP arrive disabled on purpose: Clippy
+                // executes them, so anything that can write scripts.json could
+                // otherwise run shell on this Mac. Read the body before enabling.
+                if !editing.isEnabled {
+                    Label("Disabled scripts cannot run. Review the body above before enabling.",
+                          systemImage: "exclamationmark.shield")
+                        .font(.callout)
+                        .foregroundStyle(tokens.textSecondary)
+                }
 
                 HStack {
                     Button("Save") { save() }
                         .disabled(editing.name.trimmingCharacters(in: .whitespaces).isEmpty)
                     Button(isRunning ? "Running..." : "Run") { activeDialog = .run }
-                        .disabled(isRunning || editing.body.isEmpty)
+                        .disabled(isRunning || editing.body.isEmpty || !editing.isEnabled)
                     Spacer()
                 }
 

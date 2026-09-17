@@ -498,6 +498,27 @@ final class ClipDatabase {
         }
     }
 
+    // MARK: - External writes
+
+    /// SQLite's `data_version`, which increments when a connection *other* than
+    /// this one commits. Unchanged for our own writes, so it is a false-positive
+    /// free signal that the MCP server process has touched the database.
+    /// See ExternalChangeWatcher.
+    func dataVersion() throws -> Int64 {
+        try dbQueue.read { db in
+            try Int64.fetchOne(db, sql: "PRAGMA data_version") ?? 0
+        }
+    }
+
+    /// Tell GRDB that something it could not see has changed, so every
+    /// `ValueObservation` refetches. Required because observation is blind to
+    /// commits from other processes.
+    func notifyExternalChanges() throws {
+        try dbQueue.write { db in
+            try db.notifyChanges(in: .fullDatabase)
+        }
+    }
+
     // MARK: - Reads
 
     func allClips() throws -> [Clip] {

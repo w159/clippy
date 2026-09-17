@@ -20,6 +20,20 @@ enum ScriptRunner {
                                 exitCode: -1, durationMs: 0, timedOut: false)
         }
 
+        // The single chokepoint for the disabled flag. Scripts can be created
+        // over MCP by anything connected to it, so "can this run?" is enforced
+        // here, where every caller (Settings, panel, AI tool) already funnels,
+        // rather than in each of them.
+        guard script.isEnabled else {
+            ClippyLog.warning("Refused to run disabled script '\(script.name)'",
+                              category: ClippyLog.scripts)
+            return ScriptResult(
+                stdout: "",
+                stderr: "This script is disabled. Enable it in Settings > Scripts to run it.",
+                exitCode: -1, durationMs: 0, timedOut: false
+            )
+        }
+
         // Clock starts before the temp-file write so durationMs includes that
         // overhead, consistent with the original behavior.
         let start = Date()

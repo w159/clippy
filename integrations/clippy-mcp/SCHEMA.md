@@ -89,3 +89,47 @@ The MCP server mirrors this. It builds a prefix pattern by tokenizing the query 
 ## Date handling
 
 GRDB stores `Date` as `YYYY-MM-DD HH:MM:SS.SSS` in UTC. The MCP server writes `createdAt`/`addedAt` in exactly this format (UTC) so the app parses them, and converts them back to ISO-8601 on read for callers.
+
+The JSON stores below use a different shape: Swift's `.iso8601` strategy, which is whole seconds with a `Z` suffix and **no fractional part** (`2026-09-16T21:04:07Z`). `JSON.stringify(new Date())` produces milliseconds and will not decode, so `stores.ts` strips them (`swiftISODate`). `test/smoke.mjs` asserts the shape on disk.
+
+## JSON stores (not in the database)
+
+Scripts and AI actions live in files beside `clippy.sqlite`, written by the app's generic `JSONFileStore` (`Support/JSONFileStore.swift`) with `outputFormatting = [.prettyPrinted, .sortedKeys]`. The MCP server matches that formatting so a file written by either side diffs cleanly, and writes atomically via a temp file plus rename.
+
+### `scripts.json`  (`Scripts/Script.swift`, `Scripts/ScriptStore.swift`)
+
+| key | type | notes |
+|---|---|---|
+| `id` | String | uppercase UUID |
+| `name` | String | |
+| `interpreter` | String | `zsh` \| `bash` \| `sh` \| `python3` \| `node` \| `ruby` \| `applescript` \| `swift` |
+| `body` | String | source, written to a temp file and executed |
+| `feedsClipboard` | Bool | clip arrives on stdin and in `$CLIPPY_CLIP` |
+| `outputToClipboard` | Bool | stdout offered as a new clip |
+| `createdAt` / `updatedAt` | String | Swift `.iso8601`, whole seconds |
+| `sortOrder` | Int | display order |
+| `isEnabled` | Bool | **false for anything the MCP server writes.** `ScriptRunner.run` refuses a disabled script (`Scripts/ScriptRunner.swift`). Absent in JSON written by builds before this key existed, where it decodes to `true`. |
+
+### `ai-actions.json`  (`AI/AIAction.swift`)
+
+| key | type | notes |
+|---|---|---|
+| `id` | String | uppercase UUID |
+| `name` | String | label on the clip menu |
+| `promptTemplate` | String | must contain `{clip}` |
+| `outputDisposition` | String | `proposeEdit` \| `copyToClipboard` \| `newClip` |
+| `temperature` | Double | |
+| `maxTokens` | Int | |
+| `symbolName` | String | SF Symbol |
+| `iconKind` | String | `symbol` |
+| `isBuiltIn` | Bool | built-ins are editable but not deletable |
+| `sortOrder` | Int | |
+
+## Cross-process visibility
+
+`ClipStore` observes the database with GRDB `ValueObservation`, which [does not detect changes made through external connections](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/valueobservation). The JSON stores are worse: the app holds them in memory, so its next save clobbers an external write.
+
+`Storage/ExternalChangeWatcher.swift` closes both gaps on a 2s poll:
+
+- SQLite `PRAGMA data_version`, which increments on commits from *other* connections and is unchanged for the reading connection's own commits. Clippy uses a single `DatabaseQueue`, so this is a false-positive-free signal. On a change it calls `Database.notifyChanges(in: .fullDatabase)`, GRDB's documented escape hatch for undetected changes.
+- `scripts.json` / `ai-actions.json` modification dates, compared against the store's own last load or save (`JSONFileStore.reloadIfModifiedExternally`).

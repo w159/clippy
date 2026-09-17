@@ -83,6 +83,15 @@ struct Script: Identifiable, Codable, Equatable {
     /// JSON saved by older builds (which have no sortOrder key) migrates cleanly
     /// via `decodeIfPresent ?? 0`.
     var sortOrder: Int
+    /// A disabled script cannot run: `ScriptRunner` refuses it and the panel
+    /// greys it out. This exists because scripts can be created over MCP, and a
+    /// clipboard manager that executes shell written by whatever is connected to
+    /// it is a remote code execution path. Anything created outside the app lands
+    /// disabled and stays that way until a human enables it in Settings.
+    ///
+    /// Defaults to true, and old JSON without the key decodes to true, so
+    /// existing scripts keep working across the upgrade.
+    var isEnabled: Bool
 
     init(id: UUID = UUID(),
          name: String,
@@ -92,7 +101,8 @@ struct Script: Identifiable, Codable, Equatable {
          outputToClipboard: Bool = false,
          createdAt: Date = Date(),
          updatedAt: Date = Date(),
-         sortOrder: Int = 0) {
+         sortOrder: Int = 0,
+         isEnabled: Bool = true) {
         self.id = id
         self.name = name
         self.interpreter = interpreter
@@ -102,13 +112,14 @@ struct Script: Identifiable, Codable, Equatable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.sortOrder = sortOrder
+        self.isEnabled = isEnabled
     }
 
     // MARK: - Codable with migration
 
     enum CodingKeys: String, CodingKey {
         case id, name, interpreter, body, feedsClipboard, outputToClipboard
-        case createdAt, updatedAt, sortOrder
+        case createdAt, updatedAt, sortOrder, isEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -123,6 +134,9 @@ struct Script: Identifiable, Codable, Equatable {
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
         // Old JSON has no sortOrder; default to 0 so migration backfill runs in load().
         sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        // Old JSON has no isEnabled. Scripts that predate the flag were created in
+        // the app by the user, so they stay runnable.
+        isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 }
 

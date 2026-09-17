@@ -11,8 +11,9 @@ import {
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { DatabaseSync } from "node:sqlite";
-import { openDatabase, resolveDatabasePath } from "./db.js";
-import { tools } from "./tools.js";
+import { openDatabase, resolveDatabasePath, resolveSupportDir } from "./db.js";
+import { tools, toolByName } from "./tools/index.js";
+import type { ToolContext } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Bootstrap: open the DB once, fail loud if it is missing.
@@ -36,20 +37,45 @@ try {
 // Called once in stdio mode and once per session in HTTP mode.
 // ---------------------------------------------------------------------------
 
-const toolByName = new Map(tools.map((t) => [t.name, t]));
+const context: ToolContext = { db, dbPath, supportDir: resolveSupportDir(dbPath) };
+
+/**
+ * One line per call on stderr, which Clippy captures and shows in its MCP
+ * diagnostics. A clipboard history at a regulated firm is client data, so "what
+ * did the assistant read and change" has to be answerable after the fact.
+ * Arguments are summarized, never dumped: the point is the audit trail, not a
+ * second copy of the content in a log file.
+ */
+function audit(name: string, args: unknown, outcome: "ok" | "error"): void {
+  const shape =
+    args && typeof args === "object" ? Object.keys(args as object).sort().join(",") : "";
+  console.error(
+    `${new Date().toISOString()} clippy-mcp ${outcome} ${name}${shape ? ` args=[${shape}]` : ""}`,
+  );
+}
 
 function registerTools(server: Server): void {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: zodToJsonSchema(t.schema, { target: "openApi3" }) as any,
+      // jsonSchema7, not openApi3: OpenAPI 3.0 emits the draft-04 boolean form
+      // `exclusiveMinimum: true`, which MCP clients reject outright (the tool is
+      // dropped from the client's tool list with no error). Draft-07 emits the
+      // numeric form every client accepts.
+      inputSchema: zodToJsonSchema(t.schema, { target: "jsonSchema7" }) as any,
+      annotations: {
+        readOnlyHint: t.mutates !== true,
+        destructiveHint: t.mutates === true,
+        idempotentHint: t.mutates !== true,
+      },
     })),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = toolByName.get(request.params.name);
     if (!tool) {
+      audit(request.params.name, request.params.arguments, "error");
       return {
         isError: true,
         content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }],
@@ -57,11 +83,13 @@ function registerTools(server: Server): void {
     }
     try {
       const args = tool.schema.parse(request.params.arguments ?? {});
-      const result = tool.handler(db, dbPath, args);
+      const result = tool.handler(context, args);
+      audit(tool.name, args, "ok");
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     } catch (err) {
+      audit(tool.name, request.params.arguments, "error");
       return {
         isError: true,
         content: [

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-16 - MCP tools silently dropped by every client
+
+### Fixed
+- Five of the eight MCP tools (`clippy_search`, `clippy_list_recent`, `clippy_get`,
+  `clippy_delete`, `clippy_set_category`) never reached the model. Their schemas were
+  serialized with `zodToJsonSchema(..., { target: "openApi3" })`, which emits the
+  draft-04 boolean form `"exclusiveMinimum": true` for `z.number().int().positive()`.
+  MCP clients validate against draft-07+, where the keyword must be numeric, and drop a
+  failing tool from the tool list with no error - so the server looked healthy while
+  search, read, and delete simply did not exist. Only the three tools with no numeric
+  parameter survived. Target is now `jsonSchema7`.
+  integrations/clippy-mcp/src/index.ts:46.
+- `test/smoke.mjs` now walks every advertised `inputSchema` and fails on any non-numeric
+  `exclusiveMinimum`/`exclusiveMaximum`, so a future target change cannot reintroduce it.
+  Output: `SCHEMA DIALECT: draft-07+ on all 8 tools`, `ALL CHECKS PASSED`.
+- Not yet live: `sync-mcp.sh` updates `build/index.mjs` and the plugin bundle, but the
+  server the app actually runs is the copy inside `Clippy.app/Contents/Resources/clippy-mcp/`,
+  written by `scripts/make-app.sh:62`. The fix reaches users on the next app build, and the
+  MCP client must restart to renegotiate its tool list.
+
+### Added
+- docs/audits/2026-09-16-clippy-ai-mcp-uiux-analysis.md - analysis of the MCP tool
+  surface, Apple Intelligence integration, and clip-list UI/UX, with the open bugs it
+  turned up (folder copies failing on capture, iCloud sync control characters,
+  `in 0s` relative timestamps).
+
 ## 2026-08-14 - Dropped copies from slow multi-flavor pasteboard writers
 
 ### Fixed

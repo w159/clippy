@@ -86,6 +86,16 @@ final class ScriptStore: ObservableObject {
         scripts.first { $0.id == id }
     }
 
+    /// Pick up scripts written by the MCP server process. Without this the
+    /// in-memory list wins and the next save clobbers them. Driven by
+    /// ExternalChangeWatcher; returns true when the list was republished.
+    @discardableResult
+    func reloadIfModifiedExternally() -> Bool {
+        guard store.reloadIfModifiedExternally() else { return false }
+        scripts = store.items.sorted { $0.sortOrder < $1.sortOrder }
+        return true
+    }
+
     /// Re-reads the JSON file and confirms the given id round-tripped. This is a
     /// post-condition check on the just-completed write; scripts are tiny so the
     /// extra read is negligible. Returns false on any decode/IO failure so callers

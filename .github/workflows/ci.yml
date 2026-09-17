@@ -1,0 +1,70 @@
+name: CI
+
+# The gate that has to be green before a release is cut.
+#
+# It exists because Clippy cannot be built on a machine that only has the Command
+# Line Tools: SwiftUI's @State and Foundation Models' @Generable are external
+# macros whose plugins ship with Xcode, so `swift build` fails locally with
+# "plugin for module 'SwiftUIMacros' not found". The release workflow already
+# runs `swift test` on macos-26, but only while cutting a release - which is too
+# late to find out. This runs the same checks on every push.
+
+on:
+    push:
+        branches: ["**"]
+        tags-ignore: ["v*"] # the release workflow covers tags
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    swift:
+        name: Swift build and tests
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v6.0.3
+
+            - name: Show toolchain
+              run: |
+                  swift --version
+                  xcodebuild -version
+                  sw_vers
+
+            - name: Build
+              run: swift build
+
+            - name: Test
+              run: swift test
+
+    mcp:
+        name: MCP server
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v6.0.3
+
+            # node:sqlite is unflagged from 22.13, which the server depends on.
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
+            - name: Typecheck and smoke-test
+              run: |
+                  cd integrations/clippy-mcp
+                  npm ci --no-audit --no-fund
+                  npm run typecheck
+                  npm test
+
+            # The plugin ships a vendored copy of the built server. If it drifts
+            # from src/, users of the plugin run stale code - which is exactly how
+            # the openApi3 schema bug stayed live after being fixed in source.
+            - name: Vendored plugin bundle is in sync
+              run: |
+                  cd integrations/clippy-mcp
+                  npm run build
+                  if ! diff -q build/index.mjs ../clippy-plugin/mcp/index.mjs; then
+                      echo "::error::integrations/clippy-plugin/mcp/index.mjs is stale. Run integrations/scripts/sync-mcp.sh and commit the result." >&2
+                      exit 1
+                  fi

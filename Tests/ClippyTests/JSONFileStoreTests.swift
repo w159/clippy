@@ -178,4 +178,39 @@ final class JSONFileStoreTests: XCTestCase {
             accuracy: 1.0
         )
     }
+
+    // MARK: - External writes
+
+    /// The MCP server writes scripts.json / ai-actions.json from another process.
+    /// Without a reload the in-memory array stays authoritative and the next
+    /// save() silently clobbers what it wrote.
+    func testReloadPicksUpAnotherProcessesWrite() throws {
+        let store = makeStore()
+        store.add(stub("mine"))
+        XCTAssertEqual(store.items.count, 1)
+
+        // Stand in for the MCP server: rewrite the file behind the store's back.
+        let intruder = [stub("mine"), stub("written by mcp")]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(intruder).write(to: tempURL, options: .atomic)
+        // Modification dates have 1s granularity on some filesystems; make the
+        // write unambiguously newer than the store's last save.
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(2)], ofItemAtPath: tempURL.path
+        )
+
+        XCTAssertTrue(store.reloadIfModifiedExternally())
+        XCTAssertEqual(store.items.count, 2)
+        XCTAssertEqual(store.items.last?.name, "written by mcp")
+    }
+
+    func testReloadIsANoOpWhenOnlyWeHaveWritten() {
+        let store = makeStore()
+        store.add(stub("mine"))
+        XCTAssertFalse(
+            store.reloadIfModifiedExternally(),
+            "our own save must not look like an external write"
+        )
+    }
 }

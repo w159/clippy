@@ -79,7 +79,19 @@ final class ICloudSyncService: ObservableObject {
         // main actor and mutate @Published state directly.
         let outcome: SyncOutcome = await Task.detached(priority: .utility) {
             do {
-                try await Self.pullIfPresent(url)
+                // A sync file that cannot be parsed must not block the push. It
+                // used to: the throw skipped the export, so the bad file stayed in
+                // iCloud and poisoned every subsequent sync forever. (Seen in the
+                // field June 17-23 with unescaped control characters written by a
+                // build predating the TOML escaping fix.) Quarantine it instead and
+                // let this device write a good one over the top.
+                do {
+                    try await Self.pullIfPresent(url)
+                } catch {
+                    ClippyLog.error("iCloud sync: unreadable remote archive, quarantining: \(error)",
+                                    category: ClippyLog.sync)
+                    Self.quarantine(url)
+                }
                 let toml = try ClippyArchive.exportTOML(from: ClipDatabase.shared)
                 try toml.write(to: url, atomically: true, encoding: .utf8)
                 return .success
@@ -103,6 +115,25 @@ final class ICloudSyncService: ObservableObject {
             // something actionable in the red inline status.
             status = "Sync failed: \(message) " +
                 "Check that iCloud Drive is enabled, the Clippy folder is writable, and you are not offline, then try Sync now."
+        }
+    }
+
+    /// Move an unparseable sync file aside so the next export can replace it.
+    /// Kept rather than deleted: it is the only copy of whatever the other device
+    /// had, and a human can still read the TOML out of it.
+    private static func quarantine(_ url: URL) {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let target = url.deletingLastPathComponent()
+            .appendingPathComponent("\(url.lastPathComponent).unreadable-\(stamp)")
+        do {
+            try FileManager.default.moveItem(at: url, to: target)
+            ClippyLog.info("iCloud sync: moved unreadable archive to \(target.lastPathComponent)",
+                           category: ClippyLog.sync)
+        } catch {
+            // Last resort: if it cannot be moved it must still not survive, or the
+            // next sync hits the same parse failure.
+            try? FileManager.default.removeItem(at: url)
         }
     }
 

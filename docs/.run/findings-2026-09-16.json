@@ -1,0 +1,97 @@
+{
+  "run": "ai-mcp-uiux-analysis",
+  "date": "2026-09-16",
+  "scope": "Analyze the MCP tool surface, AI integration, and clip-list UI/UX. Analysis, plus one applied fix (MCP JSON Schema dialect).",
+  "report": "docs/audits/2026-09-16-clippy-ai-mcp-uiux-analysis.md",
+  "findings": [
+    {
+      "id": "F1",
+      "title": "Five of eight MCP tools are silently dropped by every client: schemas emit the draft-04 boolean form of exclusiveMinimum",
+      "type": "root-cause",
+      "severity": "high",
+      "status": "FIXED in source, NOT YET LIVE",
+      "culprit": "integrations/clippy-mcp/src/index.ts:46 - zodToJsonSchema(t.schema, { target: \"openApi3\" })",
+      "mechanism": "OpenAPI 3.0 inherits draft-04 numeric keywords, so z.number().int().positive() serializes to {\"type\":\"integer\",\"exclusiveMinimum\":true,\"minimum\":0}. MCP clients validate against draft-07+, where exclusiveMinimum must be a number, and drop a failing tool from the tool list with no user-visible error. Affected exactly the five tools taking a numeric id/clipID/categoryID/limit: clippy_search, clippy_list_recent, clippy_get, clippy_delete, clippy_set_category. The three with no numeric parameter survived.",
+      "evidence": "tools/list probe against build/index.mjs before the fix printed \"exclusiveMinimum\": true on all five; the session's own MCP connection report listed exactly those five as excluded with the message 'schema/properties/id/exclusiveMinimum must be number'.",
+      "fix": "target: \"jsonSchema7\". Rebuilt and synced to integrations/clippy-plugin/mcp/index.mjs.",
+      "verification": "npm test -> 'SCHEMA DIALECT: draft-07+ on all 8 tools' + 'ALL CHECKS PASSED'. Probe on both bundles: 'boolean exclusiveMinimum: 0'; clippy_get.id -> {\"type\":\"integer\",\"exclusiveMinimum\":0}.",
+      "guard": "integrations/clippy-mcp/test/smoke.mjs now walks every advertised inputSchema and fails on any non-numeric exclusiveMinimum/exclusiveMaximum.",
+      "verdict": "PASS"
+    },
+    {
+      "id": "F2",
+      "title": "The live MCP server is a third bundle copy inside Clippy.app that sync-mcp.sh does not update",
+      "type": "deployment-gap",
+      "severity": "high",
+      "status": "OPEN",
+      "culprit": "scripts/make-app.sh:62 bundles build/index.mjs into Clippy.app/Contents/Resources/clippy-mcp/index.mjs; integrations/scripts/sync-mcp.sh updates only build/ and the plugin copy.",
+      "evidence": "~/.claude.json registers clippy as {\"type\":\"http\",\"url\":\"http://127.0.0.1:6015/mcp\"}; lsof shows pid 948 = /Applications/Clippy.app/Contents/Resources/clippy-mcp/index.mjs holding 6015. shasum: installed b7360a50..., rebuilt 971736e4... (differ).",
+      "consequence": "F1's fix reaches users only on the next app build + install, and the MCP client must restart to renegotiate its tool list.",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "id": "F3",
+      "title": "MCP writes are invisible to the running app: GRDB ValueObservation does not observe external connections",
+      "type": "architecture",
+      "severity": "high",
+      "status": "OPEN",
+      "culprit": "Sources/Clippy/UI/ClipStore.swift:78,109 (ValueObservation) vs integrations/clippy-mcp/src/db.ts (separate node:sqlite process on the same file).",
+      "evidence": "GRDB docs, ValueObservation.md 'Dealing with Undetected Changes': does not detect changes made through external database connections. DatabaseSharing.md: cross-process observation needs NSFileCoordinator or a Darwin notification.",
+      "consequence": "clippy_add inserts a row the running panel will not display until the next in-app write or an app restart. Same for category changes. Blocks 'manage my clips from Claude'.",
+      "recommendation": "Route MCP mutations through the app (it already runs McpServerController and a Unix-socket path from S3388) so there is one writer and observation works by construction. Fallback: keep direct writes, add a Darwin notification -> db.notifyChanges(in: .fullDatabase), and set PRAGMA busy_timeout (absent today in db.ts:openDatabase).",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "id": "F4",
+      "title": "Folder copies from Finder fail on every capture; 97% of the log is this one error",
+      "type": "bug",
+      "severity": "high",
+      "status": "OPEN",
+      "culprit": "Sources/Clippy/Capture/ClipboardMonitor.swift:246 (viability filter uses attributesOfItem[.size] > 0) vs Sources/Clippy/Storage/MediaStore.swift:74 (Data(contentsOf:)).",
+      "mechanism": "A directory reports a non-zero size attribute, passes the filter, then fails Data(contentsOf:) with NSPOSIXErrorDomain 21 'Is a directory'. The error is logged and swallowed: no clip, no capture sound, nothing surfaced in the UI.",
+      "evidence": "~/Library/Application Support/Clippy/Logs/clippy.log: 1273 of 1313 lines (97%) are 'Failed to save file clip: unreadableFile', 2026-07-12 to 2026-09-02. Reproduced: swift probe on an empty directory prints 'size attr: 64' then 'read FAILED: ... Code=21 \"Is a directory\"'.",
+      "recommendation": "Check isDirectoryKey in the filter and store folders as a path reference (Clip.filePath already exists) rather than dropping them. Skip iCloud-evicted files via ubiquitousItemDownloadingStatus. Surface capture failures once instead of silently.",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "id": "F5",
+      "title": "Apple Intelligence is available on the target platform and unused",
+      "type": "opportunity",
+      "severity": "medium",
+      "status": "OPEN",
+      "evidence": "swift probe: 'import FoundationModels; SystemLanguageModel.default.availability' -> available, on macOS 27.0 / Swift 6.4. Package floor is already .macOS(.v26). ctx_search for FoundationModels/SystemLanguageModel over Sources/ returns 0 matches. docs/ROADMAP.md lists it as deferred on a platform floor that is now in place.",
+      "unverified": "Whether LanguageModelSession tool-calling maps onto the existing AITool protocol (Sources/Clippy/AI/AIToolDefinition.swift:12). Confirm against the current SDK before writing the provider.",
+      "verdict": "CONFIRMED (availability); tool-calling parity UNVERIFIED"
+    },
+    {
+      "id": "F6",
+      "title": "Categories are effectively unused: 93% of clips are uncategorized",
+      "type": "ux-evidence",
+      "severity": "medium",
+      "status": "OPEN",
+      "evidence": "sqlite3 clippy.sqlite: clips 644, categories 6, memberships 44, uncategorized 600, titled 43, images 6. Screenshot shows 2 of 6 categories at count 0.",
+      "consequence": "The app's primary organizing affordance carries 7% of the content. Filing is one clip at a time via a submenu; batch assignment exists nowhere, including MCP.",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "id": "F7",
+      "title": "Relative timestamps render 'in 0s' for freshly captured clips",
+      "type": "bug",
+      "severity": "low",
+      "status": "OPEN",
+      "culprit": "Sources/Clippy/UI/ClipCardView.swift:497 and Sources/Clippy/UI/ScriptsPanelView.swift:220 - Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow)",
+      "evidence": "img/clippy_main_window.png shows 'in 0s' on four cards.",
+      "recommendation": "Floor the interval; special-case under a minute to 'now'.",
+      "verdict": "CONFIRMED"
+    },
+    {
+      "id": "F8",
+      "title": "iCloud sync fails on clipboard text containing control characters",
+      "type": "bug",
+      "severity": "medium",
+      "status": "OPEN",
+      "evidence": "clippy.log, 16 occurrences: 'iCloud sync failed: Error while parsing string: unescaped control characters other than TAB (U+0009) are explicitly prohibited (at line 543, column 23)'. 23 successes against 16 failures.",
+      "verdict": "CONFIRMED"
+    }
+  ]
+}

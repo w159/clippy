@@ -256,6 +256,16 @@ final class AIActionStore: ObservableObject {
         actions.first { $0.id == id }
     }
 
+    /// Pick up actions written by the MCP server process. Without this the
+    /// in-memory list wins and the next save clobbers them. Driven by
+    /// ExternalChangeWatcher; returns true when the list was republished.
+    @discardableResult
+    func reloadIfModifiedExternally() -> Bool {
+        guard store.reloadIfModifiedExternally() else { return false }
+        actions = store.items.sorted { $0.sortOrder < $1.sortOrder }
+        return true
+    }
+
     /// Reorder: move the action identified by `draggedID` to just before the
     /// action identified by `targetID`. Built-ins are reorderable (only deletion
     /// is restricted). Resequences all sortOrder values gap-free and persists.

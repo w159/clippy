@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var database: ClipDatabase { ClipDatabase.shared }
     private lazy var store = ClipStore(database: database)
     private lazy var monitor = ClipboardMonitor(database: database)
+    /// Picks up writes made by the MCP server process, which GRDB observation
+    /// cannot see on its own.
+    private lazy var externalChangeWatcher = ExternalChangeWatcher(database: database)
     private lazy var pasteService = PasteService(monitor: monitor)
     private lazy var panelController = PanelController(store: store)
     private let editorController = EditorWindowController()
@@ -111,6 +114,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start the MCP server if the user has enabled it, and wire up
         // live reactions to settings changes.
         McpServerController.shared.syncWithSettings()
+
+        // ...and watch for what that server writes. GRDB observation is blind to
+        // other processes, so without this a clip added over MCP stays invisible
+        // until the next in-app write.
+        externalChangeWatcher.start()
 
         HotKeyCenter.shared.handler = { [weak self] in
             self?.panelController.toggle()
@@ -538,6 +546,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ClippyLog.info("Clippy shutting down cleanly", category: ClippyLog.lifecycle)
+        externalChangeWatcher.stop()
         // Ensure the node MCP server process never outlives the app.
         McpServerController.shared.stop()
     }

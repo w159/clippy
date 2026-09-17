@@ -171,6 +171,7 @@ struct AzureFoundryProvider: AIProvider {
 enum AIProviderFactory {
     static func make(kind: AIProviderKind, config: AIProviderConfig) -> AIProvider {
         switch kind {
+        case .appleIntelligence: return AppleIntelligenceProvider()
         case .ollama: return OllamaProvider(config: config)
         case .openai: return OpenAIProvider(config: config)
         case .anthropic: return AnthropicProvider(config: config)

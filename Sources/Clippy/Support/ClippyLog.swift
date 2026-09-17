@@ -62,6 +62,7 @@ enum ClippyLog {
     static let sync      = Logger(subsystem: "com.bytesavvy.clippy", category: "sync")
     static let mcp       = Logger(subsystem: "com.bytesavvy.clippy", category: "mcp")
     static let ai        = Logger(subsystem: "com.bytesavvy.clippy", category: "ai")
+    static let scripts   = Logger(subsystem: "com.bytesavvy.clippy", category: "scripts")
 
     // MARK: - File sink internals
 

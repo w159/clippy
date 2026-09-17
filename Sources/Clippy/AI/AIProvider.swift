@@ -53,8 +53,10 @@ protocol AIProvider {
     func complete(_ messages: [AIMessage], options: AICompletionOptions) async throws -> String
 }
 
-/// The backends Clippy can talk to. `ollama` is local and needs no key.
+/// The backends Clippy can talk to. `appleIntelligence` and `ollama` are local
+/// and need no key.
 enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
+    case appleIntelligence
     case ollama
     case openai
     case anthropic
@@ -64,6 +66,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .appleIntelligence: return "Apple Intelligence (on device)"
         case .ollama: return "Ollama (local)"
         case .openai: return "OpenAI"
         case .anthropic: return "Anthropic"
@@ -71,14 +74,26 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// Local Ollama needs no credential; the hosted providers do.
-    var needsAPIKey: Bool { self != .ollama }
+    /// True when clipboard content never leaves this Mac: Apple Intelligence runs
+    /// in-process, Ollama on localhost. This is the deciding factor for anyone
+    /// whose clipboard carries client data, and it gates the capture-time
+    /// features - see `AppSettings.canAutoSuggestTitles`.
+    var runsLocally: Bool { self == .appleIntelligence || self == .ollama }
+
+    /// Apple Intelligence runs in-process and Ollama runs on localhost; neither
+    /// takes a credential or an endpoint. The hosted providers need both.
+    var needsAPIKey: Bool { self != .ollama && self != .appleIntelligence }
+
+    /// Apple Intelligence has no endpoint or model to choose, so Settings hides
+    /// those fields for it entirely rather than showing inert controls.
+    var needsEndpointConfiguration: Bool { self != .appleIntelligence }
 
     /// Keychain account under which this provider's key is stored.
     var keychainAccount: String { "ai.\(rawValue).apiKey" }
 
     var defaultBaseURL: String {
         switch self {
+        case .appleIntelligence: return ""
         case .ollama: return "http://localhost:11434"
         case .openai: return "https://api.openai.com"
         case .anthropic: return "https://api.anthropic.com"
@@ -88,6 +103,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
 
     var defaultModel: String {
         switch self {
+        case .appleIntelligence: return "system"
         case .ollama: return "llama3.1"
         case .openai: return "gpt-4o-mini"
         case .anthropic: return "claude-haiku-4-5"
@@ -101,6 +117,11 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
     /// every construction site (AIService.fromSettings, the assistant panel) shares
     /// one authoritative check instead of letting a placeholder host reach DNS.
     func endpointConfigError(_ baseURL: String) -> String? {
+        if self == .appleIntelligence {
+            // Availability is a runtime property of the Mac, not a typo in a
+            // settings field, so the reason comes from the framework.
+            return AppleIntelligence.availability.reason
+        }
         guard self == .azureFoundry else { return nil }
         if baseURL.contains("YOUR-RESOURCE") {
             return "Azure endpoint not configured. Set your resource Endpoint URL in Settings (e.g. https://my-resource.services.ai.azure.com)."
@@ -111,6 +132,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
     /// One-line hint shown under the model field in Settings.
     var modelHint: String {
         switch self {
+        case .appleIntelligence:
+            return "Runs entirely on this Mac. No key, no endpoint, and nothing you copy leaves the device."
         case .ollama: return "A model you have pulled, e.g. llama3.1 or qwen2.5."
         case .openai: return "An OpenAI chat model, e.g. gpt-4o-mini."
         case .anthropic: return "A Claude model id, e.g. claude-haiku-4-5."

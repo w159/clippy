@@ -35,6 +35,14 @@ export function resolveMediaDir(dbPath: string): string {
   return path.join(path.dirname(dbPath), "media");
 }
 
+/**
+ * Application Support/Clippy: the database's own directory, which also holds
+ * `media/`, `scripts.json`, and `ai-actions.json`.
+ */
+export function resolveSupportDir(dbPath: string): string {
+  return path.dirname(dbPath);
+}
+
 // ---------------------------------------------------------------------------
 // Connection
 // ---------------------------------------------------------------------------
@@ -46,6 +54,11 @@ export function openDatabase(dbPath: string): DatabaseSync {
   // The app uses WAL; match it so our connection cooperates with the app's.
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
+  // Two writers share this file: Clippy and this process. Without a busy timeout
+  // a write that lands while the app holds the lock fails immediately with
+  // SQLITE_BUSY, which surfaces to the user as a tool that randomly errors. 5s is
+  // far longer than any write Clippy makes (a capture is a single small insert).
+  db.exec("PRAGMA busy_timeout = 5000;");
   return db;
 }
 

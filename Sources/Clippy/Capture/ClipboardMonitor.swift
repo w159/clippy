@@ -40,6 +40,52 @@ final class ClipboardMonitor {
 
     var isPaused = false
 
+    /// A pasteboard file URL that survived classification, with the facts the
+    /// save loop needs so it does not re-stat the file off-main.
+    struct FileCandidate: Equatable {
+        let url: URL
+        let isRegularFile: Bool
+        let byteSize: Int
+    }
+
+    /// Decide whether a pasteboard file URL can become a clip, and how.
+    ///
+    /// Returns nil for anything that cannot: a symlink to nowhere, an empty
+    /// regular file, or an iCloud item whose bytes are not on disk yet. Reading
+    /// an evicted item would either block on a download or throw, and neither
+    /// belongs on a clipboard poll.
+    ///
+    /// Directories come back with `isRegularFile == false`. They are viable -
+    /// the clip is the path - but they must never reach `MediaStore.storeFile`,
+    /// which reads bytes and throws EISDIR on a folder.
+    static func classify(_ url: URL) -> FileCandidate? {
+        let keys: Set<URLResourceKey> = [
+            .isDirectoryKey,
+            .isRegularFileKey,
+            .fileSizeKey,
+            .isUbiquitousItemKey,
+            .ubiquitousItemDownloadingStatusKey,
+        ]
+        guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
+
+        if values.isUbiquitousItem == true,
+           let status = values.ubiquitousItemDownloadingStatus,
+           status != .current {
+            ClippyLog.warning("Skipping file clip for \(url.lastPathComponent): iCloud item not downloaded",
+                              category: ClippyLog.capture)
+            return nil
+        }
+
+        if values.isDirectory == true {
+            return FileCandidate(url: url, isRegularFile: false, byteSize: 0)
+        }
+
+        guard values.isRegularFile == true else { return nil }
+        let size = values.fileSize ?? 0
+        guard size > 0 else { return nil }
+        return FileCandidate(url: url, isRegularFile: true, byteSize: size)
+    }
+
     /// Pasteboard types that mean "do not record this". ConcealedType is the
     /// convention password managers (1Password, Bitwarden, ...) set on copied
     /// secrets; TransientType marks ephemeral writes.
@@ -205,8 +251,10 @@ final class ClipboardMonitor {
     /// text clip an AI-suggested title. Opt-in, detached, and best-effort, so it
     /// never blocks or breaks capture; the title is still user-editable.
     private func maybeAutoSuggestTitle(forText text: String, clipID: Int64?) {
-        let settings = AppSettings.shared
-        guard settings.aiEnabled, settings.aiAutoSuggestTitles, let clipID else { return }
+        // canAutoSuggestTitles, not the raw toggle: this fires on every copy, so
+        // it only runs on a provider that keeps the text on this Mac. See
+        // AppSettings.canAutoSuggestTitles.
+        guard AppSettings.shared.canAutoSuggestTitles, let clipID else { return }
         guard case .success(let service) = AIService.fromSettings() else { return }
         let database = self.database
         Task.detached {
@@ -239,15 +287,11 @@ final class ClipboardMonitor {
               !urls.isEmpty
         else { return false }
 
-        // Filter out zero-byte / unreadable files up front so one bad file in a
-        // multi-selection does not abort the whole capture. A single empty file
-        // (the legacy behavior) still returns false here so the caller can fall
-        // through to text/image capture.
-        let viable = urls.filter { url in
-            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-            let size = (attrs?[.size] as? Int) ?? 0
-            return size > 0
-        }
+        // Classify each URL up front so one bad file in a multi-selection does not
+        // abort the whole capture, and so we never hand a byte copy something that
+        // cannot produce bytes. A selection with nothing viable returns false here
+        // so the caller falls through to text/image capture.
+        let viable = urls.compactMap(Self.classify(_:))
         guard !viable.isEmpty else { return false }
 
         let thresholdBytes = settings.maxFileSizeMB * 1_000_000
@@ -263,17 +307,20 @@ final class ClipboardMonitor {
         // cannot freeze the UI.
         captureQueue.async { [weak self] in
             var capturedAny = false
-            for fileURL in urlsToStore {
-                let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
-                let fileSize = (attributes?[.size] as? Int) ?? 0
+            var failures = 0
+            for candidate in urlsToStore {
+                let fileURL = candidate.url
                 let displayName = fileURL.lastPathComponent
 
                 do {
                     var mediaFilename: String? = nil
-                    var storedByteSize: Int = fileSize
+                    var storedByteSize: Int = candidate.byteSize
 
-                    if fileSize <= thresholdBytes {
-                        // Copy bytes into the media store.
+                    // Only regular files have bytes to copy. A directory is kept as
+                    // a path reference: copying a folder tree into the media store
+                    // is not what "copy a folder" means, and Data(contentsOf:) on
+                    // one throws EISDIR, which is what used to sink the whole clip.
+                    if candidate.isRegularFile, candidate.byteSize <= thresholdBytes {
                         let stored = try database.media.storeFile(at: fileURL)
                         mediaFilename = stored.mediaFilename
                         storedByteSize = stored.byteSize
@@ -297,8 +344,17 @@ final class ClipboardMonitor {
                     try database.saveCapturedFileClip(&clip, cap: cap)
                     capturedAny = true
                 } catch {
-                    ClippyLog.error("Failed to save file clip: \(error)", category: ClippyLog.capture)
+                    failures += 1
+                    ClippyLog.error("Failed to save file clip \(displayName): \(error)",
+                                    category: ClippyLog.capture)
                 }
+            }
+            // A copy where every item failed is worth one summary line: the
+            // per-item errors above are easy to lose in a busy log, and this is
+            // the shape that used to happen 1200+ times with nobody noticing.
+            if failures > 0, !capturedAny {
+                ClippyLog.error("File copy produced no clips: all \(failures) item(s) failed",
+                                category: ClippyLog.capture)
             }
             if capturedAny {
                 DispatchQueue.main.async { [weak self] in self?.playCaptureSound() }

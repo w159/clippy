@@ -22,6 +22,11 @@ final class JSONFileStore<Element: Codable & Identifiable> {
     private let configureEncoder: ((JSONEncoder) -> Void)?
     private let configureDecoder: ((JSONDecoder) -> Void)?
 
+    /// Modification date of the file as of our last load or save. Anything newer
+    /// was written by somebody else - in practice the MCP server process. See
+    /// `reloadIfModifiedExternally`.
+    private var lastSyncedModification: Date?
+
     // MARK: - Init
 
     init(fileURL: URL,
@@ -67,11 +72,36 @@ final class JSONFileStore<Element: Codable & Identifiable> {
         save()
     }
 
+    // MARK: - External writes
+
+    /// Re-read the file when another process has written it since our last load
+    /// or save. Returns true when a reload happened, so the owning store knows to
+    /// republish. A redundant republish is cheap; a missed one leaves the UI
+    /// showing a stale list, so this errs toward reloading.
+    ///
+    /// Without this the in-memory `items` array is authoritative and the next
+    /// `save()` silently clobbers whatever the MCP server wrote. Scripts and AI
+    /// actions are edited rarely and the file is a few KB, so a stat plus an
+    /// occasional decode costs nothing.
+    @discardableResult
+    func reloadIfModifiedExternally() -> Bool {
+        guard let modified = modificationDate(), modified != lastSyncedModification else {
+            return false
+        }
+        load()
+        return true
+    }
+
+    private func modificationDate() -> Date? {
+        try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.modificationDate] as? Date
+    }
+
     // MARK: - Persistence
 
     private func load() {
         let decoder = JSONDecoder()
         configureDecoder?(decoder)
+        lastSyncedModification = modificationDate()
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? decoder.decode([Element].self, from: data) else {
             items = []
@@ -89,5 +119,8 @@ final class JSONFileStore<Element: Codable & Identifiable> {
         configureEncoder?(encoder)
         guard let data = try? encoder.encode(items) else { return }
         try? data.write(to: fileURL, options: .atomic)
+        // Record our own write so reloadIfModifiedExternally does not mistake it
+        // for somebody else's.
+        lastSyncedModification = modificationDate()
     }
 }

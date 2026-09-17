@@ -494,7 +494,7 @@ struct ClipCardView: View {
     }
 
     private var timestampText: some View {
-        Text(clip.createdAt, format: Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow))
+        Text(RelativeTime.string(for: clip.createdAt))
             .font(PanelTypography.metadata(settings))
             .foregroundStyle(tokens.textSecondary)
             .monospacedDigit()

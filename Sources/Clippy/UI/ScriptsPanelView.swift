@@ -216,8 +216,12 @@ private struct ScriptRowView: View {
                     if script.outputToClipboard {
                         flagBadge("arrow.down.to.line", "Writes to clipboard")
                     }
+                    if !script.isEnabled {
+                        flagBadge("exclamationmark.shield",
+                                  "Disabled. Review and enable it in Settings > Scripts.")
+                    }
                     Spacer(minLength: 0)
-                    Text(script.updatedAt, format: Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow))
+                    Text(RelativeTime.string(for: script.updatedAt))
                         .font(PanelTypography.micro(settings))
                         .foregroundStyle(tokens.textSecondary)
                 }
@@ -269,7 +273,10 @@ private struct ScriptRowView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .help(isRunning ? "Stop script" : "Run script")
+        .disabled(!script.isEnabled && !isRunning)
+        .help(script.isEnabled
+              ? (isRunning ? "Stop script" : "Run script")
+              : "Disabled. Enable it in Settings > Scripts.")
         .accessibilityLabel(isRunning ? "Stop \(script.name)" : "Run \(script.name)")
     }
 

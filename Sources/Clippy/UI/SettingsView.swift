@@ -1106,38 +1106,44 @@ private struct AISettingsTab: View {
                 Picker("Provider", selection: $settings.aiProvider) {
                     ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
                 }
-                // Audit finding: no inline validation for Model. Reject model ids
-                // with internal spaces (a common typo) on commit; empty is valid
-                // because it falls back to the provider default.
-                ValidatedTextField(
-                    title: "Model",
-                    prompt: Text(settings.aiProvider.defaultModel),
-                    value: $settings.aiModel,
-                    validate: { input in
-                        guard !input.isEmpty else { return nil }
-                        if input.contains(" ") { return "Model ids cannot contain spaces." }
-                        return nil
-                    }
-                )
+                // Apple Intelligence has no model to pick and no endpoint to
+                // reach, so those fields are hidden rather than shown inert.
+                if settings.aiProvider.needsEndpointConfiguration {
+                    // Audit finding: no inline validation for Model. Reject model ids
+                    // with internal spaces (a common typo) on commit; empty is valid
+                    // because it falls back to the provider default.
+                    ValidatedTextField(
+                        title: "Model",
+                        prompt: Text(settings.aiProvider.defaultModel),
+                        value: $settings.aiModel,
+                        validate: { input in
+                            guard !input.isEmpty else { return nil }
+                            if input.contains(" ") { return "Model ids cannot contain spaces." }
+                            return nil
+                        }
+                    )
+                }
                 Text(settings.aiProvider.modelHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                // Audit finding: no inline validation for Endpoint URL. Validate
-                // it parses as an http/https URL on commit; empty falls back to the
-                // provider default and is therefore allowed.
-                ValidatedTextField(
-                    title: "Endpoint URL",
-                    prompt: Text(settings.aiProvider.defaultBaseURL),
-                    value: $settings.aiBaseURL,
-                    validate: { input in
-                        guard !input.isEmpty else { return nil }
-                        guard let url = URL(string: input),
-                              let scheme = url.scheme?.lowercased(),
-                              scheme == "http" || scheme == "https"
-                        else { return "Enter a valid http:// or https:// URL." }
-                        return nil
-                    }
-                )
+                if settings.aiProvider.needsEndpointConfiguration {
+                    // Audit finding: no inline validation for Endpoint URL. Validate
+                    // it parses as an http/https URL on commit; empty falls back to the
+                    // provider default and is therefore allowed.
+                    ValidatedTextField(
+                        title: "Endpoint URL",
+                        prompt: Text(settings.aiProvider.defaultBaseURL),
+                        value: $settings.aiBaseURL,
+                        validate: { input in
+                            guard !input.isEmpty else { return nil }
+                            guard let url = URL(string: input),
+                                  let scheme = url.scheme?.lowercased(),
+                                  scheme == "http" || scheme == "https"
+                            else { return "Enter a valid http:// or https:// URL." }
+                            return nil
+                        }
+                    )
+                }
                 if settings.aiProvider == .azureFoundry {
                     TextField("API version", text: $settings.aiAzureAPIVersion)
                 }
@@ -1158,6 +1164,17 @@ private struct AISettingsTab: View {
                                 .font(.caption)
                                 .foregroundStyle(keySaved ? tokens.success : tokens.textSecondary)
                         }
+                    }
+                } else if settings.aiProvider == .appleIntelligence {
+                    if let why = AppleIntelligence.availability.reason {
+                        Label(why, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(tokens.danger)
+                    } else {
+                        Label("Ready. Runs on this Mac, no key required.",
+                              systemImage: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(tokens.success)
                     }
                 } else {
                     Text("Ollama runs locally and needs no API key.")
@@ -1184,6 +1201,17 @@ private struct AISettingsTab: View {
                 Text("The only action applied automatically. Everything else asks first, and titles can be edited or cleared anytime.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                // This one fires on every copy, so it is hard-gated on a provider
+                // that keeps the text on this Mac. Saying so beats a toggle that
+                // is on and quietly does nothing.
+                if settings.aiAutoSuggestTitles && !settings.aiProvider.runsLocally {
+                    Label(
+                        "Paused: \(settings.aiProvider.displayName) is a hosted provider, and this runs on every copy. Switch to Apple Intelligence or Ollama to enable it.",
+                        systemImage: "hand.raised"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(tokens.danger)
+                }
             }
 
             Section("Actions") {
