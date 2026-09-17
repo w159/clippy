@@ -60,16 +60,12 @@ jobs:
             # The plugin ships a vendored copy of the built server. If it drifts
             # from src/, users of the plugin run stale code - which is exactly how
             # the openApi3 schema bug stayed live after being fixed in source.
+            #
+            # Compared by tool contract rather than by bytes: esbuild embeds each
+            # bundled module's resolved path as a comment, so a checkout whose
+            # node_modules is a symlink produces a byte-different but identical
+            # bundle. See test/bundle-parity.mjs.
             - name: Vendored plugin bundle is in sync
               run: |
                   cd integrations/clippy-mcp
-                  npm run build
-                  if ! diff -q build/index.mjs ../clippy-plugin/mcp/index.mjs; then
-                      echo "Built:    $(wc -c < build/index.mjs) bytes  $(shasum build/index.mjs | cut -d' ' -f1)"
-                      echo "Vendored: $(wc -c < ../clippy-plugin/mcp/index.mjs) bytes  $(shasum ../clippy-plugin/mcp/index.mjs | cut -d' ' -f1)"
-                      echo "esbuild:  $(npx esbuild --version)"
-                      echo "--- first differing lines ---"
-                      diff build/index.mjs ../clippy-plugin/mcp/index.mjs | head -20 || true
-                      echo "::error::integrations/clippy-plugin/mcp/index.mjs is stale. Run integrations/scripts/sync-mcp.sh and commit the result." >&2
-                      exit 1
-                  fi
+                  node test/bundle-parity.mjs

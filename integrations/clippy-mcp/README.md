@@ -82,7 +82,19 @@ npm install
 npm run build
 ```
 
-This bundles everything into a single `build/index.mjs` (the server entry point) via esbuild. `npm test` builds, then runs an offline smoke test against a throwaway database. The Clippy app ships this same file inside its bundle at `Clippy.app/Contents/Resources/clippy-mcp/index.mjs` and launches it on demand, so installed users do not need to build anything.
+This bundles everything into a single `build/index.mjs` (the server entry point) via esbuild. `npm test` builds, runs an offline smoke test against a throwaway database, then checks that the plugin's vendored copy exposes the same tools as the fresh build.
+
+That last check compares the tool contract rather than bytes. esbuild writes each bundled module's resolved path into the output as a comment, so a checkout whose `node_modules` is a symlink (the `node_modules.nosync.noindex` layout that keeps npm churn out of iCloud) builds a bundle that differs from CI's in ~219 comment lines and nothing else. `diff` calls that stale; it is not. `test/bundle-parity.mjs` starts both bundles, asks each for `tools/list`, and compares normalized names, descriptions, and schemas.
+
+There are three copies of the built server and they are updated by different things:
+
+| Copy | Written by |
+|---|---|
+| `build/index.mjs` | `npm run build` |
+| `integrations/clippy-plugin/mcp/index.mjs` | `integrations/scripts/sync-mcp.sh` |
+| `Clippy.app/Contents/Resources/clippy-mcp/index.mjs` | `scripts/make-app.sh`, at app build |
+
+The third is the one the app actually runs (`McpServerController` launches it), so a source fix does not reach a running Clippy until the app is rebuilt and installed. MCP clients also negotiate their tool list at startup, so the client needs a restart afterwards.
 
 ## Configuration
 

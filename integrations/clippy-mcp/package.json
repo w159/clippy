@@ -13,7 +13,7 @@
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --outfile=build/index.mjs --external:node:*",
     "typecheck": "tsc --noEmit",
     "start": "node build/index.mjs",
-    "test": "npm run build && node test/smoke.mjs"
+    "test": "npm run build && node test/smoke.mjs && node test/bundle-parity.mjs"
   },
   "engines": {
     "node": ">=22.13.0"
