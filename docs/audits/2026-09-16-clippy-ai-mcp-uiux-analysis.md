@@ -242,12 +242,18 @@ Take the first. It fails closed and needs no runtime state.
 copied: account numbers, client names, credentials pulled from 1Password. An MCP server
 that returns full `contentText` to any connected client is an exfiltration surface that
 an examiner will ask about under Safeguards and Reg S-P. Required:
-- Honor the existing concealed/sensitive handling in every MCP read path. Concealed
-  clips return metadata only, never content.
 - Default search and list results to the 300-char preview they already return; full
   content only from `clippy_get_clip` on an explicit id.
-- Log MCP reads and writes to the existing `ClippyLog` with tool name and clip ids, so
+- Log every MCP call with the tool name and argument key names (never values), so
   there is an audit trail. This is cheap and it is the answer to "who read what."
+
+Correction to an earlier draft of this section: there is no concealed-clip handling to
+honor in the read path, because there are no concealed clips in the database to begin
+with. `ClipboardMonitor.skippedTypes` drops anything carrying
+`org.nspasteboard.ConcealedType` at capture, so a 1Password copy is never stored. That
+is a stronger control than redaction on read, and it means the exposure is ordinary
+clips that happen to contain sensitive text - which the preview default addresses and
+redaction could not.
 
 ### 2.7 Housekeeping
 
@@ -445,51 +451,88 @@ exists) rather than dropping it. Same filter should skip iCloud-evicted files
 This also means the capture path swallows errors: 1273 failures over two months with no
 user-visible signal. Capture failures should surface once, not silently.
 
-### 5.2 iCloud sync fails on control characters (MEDIUM)
+### 5.2 An unreadable iCloud archive locks sync out permanently (MEDIUM)
 
 16 occurrences of
-`iCloud sync failed: Error while parsing string: unescaped control characters other than TAB (U+0009) are explicitly prohibited (at line 543, column 23)`.
-Clipboard text legitimately contains control characters; the sync encoder does not escape
-them. Sync has been failing for those payloads since at least June.
+`iCloud sync failed: Error while parsing string: unescaped control characters other than TAB (U+0009) are explicitly prohibited (at line 543, column 23)`,
+all between 2026-06-17 and 2026-06-23, none since.
+
+The escaping bug itself is already fixed: `ClippyArchive.quote` escapes every control
+character, and `git log` puts that hardening in the June work. What is not fixed is the
+failure mode. `sync()` calls `pullIfPresent` before the export, both inside one `do`, so
+a parse failure on the remote file skips the export - which means the bad file is never
+replaced and every subsequent sync hits the same error forever. One poisoned archive
+written by an older build disables sync for good, on every device sharing it.
+
+Fix: a pull that cannot be parsed is logged and the file quarantined (moved aside, not
+deleted - it is the only copy of whatever the other device had), then the export proceeds
+and writes a good one over the top.
 
 ### 5.3 Log level hides everything useful (MEDIUM)
 
 27 INFO and 22 WARN lines against 1313 ERROR lines, over three months. The default level
 suppresses the events needed to diagnose capture and paste behavior, which is why the
-June sound investigation needed external probe scripts. The log also has no rotation:
-one file since June, and test artifacts (`test-above-<UUID>`) from the test suite are
-written into the user's production log.
+June sound investigation needed external probe scripts. Test artifacts
+(`test-above-<UUID>`) from the test suite are also written into the user's production
+log.
+
+Correction to an earlier draft: this section claimed the log has no rotation. It does -
+`ClippyLog` rotates at 2 MB and keeps one backup. The single file since June is simply a
+105 KB log that never reached the threshold.
 
 ---
 
-## 6. Recommended sequence
+## 6. Sequence, and what shipped
 
-**Ship now (small, verified, unblocks everything else)**
-1. MCP schema target - done in this session; add the smoke-test guard.
-2. Folder-copy capture fix (5.1) plus a surfaced capture error.
-3. `in 0s` timestamp fix (4.2).
+Everything in the first three groups shipped in v1.9.0 on 2026-09-16, except where
+noted. The UI group is deliberately deferred: it cannot be verified without a display,
+and the June audit deferred its own visual work for the same reason.
+
+**Shipped: bugs**
+1. MCP schema target, plus a smoke-test guard that fails the build on a non-numeric
+   `exclusiveMinimum`.
+2. Folder-copy capture fix (5.1), including iCloud-evicted files, plus one summary log
+   line when a copy produces no clips at all. The per-copy UI notice was dropped: the
+   failure mode that caused 1273 log lines is gone, and there is no general banner bus to
+   hang a notice on, so building one would have been scope for a rare residual case.
+3. `in 0s` timestamp fix (4.2), in `RelativeTime`, used by both call sites.
 4. `PRAGMA busy_timeout` on the MCP connection.
+5. iCloud archive quarantine (5.2).
 
-**Next: make MCP actually usable**
-5. Decide A vs B from 2.2. This gates everything after it.
-6. Full clip and category CRUD, batch assign, `clippy_stats`.
-7. Script and AI-action tools, with the fail-closed disabled-on-create rule.
-8. Rewritten task-shaped descriptions; skills carry the chains.
-9. MCP read/write audit logging and concealed-clip handling.
+**Shipped: MCP**
+6. Option B-plus from 2.2, not A. Writes still go straight to SQLite, but
+   `ExternalChangeWatcher` polls `data_version` and the two JSON files and calls
+   `notifyChanges(in: .fullDatabase)`, so the app reflects them in about two seconds.
+   Option A (route every mutation through the app) remains the better end state - one
+   writer, app-side invariants - but it is a larger change than the visibility problem
+   required, and B closes the user-visible gap today. Revisit A when MCP writes need to
+   respect the history cap and eviction rules.
+7. Full clip and category CRUD, batch assign and delete, `clippy_stats`.
+8. Script and AI-action tools with the fail-closed disabled-on-create rule.
+9. Task-shaped descriptions; the new `clip-automation` skill carries the chains for
+   scripts and actions, `clipboard-triage` for filing.
+10. Per-call audit logging. Concealed-clip handling turned out to be unnecessary - see
+    the correction in 2.6.
 
-**Then: Apple Intelligence**
-10. `FoundationModelsAgentProvider` behind the existing factory, availability-gated.
-11. Auto-titling on capture, off the capture path.
-12. Auto-filing suggestions into categories.
-13. Sensitive-content detection and auto-conceal.
-14. Local embeddings for semantic search, hybrid-ranked with FTS.
+**Shipped: Apple Intelligence**
+11. `AppleIntelligenceProvider` behind the existing factory, availability-gated, now the
+    default provider. Tool calling is explicitly not implemented and says so in the type:
+    Foundation Models wants compile-time `@Generable` argument types and `AITool` carries
+    a runtime JSON schema. Chat, AI actions, and auto-titling all work.
+12. Auto-titling on capture already existed (`aiAutoSuggestTitles`, opt-in, detached). It
+    is now hard-gated on a provider that runs locally, because it fires on every copy.
 
-**Then: the UI**
-15. Split `ClipListView` and `SettingsView`. No behavior change.
-16. Rebuild the card: content as headline, source app demoted, compact row mode default.
-17. Remove per-card strokes; selection owns the stroke.
-18. Native material and system list selection.
-19. Preview pane; kind/app/date filter chips.
+**Still open: the rest of the AI work**
+13. Auto-filing suggestions into categories.
+14. Sensitive-content detection and auto-conceal.
+15. Local embeddings for semantic search, hybrid-ranked with FTS.
+
+**Still open: the UI**
+16. Split `ClipListView` and `SettingsView`. No behavior change.
+17. Rebuild the card: content as headline, source app demoted, compact row mode default.
+18. Remove per-card strokes; selection owns the stroke.
+19. Native material and system list selection.
+20. Preview pane; kind/app/date filter chips.
 
 ---
 

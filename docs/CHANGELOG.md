@@ -1,30 +1,115 @@
 # Changelog
 
-## 2026-09-16 - MCP tools silently dropped by every client
+## v1.9.0 - 2026-09-16 - Apple Intelligence, and an MCP server that actually works
+
+Full analysis, with evidence: docs/audits/2026-09-16-clippy-ai-mcp-uiux-analysis.md
 
 ### Fixed
-- Five of the eight MCP tools (`clippy_search`, `clippy_list_recent`, `clippy_get`,
-  `clippy_delete`, `clippy_set_category`) never reached the model. Their schemas were
-  serialized with `zodToJsonSchema(..., { target: "openApi3" })`, which emits the
-  draft-04 boolean form `"exclusiveMinimum": true` for `z.number().int().positive()`.
-  MCP clients validate against draft-07+, where the keyword must be numeric, and drop a
-  failing tool from the tool list with no error - so the server looked healthy while
-  search, read, and delete simply did not exist. Only the three tools with no numeric
-  parameter survived. Target is now `jsonSchema7`.
-  integrations/clippy-mcp/src/index.ts:46.
-- `test/smoke.mjs` now walks every advertised `inputSchema` and fails on any non-numeric
-  `exclusiveMinimum`/`exclusiveMaximum`, so a future target change cannot reintroduce it.
-  Output: `SCHEMA DIALECT: draft-07+ on all 8 tools`, `ALL CHECKS PASSED`.
-- Not yet live: `sync-mcp.sh` updates `build/index.mjs` and the plugin bundle, but the
-  server the app actually runs is the copy inside `Clippy.app/Contents/Resources/clippy-mcp/`,
-  written by `scripts/make-app.sh:62`. The fix reaches users on the next app build, and the
-  MCP client must restart to renegotiate its tool list.
+
+- **Five of the eight MCP tools never reached the model.** `clippy_search`,
+  `clippy_list_recent`, `clippy_get`, `clippy_delete`, and `clippy_set_category` had
+  their schemas serialized with `zodToJsonSchema(..., { target: "openApi3" })`, which
+  emits the draft-04 boolean form `"exclusiveMinimum": true` for
+  `z.number().int().positive()`. MCP clients validate against draft-07+, where the
+  keyword must be numeric, and drop a failing tool from the tool list **with no error**
+  - so the server looked healthy while search, read, and delete simply did not exist.
+  Only the three tools with no numeric parameter survived. Target is now `jsonSchema7`,
+  and `test/smoke.mjs` walks every advertised schema and fails the build on a
+  non-numeric `exclusiveMinimum`/`exclusiveMaximum`. `integrations/clippy-mcp/src/index.ts`.
+
+- **Writes made over MCP were invisible to the running app.** GRDB's `ValueObservation`
+  does not detect commits from another connection, and `scripts.json` / `ai-actions.json`
+  are held in memory by the app, so an external write was not merely unseen - the next
+  in-app save overwrote it. `Storage/ExternalChangeWatcher.swift` polls SQLite's
+  `data_version` (unchanged for the reading connection's own commits, so Clippy's own
+  captures never trip it) and the two files' modification dates, then calls
+  `Database.notifyChanges(in: .fullDatabase)`. Changes now appear within about two
+  seconds. `Storage/ClipDatabase.swift`, `Support/JSONFileStore.swift`.
+
+- **Copying a folder in Finder failed every time, silently.**
+  `ClipboardMonitor.captureFileIfPresent` filtered candidates on
+  `attributesOfItem[.size] > 0`, which is non-zero for a directory, then handed them to
+  `MediaStore.storeFile`, where `Data(contentsOf:)` throws EISDIR. No clip, no capture
+  sound, nothing surfaced: **1273 of the 1313 lines in the user's log were this one
+  error**, from 2026-07-12 to 2026-09-02. `ClipboardMonitor.classify` now checks
+  `isDirectoryKey` and keeps folders as a path reference, and skips iCloud items whose
+  bytes are not downloaded instead of failing on them. A copy where every item fails now
+  logs one summary line. `Capture/ClipboardMonitor.swift`,
+  `Tests/ClippyTests/FileCaptureClassificationTests.swift`.
+
+- **One unreadable iCloud archive disabled sync permanently.** `sync()` ran
+  `pullIfPresent` and the export inside a single `do`, so a parse failure on the remote
+  file skipped the export - which meant the bad file was never replaced and every later
+  sync hit the same error. Seen in the field 2026-06-17 to 06-23, from a build predating
+  the TOML escaping fix. An unparseable archive is now quarantined (moved aside, not
+  deleted) and the export proceeds. `Integrations/ICloudSyncService.swift`.
+
+- **Fresh clips showed "in 0s"**, future tense, because
+  `Date.RelativeFormatStyle(presentation: .numeric)` rounds a sub-second interval to zero
+  and keeps the sign. Anything under a minute now reads "now", via a shared
+  `Support/RelativeTime.swift` used by both the clip card and the scripts panel.
+
+- `PRAGMA busy_timeout = 5000` on the MCP connection. Two writers share the file; without
+  it a write landing while the app holds the lock fails immediately with `SQLITE_BUSY`.
 
 ### Added
-- docs/audits/2026-09-16-clippy-ai-mcp-uiux-analysis.md - analysis of the MCP tool
-  surface, Apple Intelligence integration, and clip-list UI/UX, with the open bugs it
-  turned up (folder copies failing on capture, iCloud sync control characters,
-  `in 0s` relative timestamps).
+
+- **Apple Intelligence as an AI provider**, on device, via Foundation Models
+  (`AI/AppleIntelligenceProvider.swift`). No API key, no endpoint, and nothing copied
+  leaves the Mac - which is what makes capture-time AI defensible where the clipboard
+  carries client data. Gated on `SystemLanguageModel.default.availability`, with the
+  reason surfaced in Settings when it is not ready. It is now the default provider.
+  Tool calling is deliberately not implemented and the type says so: Foundation Models
+  wants compile-time `@Generable` argument types while `AITool` carries a runtime JSON
+  schema. Chat, AI actions, and auto-titling all work; the assistant cannot call Clippy's
+  own tools while this provider is selected.
+
+- **22 MCP tools** across clips, categories, scripts, and AI actions, replacing eight
+  read-mostly ones. New: `clippy_update_clip`, `clippy_update_category`,
+  `clippy_delete_category`, `clippy_assign_clips` and `clippy_delete_clips` (batched, up
+  to 500 per call), `clippy_stats`, and full CRUD over scripts and AI actions - the two
+  JSON stores the server previously could not see at all. Descriptions were rewritten to
+  say when to reach for a tool and how tools compose, rather than describing table rows.
+  The five old names remain as deprecated aliases on their original schemas.
+
+- **`clip-automation` skill** in the Claude Code plugin, covering when to write a script
+  versus an AI action and the rules for each.
+
+- **CI workflow** (`.github/workflows/ci.yml`) running `swift build`, `swift test`, and
+  the MCP typecheck and smoke test on every push, plus a check that the plugin's vendored
+  server bundle is in sync with `src/`. Clippy cannot be built on a machine with only the
+  Command Line Tools - SwiftUI's `@State` is an external macro whose plugin ships with
+  Xcode - and until now the release workflow was the only thing that ran the tests.
+
+### Security
+
+- **Scripts created or edited over MCP land disabled.** Clippy executes scripts as the
+  signed-in user, so a tool that could both write and enable one would be a path from any
+  connected MCP client to arbitrary shell. `Script.isEnabled` defaults to true (existing
+  scripts are unaffected) but is forced false for anything the MCP server writes, and
+  `ScriptRunner.run` refuses a disabled script at the single chokepoint every caller
+  funnels through. There is deliberately no MCP parameter to enable one; editing
+  re-disables, because the approval was for the previous body. Settings gained an
+  "Enabled" toggle and the panel greys out the run button.
+
+- **Capture-time auto-titling now requires a local provider.** It fires on every copy, so
+  with a hosted provider it would post every password and client record passing through
+  the clipboard to a third party. `AppSettings.canAutoSuggestTitles` gates it on Apple
+  Intelligence or Ollama, and Settings says so rather than leaving a toggle that is on
+  and quietly does nothing.
+
+- MCP search and list results return 300-character previews; full clip text requires
+  `clippy_get_clip` on a named id.
+
+- Every MCP call writes an audit line to stderr - timestamp, outcome, tool name, and
+  argument key names, never values - which the app captures.
+
+### Notes
+
+- The MCP fix reaches the running server only after this build installs: the live server
+  is the copy inside `Clippy.app/Contents/Resources/clippy-mcp/`, written by
+  `scripts/make-app.sh`. MCP clients also negotiate their tool list at startup, so
+  restart the client after updating.
 
 ## 2026-08-14 - Dropped copies from slow multi-flavor pasteboard writers
 

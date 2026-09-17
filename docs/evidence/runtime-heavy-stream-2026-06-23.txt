@@ -1,0 +1,71 @@
+# Evidence: heavy-stream AI freeze proof (Verification A)
+
+Date: 2026-06-23
+Run: closes the 2026-06-17 "verified-partial" gap in docs/.run/findings.json
+Binary: post-commit 017a2bb (pushed to origin/main as b27d954 after rebase), release build
+        `swift build -c release` -> Build complete! (32.85 sec), 2026-06-23.
+
+## Original failing case (red state, from docs/.run/findings.json)
+
+Symptom: the AI assistant locked Clippy up at ~100% CPU and ~2 GB RAM on a ~48.9 KB
+streamed Ollama response (~64s), requiring force-quit. Spindump evidence:
+- docs/evidence/spindump-2026-06-15-heaviest-stack.txt: Footprint 147 -> 2105 MB, 88% CPU,
+  leaf SelectionOverlay.updateNSView (non-converging SwiftUI AttributeGraph loop).
+- docs/evidence/spindump-2026-06-16-heaviest-stack.txt: Footprint 100 -> 1611 MB, 96% CPU,
+  leaf SelectionOverlay.updateNSView -> setFont.
+
+Root cause (verified 2026-06-17): .textSelection(.enabled) on the live-mutating streaming
+Text caused a non-converging AttributeGraph update loop on the main thread. Fix removed
+selection from the live branch (Sources/Clippy/AI/AIAssistantPanelView.swift). The 2026-06-17
+run reproduced only a 1.6 KB / 60s stream (peak 9.3% CPU, RSS flat 314 MB); the >=40 KB
+heavy case was NOT reproduced - that is the gap this evidence closes.
+
+## Green state captured 2026-06-23 (the same kind of failing case, now correct)
+
+User ran a >=40 KB streaming AI turn (long-essay prompt to a fast Ollama model) in the
+fixed binary and sampled RSS/%CPU every 2s during the stream. Two independent captures:
+
+Capture 1 (ps -o rss,%cpu every 2s, 10 samples):
+  311936  30.8
+  311120  38.6
+  310992  16.5
+  311520  16.5
+  311600  29.7
+  311728  32.3
+  311760  31.0
+  311760  31.9
+  311824  22.2
+  311888  36.3
+  -> RSS ~305 MB flat (311936 -> 311888, <1 MB drift); CPU 16-38% bouncing, no sample >50%.
+
+Capture 2 (same command, 10 samples):
+  313248  12.5
+  313280  10.7
+  313280  26.6
+  313328  26.0
+  313328  29.9
+  313328  14.5
+  313296  10.9
+  313312  14.2
+  313744  32.1
+  313776  13.4
+  -> RSS ~306 MB flat (313248 -> 313776, <1 MB drift); CPU 10-32% bouncing, avg ~17%.
+
+## Stream conditions (user-confirmed, 2026-06-23)
+
+- Response was actively streaming during both captures: yes.
+- Response was >=40 KB (long essay, not a short reply): yes.
+- Stream finished on its own - no force-quit, no Activity Monitor "unresponsive" flag,
+  no new cpu_resource.diag: yes.
+
+## Verdict
+
+PASS (red -> green). The non-converging AttributeGraph loop signature - main thread
+pinned at 88-96% with RSS climbing unbounded to 1.6-2.1 GB - does not reproduce under a
+>=40 KB stream on the fixed binary. RSS stays flat at ~305-306 MB; CPU stays moderate
+(10-38%, no sustained pin). The freeze fix is verified airtight for the heavy case that
+the 2026-06-17 run could not reproduce.
+
+Caveat: CPU averages ~17-28% during active streaming (higher than the 2026-06-17 1.6 KB
+run's 9.3% peak), which is expected for rendering a long token stream and is not the
+failure mode. The failure mode was sustained pin + unbounded growth, which is absent.
