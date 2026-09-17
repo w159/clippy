@@ -121,7 +121,9 @@ final class ICloudSyncService: ObservableObject {
     /// Move an unparseable sync file aside so the next export can replace it.
     /// Kept rather than deleted: it is the only copy of whatever the other device
     /// had, and a human can still read the TOML out of it.
-    private static func quarantine(_ url: URL) {
+    /// nonisolated: called from the detached sync task, like `pullIfPresent`.
+    /// It touches only the filesystem and the passed-in URL, never actor state.
+    private nonisolated static func quarantine(_ url: URL) {
         let stamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
         let target = url.deletingLastPathComponent()
