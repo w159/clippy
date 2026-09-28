@@ -921,7 +921,7 @@ struct ClipListView: View {
                         ExternalEditorService.shared.edit(clip: clip, store: store)
                     }
                 }
-                if clip.contentKind == .image {
+                if clip.isImageLike {
                     Divider()
                     Button {
                         runOCR(on: clip)

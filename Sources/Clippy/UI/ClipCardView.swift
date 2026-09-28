@@ -146,7 +146,7 @@ struct ClipCardView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     headerRow
-                    if isImage {
+                    if isImage || clip.isImageLike {
                         imagePreview
                     } else if isFile {
                         filePreview
