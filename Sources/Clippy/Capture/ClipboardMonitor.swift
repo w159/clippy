@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     /// Posted on the main thread immediately after a clip is saved, at the same
@@ -84,6 +85,28 @@ final class ClipboardMonitor {
         let size = values.fileSize ?? 0
         guard size > 0 else { return nil }
         return FileCandidate(url: url, isRegularFile: true, byteSize: size)
+    }
+
+    /// Whether `url`'s extension identifies it as an image ImageIO/Vision can
+    /// decode. A copied image is not always image-only on the pasteboard: apps
+    /// like Finder, Preview, and some screenshot flows also put a file URL
+    /// alongside the image data, and the file-URL path is captured first (see
+    /// the comment in `captureCurrentPasteboard`). Without this check that
+    /// produces a bare "path only" file clip with no preview and no OCR. When
+    /// this returns true, `captureFileIfPresent` additionally thumbnails the
+    /// file so it previews and can be OCR'd like a real image clip, while
+    /// staying a `.file` clip (Paste as file / Move / Reveal in Finder unchanged).
+    static func isImageFile(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return type.conforms(to: .image)
+    }
+
+    /// Recovers the content-hash portion of a `MediaStore.storeFile` filename
+    /// (which is `hash`, or `hash.ext` when the source had an extension), so a
+    /// follow-up `imageThumbnail(forFileAt:hash:)` call can key its thumbnail
+    /// off the exact same hash instead of recomputing it from the file bytes.
+    private static func contentHash(fromStoredFilename filename: String, extension ext: String) -> String {
+        ext.isEmpty ? filename : String(filename.dropLast(ext.count + 1))
     }
 
     /// Pasteboard types that mean "do not record this". ConcealedType is the
@@ -315,6 +338,9 @@ final class ClipboardMonitor {
                 do {
                     var mediaFilename: String? = nil
                     var storedByteSize: Int = candidate.byteSize
+                    var thumbFilename: String? = nil
+                    var pixelWidth: Int? = nil
+                    var pixelHeight: Int? = nil
 
                     // Only regular files have bytes to copy. A directory is kept as
                     // a path reference: copying a folder tree into the media store
@@ -324,6 +350,20 @@ final class ClipboardMonitor {
                         let stored = try database.media.storeFile(at: fileURL)
                         mediaFilename = stored.mediaFilename
                         storedByteSize = stored.byteSize
+
+                        // Additive: when the copied file is an image, give this
+                        // file clip the same preview + OCR eligibility as a real
+                        // image clip. Best-effort; a decode failure just leaves
+                        // the clip as a plain file reference, never fails capture.
+                        if Self.isImageFile(fileURL) {
+                            let hash = Self.contentHash(fromStoredFilename: stored.mediaFilename,
+                                                        extension: fileURL.pathExtension)
+                            if let thumb = database.media.imageThumbnail(forFileAt: fileURL, hash: hash) {
+                                thumbFilename = thumb.thumbFilename
+                                pixelWidth = thumb.pixelWidth
+                                pixelHeight = thumb.pixelHeight
+                            }
+                        }
                     }
 
                     var clip = Clip(
@@ -337,6 +377,9 @@ final class ClipboardMonitor {
                         createdAt: Date(),
                         contentKind: .file,
                         mediaFilename: mediaFilename,
+                        thumbFilename: thumbFilename,
+                        pixelWidth: pixelWidth,
+                        pixelHeight: pixelHeight,
                         byteSize: storedByteSize
                     )
                     clip.filePath = fileURL.path

@@ -1,8 +1,9 @@
-import Foundation
 import Combine
+import Foundation
 import GRDB
+
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 /// View model for the panel: live observation of clips, categories, and
@@ -31,9 +32,10 @@ final class ClipStore: ObservableObject {
             // Rebuilt once per observation pulse instead of once per
             // clipsForCategory call: the id lookup is hit several times per
             // redraw (sections, metadata, keyboard handling all query it).
-            recentsByID = Dictionary(uniqueKeysWithValues: recents.compactMap { clip in
-                clip.id.map { ($0, clip) }
-            })
+            recentsByID = Dictionary(
+                uniqueKeysWithValues: recents.compactMap { clip in
+                    clip.id.map { ($0, clip) }
+                })
             refilter()
         }
     }
@@ -106,7 +108,8 @@ final class ClipStore: ObservableObject {
             }
         )
 
-        let categoryObservation = ValueObservation.tracking { db -> ([Category], [Int64: Set<Int64>], [Int64: [Int64]]) in
+        let categoryObservation = ValueObservation.tracking {
+            db -> ([Category], [Int64: Set<Int64>], [Int64: [Int64]]) in
             let categories = try Category.order(Column("sortOrder"), Column("createdAt")).fetchAll(db)
             let map = try ClipDatabase.buildMembershipMap(db)
             // Load per-category clip order from clip_category.sortOrder.
@@ -171,8 +174,9 @@ final class ClipStore: ObservableObject {
         let trimLimit = 50
         if recents.count > trimLimit {
             recents = Array(recents.prefix(trimLimit))
-            ClippyLog.info("trimResident: reduced resident clips to \(trimLimit)",
-                           category: ClippyLog.storage)
+            ClippyLog.info(
+                "trimResident: reduced resident clips to \(trimLimit)",
+                category: ClippyLog.storage)
         }
     }
 
@@ -242,7 +246,8 @@ final class ClipStore: ObservableObject {
         // Snapshot the memberships on the main thread (`membership` is
         // @Published), then run removals + add as one enqueued unit so another
         // mutation cannot interleave between them.
-        let others = AppSettings.shared.allowMultipleCategories
+        let others =
+            AppSettings.shared.allowMultipleCategories
             ? []
             : (membership[clipID] ?? []).subtracting([categoryID])
         performWrite("fileClip") { [database] in
@@ -256,8 +261,11 @@ final class ClipStore: ObservableObject {
     }
 
     @discardableResult
-    func createCategory(named name: String, colorHex: String, iconKind: CategoryIconKind, iconValue: String) -> Category? {
-        try? database.createCategory(named: name, colorHex: colorHex, iconKind: iconKind, iconValue: iconValue)
+    func createCategory(
+        named name: String, colorHex: String, iconKind: CategoryIconKind, iconValue: String
+    ) -> Category? {
+        try? database.createCategory(
+            named: name, colorHex: colorHex, iconKind: iconKind, iconValue: iconValue)
     }
 
     func updateCategory(_ category: Category) {
@@ -366,16 +374,15 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    /// Run OCR on an image clip, copy the result to the clipboard, and save it
-    /// as a new text clip. The `completion` block is always called on the main
-    /// queue and carries a human-readable outcome message for display.
+    /// Run OCR on an image clip (or a file clip detected as an image during
+    /// capture, see `Clip.isImageLike`), copy the result to the clipboard, and
+    /// save it as a new text clip. The `completion` block is always called on
+    /// the main queue and carries a human-readable outcome message for display.
     func extractText(from clip: Clip, completion: @escaping (String) -> Void) {
-        guard clip.contentKind == .image,
-              let filename = clip.mediaFilename else {
+        guard clip.isImageLike, let imageURL = imageURL(for: clip) else {
             completion("No image data for this clip.")
             return
         }
-        let imageURL = database.media.url(for: filename)
         OCRService.recognizeText(in: imageURL) { [weak self] result in
             guard let self else { return }
             switch result {
@@ -383,8 +390,8 @@ final class ClipStore: ObservableObject {
                 completion("No text found in image.")
             case .success(let text):
                 #if canImport(AppKit)
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
                 #endif
                 do {
                     try self.database.insertTextClip(text, sourceAppName: "Clippy OCR")

@@ -96,4 +96,13 @@ extension Clip {
         case .text: return ClipKind.detect(contentText)
         }
     }
+
+    /// True for real image clips, and for file clips that were detected as
+    /// images during capture (see `ClipboardMonitor.isImageFile`) and so carry
+    /// a `thumbFilename`. Drives the image-preview rendering and "Extract
+    /// Text" (OCR) eligibility for both shapes without changing `contentKind`,
+    /// which stays `.file` so paste/move/reveal-in-Finder behavior is unaffected.
+    var isImageLike: Bool {
+        contentKind == .image || (contentKind == .file && thumbFilename != nil)
+    }
 }

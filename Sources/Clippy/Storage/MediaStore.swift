@@ -23,6 +23,15 @@ final class MediaStore {
     struct StoredFile: Equatable {
         let mediaFilename: String
         let byteSize: Int
+        /// Set only when the stored file is a decodable image: a JPEG thumbnail
+        /// plus its pixel dimensions, used by the file-clip card to show a real
+        /// preview instead of a generic document glyph, and to unlock OCR
+        /// (Extract Text) on file clips that happen to be images. Populated by a
+        /// separate call to `imageThumbnail(forFileAt:hash:)`, not by `storeFile`
+        /// itself, so copying a non-image file never pays the decode cost.
+        var thumbFilename: String? = nil
+        var pixelWidth: Int? = nil
+        var pixelHeight: Int? = nil
     }
 
     let directory: URL
@@ -88,6 +97,47 @@ final class MediaStore {
         return StoredFile(mediaFilename: mediaFilename, byteSize: data.count)
     }
 
+    /// Generates a thumbnail + pixel dimensions for an on-disk image file,
+    /// keyed by the same content-hash `storeFile` already computed for it, so
+    /// the thumbnail sits alongside the original bytes and is swept by the
+    /// same eviction path (`evictOverCap`/`evictAbsoluteCeiling` already delete
+    /// any referenced `thumbFilename` regardless of clip kind).
+    ///
+    /// Uses ImageIO's thumbnail generation directly from the source, so a
+    /// large original (e.g. a multi-megapixel photo) is never fully decoded
+    /// just to produce a small preview. Returns nil when the file is not a
+    /// decodable image; callers should treat that as "not an image" rather
+    /// than an error.
+    func imageThumbnail(forFileAt fileURL: URL, hash: String) -> (
+        thumbFilename: String, pixelWidth: Int, pixelHeight: Int
+    )? {
+        guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) else { return nil }
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let pixelWidth = properties[kCGImagePropertyPixelWidth] as? Int,
+            let pixelHeight = properties[kCGImagePropertyPixelHeight] as? Int
+        else { return nil }
+
+        let thumbFilename = "\(hash)-thumb.jpg"
+        let thumbURL = url(for: thumbFilename)
+        if !FileManager.default.fileExists(atPath: thumbURL.path) {
+            let opts: [CFString: Any] = [
+                kCGImageSourceThumbnailMaxPixelSize: Int(Self.thumbnailMaxEdge),
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+            ]
+            guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, opts as CFDictionary),
+                let jpeg = NSBitmapImageRep(cgImage: cgThumb)
+                    .representation(using: .jpeg, properties: [.compressionFactor: 0.8])
+            else { return nil }
+            do {
+                try jpeg.write(to: thumbURL, options: .atomic)
+            } catch {
+                return nil
+            }
+        }
+        return (thumbFilename, pixelWidth, pixelHeight)
+    }
+
     func delete(filenames: [String]) {
         for filename in filenames where !filename.isEmpty {
             try? FileManager.default.removeItem(at: url(for: filename))
@@ -101,8 +151,10 @@ final class MediaStore {
         let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         for filename in onDisk where !referencedFilenames.contains(filename) {
             let fileURL = url(for: filename)
-            if let modified = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-               Date().timeIntervalSince(modified) < 60 {
+            if let modified = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate,
+                Date().timeIntervalSince(modified) < 60
+            {
                 continue
             }
             try? FileManager.default.removeItem(at: fileURL)
@@ -114,7 +166,8 @@ final class MediaStore {
     /// and archive import, which each supply their own source-specific decode.
     static func pngData(from image: NSImage) -> Data? {
         guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+            let rep = NSBitmapImageRep(data: tiff)
+        else { return nil }
         return rep.representation(using: .png, properties: [:])
     }
 
@@ -129,20 +182,23 @@ final class MediaStore {
         let scale = min(1, thumbnailMaxEdge / max(width, height))
         let targetWidth = max(1, Int(width * scale))
         let targetHeight = max(1, Int(height * scale))
-        guard let context = CGContext(
-            data: nil,
-            width: targetWidth,
-            height: targetHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { throw MediaStoreError.thumbnailFailed }
+        guard
+            let context = CGContext(
+                data: nil,
+                width: targetWidth,
+                height: targetHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { throw MediaStoreError.thumbnailFailed }
         context.interpolationQuality = .high
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
         guard let scaled = context.makeImage() else { throw MediaStoreError.thumbnailFailed }
-        guard let jpeg = NSBitmapImageRep(cgImage: scaled)
-            .representation(using: .jpeg, properties: [.compressionFactor: 0.8])
+        guard
+            let jpeg = NSBitmapImageRep(cgImage: scaled)
+                .representation(using: .jpeg, properties: [.compressionFactor: 0.8])
         else { throw MediaStoreError.thumbnailFailed }
         return jpeg
     }
