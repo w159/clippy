@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.10.0 - 2026-09-28 - Real previews and OCR for image file clips
+
+### Added
+
+- **File clips that are actually images now get a real preview and Extract
+  Text.** Some capture flows (Finder, Preview, screenshot tools) put a file
+  URL on the pasteboard alongside the image bytes, so Clippy captured them as
+  a plain file clip with no preview and no OCR. `ClipboardMonitor` now checks
+  whether a captured file's extension is a decodable image
+  (`ClipboardMonitor.isImageFile`) and, if so, has `MediaStore` generate a
+  thumbnail and pixel dimensions for it via ImageIO
+  (`imageThumbnail(forFileAt:hash:)`), without changing `contentKind` away
+  from `.file` so paste/move/reveal-in-Finder behavior is unaffected. A new
+  `Clip.isImageLike` (real image clips, or file clips carrying a
+  `thumbFilename`) drives both `ClipCardView`'s preview and the Extract Text
+  menu item in `ClipListView`. `Sources/Clippy/Capture/ClipboardMonitor.swift`,
+  `Sources/Clippy/Storage/MediaStore.swift`, `Sources/Clippy/Storage/ClipKind.swift`,
+  `Sources/Clippy/UI/ClipStore.swift`, `Sources/Clippy/UI/ClipCardView.swift`,
+  `Sources/Clippy/UI/ClipListView.swift`.
+
 ## v1.9.0 - 2026-09-16 - Apple Intelligence, and an MCP server that actually works
 
 Full analysis, with evidence: docs/audits/2026-09-16-clippy-ai-mcp-uiux-analysis.md
