@@ -60,7 +60,7 @@ struct OnboardingStepContent: View {
             heading("Smart Suggestions (optional)",
                     "Suggests clips that fit the app you are typing in, using its name and window title. On-device only. " +
                         "Off unless you turn it on.")
-            Toggle("Turn on Smart Suggestions", isOn: Binding(get: { viewModel.suggestionsOn }, set: viewModel.setSuggestions))
+            Toggle("Turn on Smart Suggestions", isOn: Binding(get: { viewModel.suggestionsOn }, set: { viewModel.setSuggestions($0) }))
             if !viewModel.accessibilityTrusted {
                 Text("Suggestions also need Accessibility access (previous step).")
                     .font(.caption).foregroundStyle(tokens.textSecondary)
@@ -73,7 +73,7 @@ struct OnboardingStepContent: View {
             heading("Search text inside images (optional)",
                     "Clippy can recognize text in copied images on this Mac so you can find them by search. " +
                         "Recognized text never leaves the device and can be deleted in Settings.")
-            Toggle("Index text in images", isOn: Binding(get: { viewModel.ocrOn }, set: viewModel.setOCR))
+            Toggle("Index text in images", isOn: Binding(get: { viewModel.ocrOn }, set: { viewModel.setOCR($0) }))
         }
     }
 
@@ -91,7 +91,7 @@ struct OnboardingStepContent: View {
             heading("Open Clippy at login", "Clippy lives in the menu bar and only captures while it is running.")
             Toggle("Launch Clippy at login", isOn: Binding(
                 get: { viewModel.launchStatus == .enabled || viewModel.launchStatus == .requiresApproval },
-                set: viewModel.setLaunchAtLogin))
+                set: { viewModel.setLaunchAtLogin($0) }))
             switch viewModel.launchStatus {
             case .requiresApproval:
                 status("Waiting for approval in System Settings", ok: false)
