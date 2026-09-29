@@ -68,8 +68,10 @@ final class OCRServiceTests: XCTestCase {
         }
 
         // Vision is synchronous under the hood but dispatches the callback on
-        // main; 10 seconds is conservative — it usually finishes in < 1s.
-        wait(for: [expectation], timeout: 10)
+        // main; the first call in a fresh process can take ~24s (cold model load),
+        // so the timeout is generous. A timeout that expires before the callback
+        // fires makes the late fulfill() crash the whole xctest process.
+        wait(for: [expectation], timeout: 90)
 
         switch capturedResult {
         case .success(let text):
@@ -102,7 +104,7 @@ final class OCRServiceTests: XCTestCase {
             expectation.fulfill()
         }
 
-        wait(for: [expectation], timeout: 10)
+        wait(for: [expectation], timeout: 90)
 
         guard case .success(let text) = capturedResult else {
             throw XCTSkip("Vision unavailable in this environment")

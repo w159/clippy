@@ -32,6 +32,54 @@ enum OCRService {
         }
     }
 
+    // MARK: - Warm-Up
+
+    /// True while a warm-up recognition is in flight; guarded by `warmUpLock`
+    /// so concurrent callers collapse instead of stacking cold model loads.
+    private nonisolated(unsafe) static var isWarming = false
+    private nonisolated(unsafe) static let warmUpLock = NSLock()
+
+    /// Warms the Vision text-recognition stack in the background.
+    ///
+    /// The **first** VNRecognizeTextRequest after the models have gone cold
+    /// pays a one-time model load (measured ~24s on current macOS; the OS
+    /// re-evicts them after a period of disuse); every later request is
+    /// ~0.03s. Paying that cost invisibly on a utility queue — at launch and
+    /// whenever the panel is shown, the user's "about to interact" signal —
+    /// means Extract Text completes in ~0.03s instead of appearing hung.
+    /// Fire-and-forget: never touches the main thread, allocates no files.
+    /// Concurrent calls collapse into the in-flight one.
+    static func warmUp() {
+        guard warmUpLock.withLock({
+            if isWarming { return false }
+            isWarming = true
+            return true
+        }) else { return }
+        DispatchQueue.global(qos: .utility).async {
+            defer { warmUpLock.withLock { isWarming = false } }
+            // Tiny opaque white in-memory image (no disk I/O): enough to make
+            // Vision load its model, too small to matter for recognition cost.
+            let size = CGSize(width: 64, height: 32)
+            guard let context = CGContext(
+                data: nil,
+                width: Int(size.width),
+                height: Int(size.height),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return }
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            context.fill(CGRect(origin: .zero, size: size))
+            guard let cgImage = context.makeImage() else { return }
+            let startedAt = Date()
+            _ = performRecognition(cgImage: cgImage)
+            ClippyLog.info(
+                "Vision OCR warm-up finished in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)))s",
+                category: ClippyLog.lifecycle)
+        }
+    }
+
     // MARK: - Implementation
 
     private static func performRecognition(imageURL: URL) -> RecognitionResult {
@@ -39,6 +87,12 @@ enum OCRService {
             return .failure(OCRError.imageLoadFailed(imageURL))
         }
 
+        return performRecognition(cgImage: cgImage)
+    }
+
+    /// Runs the recognition request/handler/results logic on an in-memory
+    /// CGImage; the core shared by the URL wrapper and `warmUp()`.
+    private static func performRecognition(cgImage: CGImage) -> RecognitionResult {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true

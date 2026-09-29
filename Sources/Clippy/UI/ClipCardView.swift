@@ -65,6 +65,9 @@ struct ClipCardView: View {
     private var iconSize: CGFloat { CGFloat(settings.fontSizeBase) + 1 }
     /// Whether the title field is in inline-edit mode. Driven by the parent via
     /// isRenamingBinding so context-menu "Rename..." can trigger it externally.
+    /// True while the parent runs OCR on this clip; the image preview shows a
+    /// spinner scrim instead of looking frozen.
+    let isProcessingOCR: Bool
     @Binding var isRenaming: Bool
 
     /// Convenience init for callers that do not need external rename control.
@@ -75,6 +78,7 @@ struct ClipCardView: View {
         categoryColors: [Color],
         pinnedCategory: Category?,
         isRenaming: Binding<Bool> = .constant(false),
+        isProcessingOCR: Bool = false,
         onActivate: @escaping () -> Void,
         onPaste: @escaping () -> Void,
         onPastePlain: @escaping () -> Void,
@@ -95,6 +99,7 @@ struct ClipCardView: View {
         self.categoryColors = categoryColors
         self.pinnedCategory = pinnedCategory
         self._isRenaming = isRenaming
+        self.isProcessingOCR = isProcessingOCR
         self.onActivate = onActivate
         self.onPaste = onPaste
         self.onPastePlain = onPastePlain
@@ -181,6 +186,7 @@ struct ClipCardView: View {
             )
             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isHovering)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isSelected)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isProcessingOCR)
             .contentShape(Rectangle())
             .onHover { hovering in
                 isHovering = hovering
@@ -207,7 +213,11 @@ struct ClipCardView: View {
         // card is in the active multi-selection (replicates CategorySidePane's
         // .isSelected pattern). Combined with .isButton above.
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityValue(isSelected ? "selected" : "not selected")
+        .accessibilityValue(
+            isProcessingOCR
+                ? "extracting text"
+                : (isSelected ? "selected" : "not selected")
+        )
         .accessibilityHint(isPinned ? "Pinned clip. Activate to paste." : "Activate to paste.")
     }
 
@@ -751,6 +761,24 @@ struct ClipCardView: View {
                     .font(PanelTypography.micro(settings))
                     .foregroundStyle(tokens.textSecondary)
                     .monospacedDigit()
+            }
+        }
+        // While OCR runs, veil the preview so the card reads as busy rather
+        // than frozen behind a hung-looking still frame.
+        .overlay {
+            if isProcessingOCR {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(.thinMaterial)
+                    .overlay {
+                        VStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Extracting Text…")
+                                .font(PanelTypography.metadata(settings))
+                                .foregroundStyle(tokens.textPrimary)
+                        }
+                    }
+                    .transition(.opacity)
             }
         }
     }

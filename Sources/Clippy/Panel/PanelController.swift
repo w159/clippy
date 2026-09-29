@@ -39,6 +39,14 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     func show() {
+
+        // User intent signal: the panel is the only surface Extract Text
+        // lives on, and Vision evicts its loaded models after a period of
+        // disuse (observed once at ~14 minutes). Warm the stack now
+        // (background, collapsed if already warming/warm) so the first OCR
+        // after eviction doesn't stall ~24s. That cold load is a
+        // system-level model load, not paid on every launch.
+        OCRService.warmUp()
         // Remember who had focus before the panel grabs key status, so the send
         // paths can hand keyboard focus back to that app. Skip Clippy itself
         // (e.g. when the panel is re-shown while already frontmost).

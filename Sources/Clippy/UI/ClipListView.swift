@@ -49,8 +49,6 @@ struct ClipListView: View {
     /// Retry action shown as a button on failure banners. nil for auto-dismissed
     /// info/success banners; non-nil banners persist until the user acts.
     @State private var bannerRetry: (() -> Void)?
-    /// ID of the clip currently being processed by OCR so the card can show a spinner.
-    @State private var ocrProcessingClipID: Int64?
     /// The ID of the keyboard-anchored clip, tracked across DB pulses so a
     /// background capture does not yank the highlight (audit: selection reset on
     /// every DB pulse). Re-indexed to the anchored clip's new position when
@@ -815,6 +813,7 @@ struct ClipListView: View {
                 get: { renamingClipID == clip.id },
                 set: { active in renamingClipID = active ? clip.id : nil }
             ),
+            isProcessingOCR: store.ocrInFlightClipIDs.contains(clip.id ?? -1),
             // The card's button action is now a plain single-click select.
             // The actual paste/activate moved to the double-click gesture below
             // so single-click selects and double-click pastes.
@@ -1202,9 +1201,10 @@ struct ClipListView: View {
     /// Failures carry a Retry that re-runs this function on the same clip (audit:
     /// OCR banner renders success/failure identically; no retry on failure).
     private func runOCR(on clip: Clip) {
-        ocrProcessingClipID = clip.id
+        ClippyLog.info(
+            "Extract Text requested for clip \(clip.id.map(String.init) ?? "nil")",
+            category: ClippyLog.storage)
         store.extractText(from: clip) { message in
-            ocrProcessingClipID = nil
             let lower = message.lowercased()
             let isFailure = lower.contains("fail") || lower.contains("no image data")
             showStatusBanner(

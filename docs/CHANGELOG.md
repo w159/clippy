@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.10.1 - 2026-09-29 - Extract Text no longer looks hung
+
+### Docs
+
+- **ROADMAP rebuilt from a full 2026-09-29 audit.** It combines a live build walkthrough
+  (72 screenshots in `.atlas/evidence/2026-09-29-ui-audit/`), per-area code audits, and
+  201 claims checked against the code (31 refuted and listed so they are not
+  re-reported). The result is 188 gap items across 17 areas, each with evidence and a
+  fix direction, plus a phased delivery plan starting with data-loss and compliance
+  items.
+
+### Fixed
+
+- **Extract Text no longer looks hung on the first use after the models go
+  cold.** The first Vision text-recognition request after the OS has evicted
+  its loaded models (observed once at ~14 minutes) pays a one-time
+  system-level model load (measured ~24s on current macOS; not paid on every
+  launch) while every later request takes
+  ~0.03s, and nothing on screen indicated work was happening - so the first
+  Extract Text appeared dead and users clicked twice. Two fixes:
+  `OCRService.warmUp()` now runs one throwaway recognition on a tiny
+  in-memory image on a utility queue at launch and on every panel show (the
+  user's "about to interact" signal; concurrent calls collapse into the
+  in-flight one) and logs its duration; and the in-flight clip now shows a
+  real activity indicator - Extract Text state moved to
+  `ClipStore.ocrInFlightClipIDs` (survives the panel being rebuilt, doubles
+  as a double-run guard so a second click can't insert a duplicate "Clippy
+  OCR" row) driving an "Extracting Text…" spinner scrim over the card's
+  image preview, with a matching VoiceOver accessibility value. The OCR
+  pasteboard write is now suppressed from re-capture (`ignoreNextChange`,
+  same as paste) so it no longer adds a duplicate "Clippy" text row.
+  OCR start/finish (elapsed seconds, result kind) and the Extract Text request
+  are logged at info level in the storage category.
+  `Support/OCRService.swift`, `AppDelegate.swift`, `Panel/PanelController.swift`,
+  `UI/ClipCardView.swift`, `UI/ClipListView.swift`, `UI/ClipStore.swift`.
+
 ## v1.10.0 - 2026-09-28 - Real previews and OCR for image file clips
 
 ### Added

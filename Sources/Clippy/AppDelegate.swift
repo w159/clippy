@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // on-disk database. The lazy vars below capture `database` on first access,
     // which in the Retry path happens AFTER the successful reopen.
     private var database: ClipDatabase { ClipDatabase.shared }
-    private lazy var store = ClipStore(database: database)
+    private lazy var store = ClipStore(database: database, monitor: monitor)
     private lazy var monitor = ClipboardMonitor(database: database)
     /// Picks up writes made by the MCP server process, which GRDB observation
     /// cannot see on its own.
@@ -104,6 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let referenced = (try? ClipDatabase.shared.referencedMediaFilenames()) ?? []
             ClipDatabase.shared.media.sweepOrphans(referencedFilenames: referenced)
         }
+
+        // Warm Vision OCR: the first recognition after the models go cold
+        // costs ~24s (later ones ~0.03s). PanelController.show() re-warms on
+        // user intent; this covers the launch-to-first-interaction window.
+        OCRService.warmUp()
 
         // Kick off an iCloud Drive sync if the user has enabled it (safe no-op
         // otherwise; never touches CloudKit, so it cannot crash on launch).

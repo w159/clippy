@@ -26,6 +26,11 @@ final class ClipStore: ObservableObject {
     /// Last DB observation failure. Non-nil triggers an error banner with a
     /// Retry that re-starts the ValueObservation pipelines.
     @Published var observationError: String?
+    /// Clip IDs with OCR (Extract Text) currently in flight. Lives on the store,
+    /// not view state, because PanelController.show() builds a fresh ClipListView
+    /// per presentation — view @State would drop both the spinner and the
+    /// double-run guard if the panel is closed and reopened mid-recognition.
+    @Published private(set) var ocrInFlightClipIDs: Set<Int64> = []
 
     private var recents: [Clip] = [] {
         didSet {
@@ -50,6 +55,15 @@ final class ClipStore: ObservableObject {
     private var clipsCancellable: AnyDatabaseCancellable?
     private var categoriesCancellable: AnyDatabaseCancellable?
     private let database: ClipDatabase
+    private let monitor: ClipboardMonitor?
+    /// Pasteboard the OCR result is written to. Injectable for tests so
+    /// the suppression test can use a scratch pasteboard instead of the
+    /// real one (mirrors ClipboardMonitor's pasteboard seam).
+    private let pasteboard: NSPasteboard
+    /// Text recognizer used by `extractText`; must call its completion on the
+    /// main queue (as `OCRService.recognizeText` does). Injectable so tests can
+    /// stub Vision, which is slow/flaky when cold on CI runners.
+    private let recognizer: (URL, @escaping (OCRService.RecognitionResult) -> Void) -> Void
     private let displayLimit = 300
     /// Serial lane for mutation writes. The shared DatabaseQueue serializes all
     /// access, so a synchronous write from the main thread stalls the UI while
@@ -58,10 +72,25 @@ final class ClipStore: ObservableObject {
     /// such as successive drag-reorders apply in the order they were issued.
     /// The GRDB ValueObservation republishes state after each write, so the UI
     /// never needs to wait on the write itself.
-    private let writeQueue = DispatchQueue(label: "com.clippy.ClipStore.writes", qos: .userInitiated)
+    private let writeQueue = DispatchQueue(
+        label: "com.clippy.ClipStore.writes", qos: .userInitiated)
 
-    init(database: ClipDatabase) {
+    /// - Parameters:
+    ///   - database: shared clip database.
+    ///   - monitor: clipboard monitor, when supplied, is used to suppress
+    ///     re-capturing Clippy's own OCR pasteboard write.
+    init(
+        database: ClipDatabase,
+        monitor: ClipboardMonitor? = nil,
+        pasteboard: NSPasteboard = .general,
+        recognizer: @escaping (URL, @escaping (OCRService.RecognitionResult) -> Void) -> Void = {
+            OCRService.recognizeText(in: $0, completion: $1)
+        }
+    ) {
         self.database = database
+        self.monitor = monitor
+        self.pasteboard = pasteboard
+        self.recognizer = recognizer
         startObservations()
     }
 
@@ -110,7 +139,8 @@ final class ClipStore: ObservableObject {
 
         let categoryObservation = ValueObservation.tracking {
             db -> ([Category], [Int64: Set<Int64>], [Int64: [Int64]]) in
-            let categories = try Category.order(Column("sortOrder"), Column("createdAt")).fetchAll(db)
+            let categories = try Category.order(Column("sortOrder"), Column("createdAt")).fetchAll(
+                db)
             let map = try ClipDatabase.buildMembershipMap(db)
             // Load per-category clip order from clip_category.sortOrder.
             let orderRows = try Row.fetchAll(
@@ -133,7 +163,8 @@ final class ClipStore: ObservableObject {
             in: database.dbQueue,
             scheduling: .async(onQueue: .main),
             onError: { [weak self] error in
-                ClippyLog.error("Category observation failed: \(error)", category: ClippyLog.storage)
+                ClippyLog.error(
+                    "Category observation failed: \(error)", category: ClippyLog.storage)
                 DispatchQueue.main.async { self?.observationError = error.localizedDescription }
             },
             onChange: { [weak self] categories, map, order in
@@ -313,7 +344,8 @@ final class ClipStore: ObservableObject {
         // follows the write recomputes the identical order (same reorderIDs
         // applied to the same list), so no visible correction occurs.
         if let current = categoryClipOrder[categoryID], current.contains(clipID) {
-            categoryClipOrder[categoryID] = reorderIDs(current, draggedID: clipID, before: targetClipID)
+            categoryClipOrder[categoryID] = reorderIDs(
+                current, draggedID: clipID, before: targetClipID)
         }
         performWrite("moveClip") { [database] in
             try database.moveClip(clipID, inCategory: categoryID, before: targetClipID)
@@ -383,15 +415,34 @@ final class ClipStore: ObservableObject {
             completion("No image data for this clip.")
             return
         }
-        OCRService.recognizeText(in: imageURL) { [weak self] result in
+        let clipID = clip.id
+        if let clipID, ocrInFlightClipIDs.contains(clipID) {
+            completion("Text extraction is already running for this clip.")
+            return
+        }
+        // A clip with no identity (never persisted) cannot be tracked;
+        // run it untracked rather than refusing it as a false duplicate.
+        if let clipID { ocrInFlightClipIDs.insert(clipID) }
+        ClippyLog.info("OCR started for clip \(clipID.map(String.init) ?? "nil")", category: ClippyLog.storage)
+        let startedAt = Date()
+        recognizer(imageURL) { [weak self] result in
             guard let self else { return }
+            defer { if let clipID { self.ocrInFlightClipIDs.remove(clipID) } }
+            let secs = String(format: "%.2f", Date().timeIntervalSince(startedAt))
             switch result {
             case .success(let text) where text.isEmpty:
+                ClippyLog.info("OCR finished in \(secs)s: empty", category: ClippyLog.storage)
                 completion("No text found in image.")
             case .success(let text):
+                ClippyLog.info("OCR finished in \(secs)s: \(text.count) chars", category: ClippyLog.storage)
                 #if canImport(AppKit)
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(text, forType: .string)
+                    // Clippy's own pasteboard write must not be re-captured as a new
+                    // "Clippy" text clip (same suppression PasteService uses before
+                    // its writes; unlike paste, OCR result text should never re-enter
+                    // history via capture — insertTextClip already saved it).
+                    self.monitor?.ignoreNextChange()
+                    pasteboard.clearContents()
+                    pasteboard.setString(text, forType: .string)
                 #endif
                 do {
                     try self.database.insertTextClip(text, sourceAppName: "Clippy OCR")
@@ -402,7 +453,7 @@ final class ClipStore: ObservableObject {
                     completion("Text copied to clipboard (save failed).")
                 }
             case .failure(let error):
-                ClippyLog.error("OCR recognition failed: \(error)", category: ClippyLog.storage)
+                ClippyLog.error("OCR failed after \(secs)s: \(error)", category: ClippyLog.storage)
                 completion("Text extraction failed: \(error.localizedDescription)")
             }
         }
@@ -416,7 +467,8 @@ final class ClipStore: ObservableObject {
         // Treat empty string the same as nil (clear the custom title).
         let trimmed = userTitle.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         do {
-            try database.updateClipTitle(id: id, userTitle: trimmed?.isEmpty == true ? nil : trimmed)
+            try database.updateClipTitle(
+                id: id, userTitle: trimmed?.isEmpty == true ? nil : trimmed)
             return true
         } catch {
             ClippyLog.error("failed to rename clip: \(error)", category: ClippyLog.storage)
@@ -506,7 +558,8 @@ extension Clip {
         if !parsed.sourceApps.isEmpty {
             let name = sourceAppName?.lowercased() ?? ""
             let bundle = sourceAppBundleID?.lowercased() ?? ""
-            guard parsed.sourceApps.contains(where: { name.contains($0) || bundle.contains($0) }) else {
+            guard parsed.sourceApps.contains(where: { name.contains($0) || bundle.contains($0) })
+            else {
                 return false
             }
         }
