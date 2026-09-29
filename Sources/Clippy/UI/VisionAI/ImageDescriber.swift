@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 import Vision
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && compiler(>=6.4)
     import FoundationModels
 #endif
 
@@ -17,7 +17,7 @@ struct DescribeAvailability: Equatable {
 
     /// Probes the running system. Image prompts are a macOS 27 API.
     static func current() -> DescribeAvailability {
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && compiler(>=6.4)
             if #available(macOS 27.0, *) {
                 let model = SystemLanguageModel.default
                 var available = false
@@ -38,7 +38,7 @@ enum ImageDescriber {
 
     /// `availability` defaults to a live probe.
     static func describe(imageURL: URL, availability: DescribeAvailability = .current()) async throws -> ImageDescription {
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && compiler(>=6.4)
             if #available(macOS 27.0, *), availability.canUseGenerative,
                 let text = try? await generate(imageURL: imageURL)
             {
@@ -65,7 +65,7 @@ enum ImageDescriber {
         }.value
     }
 
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.4)
         @available(macOS 27.0, *)
         private static func generate(imageURL: URL) async throws -> String {
             let session = LanguageModelSession(instructions: "You describe images for a clipboard manager. Be brief and factual.")

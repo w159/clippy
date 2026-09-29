@@ -41,12 +41,12 @@ enum SettingsSearchIndex {
         let tokens = needle.split(separator: " ").map(String.init)
         var hits: [SettingsSearchHit] = []
         for entry in entries {
-            let score = tokens.reduce(into: 0) { total, token in
+            let matchScore = tokens.reduce(into: 0) { total, token in
                 guard total >= 0 else { return }
                 let single = score(token: token, entry: entry)
                 total = single == 0 ? -1 : total + single
             }
-            if score > 0 { hits.append(SettingsSearchHit(entry: entry, score: score)) }
+            if matchScore > 0 { hits.append(SettingsSearchHit(entry: entry, score: matchScore)) }
         }
         let indexed = hits.enumerated().sorted {
             $0.element.score != $1.element.score ? $0.element.score > $1.element.score : $0.offset < $1.offset
