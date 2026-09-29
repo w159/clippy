@@ -19,14 +19,31 @@ let package = Package(
                 .product(name: "TOMLKit", package: "TOMLKit"),
                 .product(name: "MarkdownUI", package: "swift-markdown-ui"),
             ],
-            // AppKit delegates and Carbon callbacks are simpler under the v5
-            // concurrency model; revisit when the whole app moves to Swift 6 mode.
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        // Pure, dependency-free CLI logic (argument parser, sensitive-flag reader) so
+        // tests can import it without building the CLI executable.
+        .target(
+            name: "ClippyCLICore",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        // Command line tool. Named `clippy-cli` because the `Clippy` app executable would
+        // collide with `clippy` in .build/ on case-insensitive volumes; make-app.sh installs
+        // it as Contents/Resources/bin/clippy.
+        .executableTarget(
+            name: "clippy-cli",
+            dependencies: [
+                "ClippyCLICore",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ],
+            path: "Sources/ClippyCLI",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "ClippyTests",
             dependencies: [
                 "Clippy",
+                "ClippyCLICore",
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "TOMLKit", package: "TOMLKit"),
             ],

@@ -21,18 +21,20 @@ final class ICloudSyncTests: XCTestCase {
         XCTAssertTrue(missing.isAvailable)
     }
 
-    func testForcedSyncWritesArchiveFileWithoutCrashing() async {
+    func testForcedSyncWritesArchivePackageWithoutCrashing() async throws {
         let dir = tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        let service = ICloudSyncService(rootOverride: dir)
+        // Inject a scratch database: the default is the user's real one.
+        let service = ICloudSyncService(rootOverride: dir, database: try makeTestDatabase(self))
         // force: true bypasses the global enabled flag so the test does not touch
         // user defaults; it exercises the same code path the launch start uses.
         await service.sync(force: true)
 
-        let syncFile = dir.appendingPathComponent("Clippy/clippy-sync.toml")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: syncFile.path),
-                      "sync must write the archive file")
+        // The archive is a package folder: manifest plus bundled media.
+        let manifest = dir.appendingPathComponent("Clippy/\(ICloudSyncService.packageName)/clippy.toml")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifest.path),
+                      "sync must write the archive package")
         XCTAssertTrue(service.status.contains("Synced"), "status was: \(service.status)")
     }
 
@@ -46,7 +48,7 @@ final class ICloudSyncTests: XCTestCase {
 
         let service = ICloudSyncService(rootOverride: dir)
         await service.sync()  // not forced, disabled -> no-op
-        let syncFile = dir.appendingPathComponent("Clippy/clippy-sync.toml")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: syncFile.path))
+        let package = dir.appendingPathComponent("Clippy/\(ICloudSyncService.packageName)")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: package.path))
     }
 }

@@ -2,12 +2,13 @@ import XCTest
 @testable import Clippy
 
 /// Regression tests for Extract Text (OCR): the store-owned in-flight set
-/// (double-run guard), single-insert behavior, and pasteboard self-write
-/// suppression. See docs/CHANGELOG.md "Unreleased".
+/// (double-run guard) and OCR-01: extraction returns text through its outcome
+/// and NEVER writes the pasteboard or database implicitly. See docs/CHANGELOG.md "Unreleased".
 ///
 /// Vision is deliberately NOT called: a cold Vision call can take ~24s (or fail
 /// without models) on a CI runner. The store's recognizer seam is stubbed so
 /// these run deterministically everywhere; real Vision is exercised manually.
+@MainActor
 final class OCRExtractTests: XCTestCase {
 
     /// Stub recognizer that behaves like `OCRService.recognizeText`: work off
@@ -69,24 +70,24 @@ final class OCRExtractTests: XCTestCase {
 
         let first = expectation(description: "first extraction")
         let second = expectation(description: "guarded second extraction")
-        var secondMessage: String?
+        var secondOutcome: OCRExtractOutcome?
 
         // Fire back-to-back: the second call must hit the in-flight guard
         // while the first recognition is still running.
         store.extractText(from: clip) { _ in first.fulfill() }
-        store.extractText(from: clip) { message in
-            secondMessage = message
+        store.extractText(from: clip) { outcome in
+            secondOutcome = outcome
             second.fulfill()
         }
         // Recognition is still gated, so the guard (not completion) answered.
         gate.signal()
         wait(for: [first, second], timeout: 10)
 
-        XCTAssertTrue(
-            secondMessage?.lowercased().contains("already running") == true,
-            "second call should report already running, got: \(secondMessage ?? "nil")")
+        XCTAssertEqual(
+            secondOutcome, .notice("Text extraction is already running for this clip."),
+            "second call should report already running")
         let ocrRows = try db.allClips().filter { $0.sourceAppName == "Clippy OCR" }
-        XCTAssertEqual(ocrRows.count, 1, "double click must not insert two OCR rows")
+        XCTAssertEqual(ocrRows.count, 0, "extraction must not insert rows implicitly")
         XCTAssertTrue(store.ocrInFlightClipIDs.isEmpty, "in-flight set must drain")
     }
 
@@ -111,37 +112,62 @@ final class OCRExtractTests: XCTestCase {
         XCTAssertTrue(store.ocrInFlightClipIDs.isEmpty, "in-flight set must drain after completion")
     }
 
-    func testOCRResultWriteIsNotRecaptured() throws {
+    func testExtractReturnsTextWithoutTouchingPasteboardOrDatabase() throws {
         let db = try makeTestDatabase(self)
-        // Scratch pasteboard so the test never touches the real clipboard;
-        // ClipStore and the monitor must observe the SAME pasteboard for the
-        // suppression to be observable. The board is never seeded: the only
-        // change it ever sees is the OCR result write itself, and captures
-        // write to the DB asynchronously, so seeding would race the counts.
         let scratch = NSPasteboard(name: NSPasteboard.Name("ClippyOCRTest-\(UUID().uuidString)"))
-        let monitor = ClipboardMonitor(database: db, pasteboard: scratch)
-        // Open the gate up front. (Initial value must stay 0: libdispatch traps
-        // if a semaphore is deallocated with a value below its initial value.)
+        scratch.clearContents()
+        scratch.setString("user clipboard", forType: .string)
+        let changeBefore = scratch.changeCount
         let gate = DispatchSemaphore(value: 0)
         gate.signal()
         let store = ClipStore(
-            database: db, monitor: monitor, pasteboard: scratch,
-            recognizer: gatedRecognizer(gate: gate))
+            database: db, pasteboard: scratch, recognizer: gatedRecognizer(gate: gate, text: "  hello world \n"))
         let clip = try makeSavedImageClip(in: db)
         let rowsBefore = try db.allClips().count
 
         let done = expectation(description: "extraction finished")
-        store.extractText(from: clip) { _ in done.fulfill() }
+        var outcome: OCRExtractOutcome?
+        store.extractText(from: clip) { outcome = $0; done.fulfill() }
         wait(for: [done], timeout: 10)
 
-        // Drive the monitor through the change the OCR write produced.
-        monitor.tick()
-        monitor.tick()
+        XCTAssertEqual(outcome, .text("hello world"))
+        XCTAssertEqual(scratch.changeCount, changeBefore, "OCR must not write the pasteboard")
+        XCTAssertEqual(scratch.string(forType: .string), "user clipboard")
+        XCTAssertEqual(try db.allClips().count, rowsBefore, "OCR must not insert a clip")
+    }
 
-        XCTAssertEqual(
-            try db.allClips().count, rowsBefore + 1,
-            "only the OCR insert may appear; the pasteboard write must not be re-captured")
-        XCTAssertEqual(
-            try db.allClips().filter { $0.sourceAppName == "Clippy OCR" }.count, 1)
+    func testWhitespaceOnlyResultIsNoticeNotText() throws {
+        let db = try makeTestDatabase(self)
+        let gate = DispatchSemaphore(value: 0)
+        gate.signal()
+        let store = ClipStore(database: db, recognizer: gatedRecognizer(gate: gate, text: " \n\t "))
+        let clip = try makeSavedImageClip(in: db)
+        let done = expectation(description: "done")
+        var outcome: OCRExtractOutcome?
+        store.extractText(from: clip) { outcome = $0; done.fulfill() }
+        wait(for: [done], timeout: 10)
+        XCTAssertEqual(outcome, .notice("No text found in image."))
+    }
+
+    func testSaveOCRTextIsExplicitAndSingleInsert() throws {
+        let db = try makeTestDatabase(self)
+        let store = ClipStore(database: db)
+        try store.saveOCRText("saved on request")
+        let rows = try db.allClips().filter { $0.sourceAppName == "Clippy OCR" }
+        XCTAssertEqual(rows.map(\.contentText), ["saved on request"])
+    }
+
+    func testCancelledRunPresentsNothing() throws {
+        let db = try makeTestDatabase(self)
+        let clip = try makeSavedImageClip(in: db)
+        let gate = DispatchSemaphore(value: 0)
+        let store = ClipStore(database: db, recognizer: gatedRecognizer(gate: gate))
+        let done = expectation(description: "done")
+        var outcome: OCRExtractOutcome?
+        store.extractText(from: clip) { outcome = $0; done.fulfill() }
+        store.cancelOCR(for: try XCTUnwrap(clip.id))
+        gate.signal()
+        wait(for: [done], timeout: 10)
+        XCTAssertEqual(outcome, .notice("Text extraction was cancelled."))
     }
 }

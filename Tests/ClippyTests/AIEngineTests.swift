@@ -92,6 +92,7 @@ final class RecordingTool: AITool {
 
 // MARK: - AIAction template tests
 
+@MainActor
 final class AIActionTemplateTests: XCTestCase {
 
     func testBuildPromptSubstitutesClipAndInstruction() {
@@ -131,6 +132,7 @@ final class AIActionTemplateTests: XCTestCase {
 
 // MARK: - AIActionStore tests
 
+@MainActor
 final class AIActionStoreTests: XCTestCase {
 
     private func tempStore() -> AIActionStore {
@@ -212,6 +214,7 @@ final class AIActionStoreTests: XCTestCase {
 
 // MARK: - AIService.run(action:on:) tests
 
+@MainActor
 final class AIServiceRunActionTests: XCTestCase {
 
     func testRunActionSendsRenderedPromptToProvider() async throws {
@@ -319,6 +322,7 @@ final class AIServiceRunActionTests: XCTestCase {
 
 // MARK: - Tool registry serialization tests
 
+@MainActor
 final class AIToolRegistryTests: XCTestCase {
 
     func testOpenAIFunctionSpecShape() {
@@ -409,6 +413,7 @@ final class AIToolRegistryTests: XCTestCase {
 
 // MARK: - Tool result sentinel tests
 
+@MainActor
 final class AIToolResultSentinelTests: XCTestCase {
 
     func testRoundTrip() {
@@ -427,6 +432,7 @@ final class AIToolResultSentinelTests: XCTestCase {
 
 // MARK: - Agent loop tests
 
+@MainActor
 final class AIAgentLoopTests: XCTestCase {
 
     // 1. Happy path: model returns text on first turn.
@@ -582,6 +588,7 @@ final class AIAgentLoopTests: XCTestCase {
 
 // MARK: - Endpoint configuration tests
 
+@MainActor
 final class AIProviderEndpointConfigTests: XCTestCase {
 
     func testAzurePlaceholderEndpointIsRejected() {
@@ -608,6 +615,7 @@ final class AIProviderEndpointConfigTests: XCTestCase {
 
 // MARK: - AITool truncation tests
 
+@MainActor
 final class AIToolTruncationTests: XCTestCase {
 
     func testTruncateLongResult() {
@@ -626,6 +634,7 @@ final class AIToolTruncationTests: XCTestCase {
 
 // MARK: - AIToolRegistry.makeFiltered tests
 
+@MainActor
 final class AIToolRegistryFilteredTests: XCTestCase {
 
     /// With both toggles off, only search_clips and create_clip are registered;
@@ -691,6 +700,7 @@ final class AIToolRegistryFilteredTests: XCTestCase {
 
 // MARK: - WebSearchTool tests
 
+@MainActor
 final class WebSearchToolTests: XCTestCase {
 
     /// Parse a result with a DDG redirect-wrapped href, HTML entities, and a
@@ -736,6 +746,7 @@ final class WebSearchToolTests: XCTestCase {
 
 // MARK: - ExecuteCodeTool smoke tests
 
+@MainActor
 final class ExecuteCodeToolTests: XCTestCase {
 
     /// Confirms code execution actually runs a subprocess and returns its output.

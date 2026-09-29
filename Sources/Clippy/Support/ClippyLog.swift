@@ -51,8 +51,14 @@ enum ClippyLog {
     // stored logLevel at init and on every change, so logging is configurable
     // without ClippyLog importing AppSettings (avoids a Support->UI cycle and
     // keeps this enum usable from crash-handler code that runs before settings).
-    // Read on each emit so a live change takes effect immediately.
-    nonisolated(unsafe) static var threshold: LogLevel = .info
+    // Read on each emit so a live change takes effect immediately. Written from
+    // the main actor (Settings) and read from every logging thread, so it sits
+    // behind a lock rather than being a bare mutable global.
+    private static let thresholdLock = OSAllocatedUnfairLock<LogLevel>(initialState: .info)
+    static var threshold: LogLevel {
+        get { thresholdLock.withLock { $0 } }
+        set { thresholdLock.withLock { $0 = newValue } }
+    }
 
     // MARK: - os.Logger accessors (one per functional area)
 
@@ -84,8 +90,9 @@ enum ClippyLog {
     private static let backupURL: URL = logDir.appendingPathComponent("clippy.log.1")
 
     // FileHandle kept open for the lifetime of the process (append-only).
-    // Created lazily on the fileQueue the first time a line is written.
-    private static var _handle: FileHandle?
+    // Created lazily on the fileQueue the first time a line is written; the
+    // lock makes the open/append/rotate sequence one critical section.
+    private static let logHandle = OSAllocatedUnfairLock<FileHandle?>(initialState: nil)
 
     // MARK: - Public API (leveled)
 
@@ -120,18 +127,34 @@ enum ClippyLog {
     static func emit(_ level: LogLevel, _ message: String, category: Logger) {
         guard level >= threshold else { return }
 
+        // Callers hand us one pre-built string, and some of them interpolate text
+        // derived from clipboard content (client NPI at this firm). os.Logger
+        // persists `.public` strings in the unified log, so the message is `.private`
+        // (redacted as <private> unless a debugger is attached) and known secret
+        // shapes are scrubbed first. The local file sink is 0600 and carries the
+        // scrubbed text so post-mortem diagnosis still works.
+        let safe = LogRedaction.scrub(message)
         switch level {
         case .verbose, .debug:
-            category.debug("\(message, privacy: .public)")
+            category.debug("\(safe, privacy: .private)")
         case .info:
-            category.info("\(message, privacy: .public)")
+            category.info("\(safe, privacy: .private)")
         case .warning:
-            category.warning("\(message, privacy: .public)")
+            category.warning("\(safe, privacy: .private)")
         case .error:
-            category.error("\(message, privacy: .public)")
+            category.error("\(safe, privacy: .private)")
         }
 
-        fileSink(level: fileTag(level), message: message)
+        fileSink(level: fileTag(level), message: safe)
+    }
+
+    // MARK: - Redaction
+
+    /// Placeholder for a content-derived value: keeps the length (useful for
+    /// diagnosing empty/oversized input) and drops every character. Use this
+    /// instead of interpolating clip text, titles, or secrets into a message.
+    static func redact(_ value: String) -> String {
+        LogRedaction.placeholder(for: value)
     }
 
     private static func fileTag(_ level: LogLevel) -> String {
@@ -150,24 +173,49 @@ enum ClippyLog {
     /// uncaught-exception handler so the line is guaranteed to land before
     /// the process exits.
     static func syncWrite(_ message: String, level: String = "FATAL") {
-        let line = formatLine(level: level, message: message)
+        let line = formatLine(level: level, message: LogRedaction.scrub(message))
         // Best-effort: open, append, close inline.
         do {
-            try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+            try secureLogDirectory()
             if let data = (line + "\n").data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: logURL.path) {
-                    let fh = try FileHandle(forWritingTo: logURL)
-                    fh.seekToEndOfFile()
-                    fh.write(data)
-                    try fh.close()
+                    hardenFile(logURL)
+                    let fileHandle = try FileHandle(forWritingTo: logURL)
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    try fileHandle.close()
                 } else {
-                    try data.write(to: logURL, options: .atomic)
+                    guard FileManager.default.createFile(atPath: logURL.path, contents: data,
+                                                         attributes: filePermissions) else {
+                        throw CocoaError(.fileWriteUnknown)
+                    }
                 }
             }
         } catch {
             // Last resort: os_log only — cannot recurse into ClippyLog.error here.
             os_log(.fault, "ClippyLog syncWrite failed: %{public}@", error.localizedDescription)
         }
+    }
+
+    // MARK: - File permissions
+
+    /// The log holds operational detail about a regulated firm's clipboard tool:
+    /// owner read/write only, in a directory only the owner can list.
+    // Computed rather than stored: `[FileAttributeKey: Any]` is not Sendable, so a
+    // stored static would be shared mutable state under Swift 6.
+    private static var filePermissions: [FileAttributeKey: Any] { [.posixPermissions: 0o600] }
+    private static var dirPermissions: [FileAttributeKey: Any] { [.posixPermissions: 0o700] }
+
+    /// Create the log directory (0700) and tighten it if it already exists.
+    private static func secureLogDirectory() throws {
+        try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true,
+                                                attributes: dirPermissions)
+        try? FileManager.default.setAttributes(dirPermissions, ofItemAtPath: logDir.path)
+    }
+
+    /// Force 0600 on an existing file (logs created by earlier builds used the umask default).
+    private static func hardenFile(_ url: URL) {
+        try? FileManager.default.setAttributes(filePermissions, ofItemAtPath: url.path)
     }
 
     // MARK: - Test support
@@ -201,51 +249,55 @@ enum ClippyLog {
         return "\(iso.string(from: Date())) | \(level) | \(message)"
     }
 
-    /// Must only be called on fileQueue.
+    /// Runs on fileQueue; the whole open/append/rotate sequence holds `logHandle`'s lock.
     private static func appendToFile(_ text: String) {
-        // Ensure log directory exists.
-        if _handle == nil {
-            do {
-                try FileManager.default.createDirectory(
-                    at: logDir, withIntermediateDirectories: true)
-                if !FileManager.default.fileExists(atPath: logURL.path) {
-                    FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        logHandle.withLock { handle in
+            // Ensure log directory exists.
+            if handle == nil {
+                do {
+                    try secureLogDirectory()
+                    if !FileManager.default.fileExists(atPath: logURL.path) {
+                        FileManager.default.createFile(atPath: logURL.path, contents: nil,
+                                                       attributes: filePermissions)
+                    }
+                    hardenFile(logURL)
+                    handle = try FileHandle(forWritingTo: logURL)
+                    handle?.seekToEndOfFile()
+                } catch {
+                    os_log(.error, "ClippyLog: could not open log file: %{public}@",
+                           error.localizedDescription)
+                    return
                 }
-                _handle = try FileHandle(forWritingTo: logURL)
-                _handle?.seekToEndOfFile()
-            } catch {
-                os_log(.error, "ClippyLog: could not open log file: %{public}@",
-                       error.localizedDescription)
-                return
             }
+
+            guard let data = text.data(using: .utf8) else { return }
+            handle?.write(data)
+
+            // Rotate when the file exceeds the threshold.
+            rotateIfNeeded(&handle)
         }
-
-        guard let data = text.data(using: .utf8) else { return }
-        _handle?.write(data)
-
-        // Rotate when the file exceeds the threshold.
-        rotateIfNeeded()
     }
 
-    /// Must only be called on fileQueue.
-    private static func rotateIfNeeded() {
+    /// Called with `logHandle`'s lock held (via appendToFile).
+    private static func rotateIfNeeded(_ handle: inout FileHandle?) {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: logURL.path),
               let size = attrs[.size] as? UInt64,
               size >= maxLogBytes else { return }
 
         // Close the active handle before renaming.
-        try? _handle?.close()
-        _handle = nil
+        try? handle?.close()
+        handle = nil
 
         // Overwrite any existing backup and rotate.
-        let fm = FileManager.default
-        try? fm.removeItem(at: backupURL)
-        try? fm.moveItem(at: logURL, to: backupURL)
+        let fileManager = FileManager.default
+        try? fileManager.removeItem(at: backupURL)
+        try? fileManager.moveItem(at: logURL, to: backupURL)
 
         // Open a fresh file.
-        fm.createFile(atPath: logURL.path, contents: nil)
-        if let fh = try? FileHandle(forWritingTo: logURL) {
-            _handle = fh
+        hardenFile(backupURL)
+        fileManager.createFile(atPath: logURL.path, contents: nil, attributes: filePermissions)
+        if let fileHandle = try? FileHandle(forWritingTo: logURL) {
+            handle = fileHandle
         }
     }
 }
@@ -272,5 +324,48 @@ extension ClippyLog {
         case "ai":        return ai
         default:          return lifecycle
         }
+    }
+}
+
+// MARK: - Redaction
+
+/// Pure string scrubbing for log output. Kept separate from ClippyLog's I/O so it
+/// is unit-testable and reusable by call sites that build messages themselves.
+enum LogRedaction {
+
+    /// `<redacted N chars>`: the length survives, the content does not. Never a
+    /// hash: a hash of a short secret or SSN is trivially reversible.
+    static func placeholder(for value: String) -> String {
+        "<redacted \(value.count) chars>"
+    }
+
+    // Compiled once. Order matters only in that each rule is independent.
+    private static let rules: [(NSRegularExpression, String)] = {
+        let specs: [(String, String)] = [
+            // "Authorization: [Bearer] <value>": one redaction for the whole credential.
+            (#"(?i)\b(authorization\s*[=:]\s*)(?:bearer\s+)?(?!<redacted)[^\s,;"']+"#, "$1<redacted>"),
+            // Bare "Bearer <token>".
+            (#"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{8,}"#, "Bearer <redacted>"),
+            // key=value / key: value for credential-looking keys.
+            (#"(?i)\b(token|secret|password|passwd|api[_-]?key)(\s*[=:]\s*)(?!<redacted)[^\s,;"']+"#,
+             "$1$2<redacted>"),
+            // 1Password secret references.
+            (#"op://[^\s"']+"#, "op://<redacted>"),
+        ]
+        return specs.compactMap { pattern, template in
+            (try? NSRegularExpression(pattern: pattern)).map { ($0, template) }
+        }
+    }()
+
+    /// Mask credential shapes (bearer tokens, `password=...`, `op://` references)
+    /// in a message. This is a backstop for strings that slip through, not a
+    /// substitute for keeping clip content out of log messages.
+    static func scrub(_ message: String) -> String {
+        var result = message
+        for (regex, template) in rules {
+            let range = NSRange(result.startIndex..., in: result)
+            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: template)
+        }
+        return result
     }
 }

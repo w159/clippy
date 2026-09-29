@@ -6,20 +6,32 @@ import GRDB
     import AppKit
 #endif
 
+/// Lifecycle of the Smart Suggestions pane.
+enum SuggestionsState: Equatable {
+    case disabled, needsPermission, loading, ready, empty
+}
+
 /// View model for the panel: live observation of clips, categories, and
 /// membership; FTS5 search when a query is typed. "Pinned" is derived:
 /// a clip is pinned when it belongs to at least one category.
+@MainActor
 final class ClipStore: ObservableObject {
     @Published var query: String = "" {
         didSet { scheduleRefilter() }
     }
-    @Published private(set) var clips: [Clip] = []
+    /// Widened from private(set): ClipStore+Older (paged history) appends to it.
+    @Published var clips: [Clip] = []
+    /// Clips loaded past the resident window by `loadOlder(before:limit:)`, newest
+    /// first, appended to `clips` in browse mode. Dropped by `resetOlder()`.
+    @Published var olderClips: [Clip] = []
+    /// False once `loadOlder` reached the oldest clip.
+    @Published var hasMoreOlder = true
     @Published private(set) var categories: [Category] = []
     @Published private(set) var membership: [Int64: Set<Int64>] = [:]
     /// Per-category ordered clip ID lists, keyed by categoryID.
     /// Reflects clip_category.sortOrder so category panes can present clips
     /// in user-defined order rather than global createdAt order.
-    @Published private(set) var categoryClipOrder: [Int64: [Int64]] = [:]
+    @Published var categoryClipOrder: [Int64: [Int64]] = [:]
     /// Last search failure. Non-nil triggers an error banner with Retry in the
     /// panel. Cleared on the next successful search or when the query empties.
     @Published var searchError: String?
@@ -30,9 +42,29 @@ final class ClipStore: ObservableObject {
     /// not view state, because PanelController.show() builds a fresh ClipListView
     /// per presentation — view @State would drop both the spinner and the
     /// double-run guard if the panel is closed and reopened mid-recognition.
-    @Published private(set) var ocrInFlightClipIDs: Set<Int64> = []
+    ///
+    /// OCR-05: this whole-store set still invalidates every observer on each OCR
+    /// start/finish. New code should observe `ocrProgress(for:)` instead, which
+    /// invalidates only the affected card; callers migrate off this set over time.
+    @Published var ocrInFlightClipIDs: Set<Int64> = []
+    /// Per-clip OCR state, created on demand (see ClipStore+OCR.swift).
+    var ocrProgressByClip: [Int64: OCRProgress] = [:]
+    /// Identity of the OCR run currently owning each clip; a completion whose
+    /// token no longer matches was cancelled and must not write anything.
+    var ocrRunTokens: [Int64: UUID] = [:]
+    /// Last category create/rename/delete failure (DAT-14). UI shows it and clears it.
+    @Published var categoryError: String?
+    /// Non-nil when the clip table is at or above 90% of the configured ceiling (DAT-06).
+    @Published private(set) var storageWarning: StorageUsage?
 
-    private var recents: [Clip] = [] {
+    /// Ranked Smart Suggestions for the current screen context (or a
+    /// "Find Similar" clip). In memory only; dropped when the panel hides.
+    @Published var suggestions: [Suggestion] = []
+    @Published var suggestionsState: SuggestionsState = .disabled
+    /// Human summary shown in the pane header. Never raw screen text.
+    @Published var suggestionsContextSummary: String?
+
+    var recents: [Clip] = [] {
         didSet {
             // Rebuilt once per observation pulse instead of once per
             // clipsForCategory call: the id lookup is hit several times per
@@ -42,29 +74,36 @@ final class ClipStore: ObservableObject {
                     clip.id.map { ($0, clip) }
                 })
             refilter()
+            pruneOlder()
         }
     }
     /// id -> clip lookup over `recents`, kept in sync by `recents.didSet`.
-    private var recentsByID: [Int64: Clip] = [:]
+    var recentsByID: [Int64: Clip] = [:]
     private var searchDebounce: Task<Void, Never>?
+    /// The in-flight FTS read, cancelled whenever the query or window changes.
+    private var searchTask: Task<Void, Never>?
     /// Monotonic generation for the async FTS search. Incremented on every
     /// refilter that kicks off a background read; the completion discards
     /// results from any earlier generation so a fast-typed query or a DB pulse
     /// mid-search cannot overwrite the current results with stale ones.
-    private var refilterToken = 0
+    var refilterToken = 0
+    /// Where each semantic-merged hit came from (search pass 2); empty unless the semantic opt-in produced results.
+    var semanticMatches: [Int64: SearchMatchSource] = [:]
+    /// Generation for async suggestion ranking; stale completions are dropped.
+    var suggestionsToken = 0
     private var clipsCancellable: AnyDatabaseCancellable?
     private var categoriesCancellable: AnyDatabaseCancellable?
-    private let database: ClipDatabase
-    private let monitor: ClipboardMonitor?
+    let database: ClipDatabase
+    let monitor: ClipboardMonitor?
     /// Pasteboard the OCR result is written to. Injectable for tests so
     /// the suppression test can use a scratch pasteboard instead of the
     /// real one (mirrors ClipboardMonitor's pasteboard seam).
-    private let pasteboard: NSPasteboard
+    let pasteboard: NSPasteboard
     /// Text recognizer used by `extractText`; must call its completion on the
     /// main queue (as `OCRService.recognizeText` does). Injectable so tests can
     /// stub Vision, which is slow/flaky when cold on CI runners.
-    private let recognizer: (URL, @escaping (OCRService.RecognitionResult) -> Void) -> Void
-    private let displayLimit = 300
+    let recognizer: (URL, @escaping @MainActor (OCRService.RecognitionResult) -> Void) -> Void
+    let displayLimit = 300
     /// Serial lane for mutation writes. The shared DatabaseQueue serializes all
     /// access, so a synchronous write from the main thread stalls the UI while
     /// a capture write or iCloud export holds the queue (reads already moved
@@ -83,7 +122,7 @@ final class ClipStore: ObservableObject {
         database: ClipDatabase,
         monitor: ClipboardMonitor? = nil,
         pasteboard: NSPasteboard = .general,
-        recognizer: @escaping (URL, @escaping (OCRService.RecognitionResult) -> Void) -> Void = {
+        recognizer: @escaping (URL, @escaping @MainActor (OCRService.RecognitionResult) -> Void) -> Void = {
             OCRService.recognizeText(in: $0, completion: $1)
         }
     ) {
@@ -106,33 +145,29 @@ final class ClipStore: ObservableObject {
         // window for every category edit.
         // Recents window plus every categorized clip: categorized clips must
         // stay visible in their panes even when older than the window.
-        let clipObservation = ValueObservation.tracking { db in
-            try Clip.fetchAll(
-                db,
-                sql: """
-                    SELECT * FROM clips
-                    WHERE id IN (SELECT clipID FROM clip_category)
-                    OR id IN (SELECT id FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?)
-                    ORDER BY createdAt DESC, id DESC
-                    """,
-                arguments: [limit]
-            )
+        let clipObservation = ValueObservation.tracking { db -> ([Clip], Int) in
+            let total = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
+            let window = try Clip.fetchAll(db, sql: ClipDatabase.observationWindowSQL, arguments: [limit])
+            return (window, total)
         }
-        // .immediate delivers the first batch synchronously before start() returns,
-        // so the panel always has data the moment it becomes visible. Subsequent
-        // updates still arrive asynchronously (GRDB coalesces them).
+        // Initial count + list fetch are deliberately scheduled away from the
+        // main thread: opening the panel must not wait for SQLite. The first
+        // observation is published as soon as it completes.
         clipsCancellable = clipObservation.start(
             in: database.dbQueue,
-            scheduling: .immediate,
+            scheduling: .async(onQueue: DispatchQueue.global(qos: .userInitiated)),
             onError: { [weak self] error in
                 ClippyLog.error("Clip observation failed: \(error)", category: ClippyLog.storage)
                 DispatchQueue.main.async { self?.observationError = error.localizedDescription }
             },
-            onChange: { [weak self] clips in
+            onChange: { [weak self] clips, total in
                 guard let self else { return }
                 DispatchQueue.main.async {
                     self.observationError = nil
                     self.recents = clips
+                    let usage = StorageUsage(count: total, ceiling: StorageCeiling.current)
+                    let warning = usage.isNearCeiling ? usage : nil
+                    if self.storageWarning != warning { self.storageWarning = warning }
                 }
             }
         )
@@ -211,35 +246,11 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    // MARK: - Derived data
-
-    /// Distinct source apps seen in history, for category icon pickers.
-    var knownBundleIDs: [String] {
-        var seen = Set<String>()
-        return clips.compactMap(\.sourceAppBundleID).filter { seen.insert($0).inserted }
-    }
-
-    // MARK: - Membership queries
-
-    func isPinned(_ clip: Clip) -> Bool {
-        guard let id = clip.id else { return false }
-        return !(membership[id] ?? []).isEmpty
-    }
-
-    func categoryIDs(for clip: Clip) -> Set<Int64> {
-        guard let id = clip.id else { return [] }
-        return membership[id] ?? []
-    }
-
-    func clipCount(inCategory categoryID: Int64) -> Int {
-        membership.values.reduce(0) { $0 + ($1.contains(categoryID) ? 1 : 0) }
-    }
-
     // MARK: - Actions
 
     /// Enqueue a DB mutation on the serial write lane. Failures were previously
     /// swallowed with try?; log them so background writes are not silent.
-    private func performWrite(_ label: String, _ body: @escaping () throws -> Void) {
+    func performWrite(_ label: String, _ body: @escaping () throws -> Void) {
         writeQueue.async {
             do {
                 try body()
@@ -291,196 +302,16 @@ final class ClipStore: ObservableObject {
         }
     }
 
-    @discardableResult
-    func createCategory(
-        named name: String, colorHex: String, iconKind: CategoryIconKind, iconValue: String
-    ) -> Category? {
-        try? database.createCategory(
-            named: name, colorHex: colorHex, iconKind: iconKind, iconValue: iconValue)
-    }
-
-    func updateCategory(_ category: Category) {
-        try? database.updateCategory(category)
-    }
-
-    func deleteCategory(_ category: Category) {
-        guard let id = category.id else { return }
-        try? database.deleteCategory(id: id)
-    }
-
-    /// Move one category so it sits just before another (drag-to-reorder).
-    func moveCategory(id: Int64, beforeCategoryID: Int64) {
-        performWrite("moveCategory") { [database] in
-            try database.moveCategory(id: id, before: beforeCategoryID)
-        }
-    }
-
-    /// Clips for a category in user-defined sortOrder. Uses the categoryClipOrder
-    /// map so the result is instantly consistent with the live observation.
-    /// When a search query is active, the result is further filtered in-memory
-    /// so the search bar scopes to the pane the user is viewing.
-    func clipsForCategory(_ categoryID: Int64) -> [Clip] {
-        // Source from `recents` (every categorized clip, unconditionally) rather
-        // than `clips` (overwritten by FTS search results): otherwise an active
-        // global search query makes category members that do not match the query
-        // vanish from their own category pane.
-        let ordered: [Clip]
-        if let orderedIDs = categoryClipOrder[categoryID] {
-            ordered = orderedIDs.compactMap { recentsByID[$0] }
-        } else {
-            ordered = recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
-        }
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return ordered }
-        return ordered.filter { $0.matchesLocally(query: trimmed) }
-    }
-
-    /// Move a clip to a new position within a category (drag-to-reorder).
-    /// `targetClipID` is the clip the dragged one is dropped onto; pass nil to
-    /// move to the end of the list.
-    func moveClip(_ clipID: Int64, inCategory categoryID: Int64, before targetClipID: Int64?) {
-        // Optimistic: republish the reordered ids immediately so the drop
-        // animates without waiting on the DB write. The observation pulse that
-        // follows the write recomputes the identical order (same reorderIDs
-        // applied to the same list), so no visible correction occurs.
-        if let current = categoryClipOrder[categoryID], current.contains(clipID) {
-            categoryClipOrder[categoryID] = reorderIDs(
-                current, draggedID: clipID, before: targetClipID)
-        }
-        performWrite("moveClip") { [database] in
-            try database.moveClip(clipID, inCategory: categoryID, before: targetClipID)
-        }
-    }
-
     func delete(_ clip: Clip) {
         guard let id = clip.id else { return }
+        if olderClips.contains(where: { $0.id == id }) {
+            olderClips.removeAll { $0.id == id }
+            refilter()
+        }
         performWrite("deleteClip") { [database] in
             try database.deleteClip(id: id)
+            ClipSpotlightIndexer.remove(clipID: id)
         }
-    }
-
-    /// Save edited clip text. Returns true on success so the editor can keep
-    /// its window open and surface the failure instead of silently discarding.
-    @discardableResult
-    func updateText(of clip: Clip, to newText: String) -> Bool {
-        guard let id = clip.id else { return false }
-        do {
-            try database.updateClipText(id: id, newText: newText)
-            return true
-        } catch {
-            ClippyLog.error("failed to update clip text: \(error)", category: ClippyLog.storage)
-            return false
-        }
-    }
-
-    /// Save an edited image clip: store the new PNG, repoint the row, free the
-    /// old files. Returns true on success so the editor can confirm.
-    @discardableResult
-    func updateImage(of clip: Clip, to pngData: Data) -> Bool {
-        guard let id = clip.id else { return false }
-        do {
-            let stored = try database.media.store(pngData: pngData)
-            try database.updateClipImage(id: id, stored: stored)
-            return true
-        } catch {
-            ClippyLog.error("failed to save edited image: \(error)", category: ClippyLog.storage)
-            return false
-        }
-    }
-
-    /// The on-disk URL of an image clip's full-resolution PNG, for the editor.
-    func imageURL(for clip: Clip) -> URL? {
-        clip.mediaFilename.map { database.media.url(for: $0) }
-    }
-
-    /// Save script stdout as a new clip in history. Distinct from the capture
-    /// pipeline: no deduplication, source set to "Clippy Scripts".
-    @discardableResult
-    func saveScriptOutput(_ text: String) -> Bool {
-        do {
-            try database.insertTextClip(text)
-            return true
-        } catch {
-            ClippyLog.error("failed to save script output: \(error)", category: ClippyLog.storage)
-            return false
-        }
-    }
-
-    /// Run OCR on an image clip (or a file clip detected as an image during
-    /// capture, see `Clip.isImageLike`), copy the result to the clipboard, and
-    /// save it as a new text clip. The `completion` block is always called on
-    /// the main queue and carries a human-readable outcome message for display.
-    func extractText(from clip: Clip, completion: @escaping (String) -> Void) {
-        guard clip.isImageLike, let imageURL = imageURL(for: clip) else {
-            completion("No image data for this clip.")
-            return
-        }
-        let clipID = clip.id
-        if let clipID, ocrInFlightClipIDs.contains(clipID) {
-            completion("Text extraction is already running for this clip.")
-            return
-        }
-        // A clip with no identity (never persisted) cannot be tracked;
-        // run it untracked rather than refusing it as a false duplicate.
-        if let clipID { ocrInFlightClipIDs.insert(clipID) }
-        ClippyLog.info("OCR started for clip \(clipID.map(String.init) ?? "nil")", category: ClippyLog.storage)
-        let startedAt = Date()
-        recognizer(imageURL) { [weak self] result in
-            guard let self else { return }
-            defer { if let clipID { self.ocrInFlightClipIDs.remove(clipID) } }
-            let secs = String(format: "%.2f", Date().timeIntervalSince(startedAt))
-            switch result {
-            case .success(let text) where text.isEmpty:
-                ClippyLog.info("OCR finished in \(secs)s: empty", category: ClippyLog.storage)
-                completion("No text found in image.")
-            case .success(let text):
-                ClippyLog.info("OCR finished in \(secs)s: \(text.count) chars", category: ClippyLog.storage)
-                #if canImport(AppKit)
-                    // Clippy's own pasteboard write must not be re-captured as a new
-                    // "Clippy" text clip (same suppression PasteService uses before
-                    // its writes; unlike paste, OCR result text should never re-enter
-                    // history via capture — insertTextClip already saved it).
-                    self.monitor?.ignoreNextChange()
-                    pasteboard.clearContents()
-                    pasteboard.setString(text, forType: .string)
-                #endif
-                do {
-                    try self.database.insertTextClip(text, sourceAppName: "Clippy OCR")
-                    completion("Text extracted and copied to clipboard.")
-                } catch {
-                    ClippyLog.error("OCR insert failed: \(error)", category: ClippyLog.storage)
-                    // Clipboard copy succeeded even if the save did not.
-                    completion("Text copied to clipboard (save failed).")
-                }
-            case .failure(let error):
-                ClippyLog.error("OCR failed after \(secs)s: \(error)", category: ClippyLog.storage)
-                completion("Text extraction failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    /// Set or clear a clip's custom title. Returns true on success so the
-    /// editor can keep its window open and surface the failure.
-    @discardableResult
-    func renameClip(_ clip: Clip, userTitle: String?) -> Bool {
-        guard let id = clip.id else { return false }
-        // Treat empty string the same as nil (clear the custom title).
-        let trimmed = userTitle.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        do {
-            try database.updateClipTitle(
-                id: id, userTitle: trimmed?.isEmpty == true ? nil : trimmed)
-            return true
-        } catch {
-            ClippyLog.error("failed to rename clip: \(error)", category: ClippyLog.storage)
-            return false
-        }
-    }
-
-    /// The first category this clip belongs to, ordered by (sortOrder, createdAt).
-    /// Used to pick the icon and accent color for pinned cards.
-    func firstCategory(for clip: Clip) -> Category? {
-        let ids = categoryIDs(for: clip)
-        return categories.first { $0.id.map { ids.contains($0) } ?? false }
     }
 
     /// Debounced entry from `query.didSet`. An empty query refilters
@@ -488,12 +319,15 @@ final class ClipStore: ObservableObject {
     /// ~180ms for the user to stop typing, coalescing rapid keystrokes into one
     /// FTS5 read instead of one per character on the main thread.
     private func scheduleRefilter() {
+        // Every keystroke invalidates whatever search is running or pending, so a
+        // late result for the previous query can never land (KEY-02).
+        invalidateSearch()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         searchDebounce?.cancel()
         if trimmed.isEmpty {
             // Immediate: clearing search should never feel laggy.
             searchError = nil
-            clips = recents
+            clips = residentClips()
             return
         }
         searchDebounce = Task { [weak self] in
@@ -505,33 +339,44 @@ final class ClipStore: ObservableObject {
         }
     }
 
+    /// Bump the generation and cancel the running search. Called on EVERY path
+    /// (empty query included) so no earlier completion can overwrite the list.
+    private func invalidateSearch() {
+        refilterToken &+= 1
+        searchTask?.cancel()
+        searchTask = nil
+    }
+
     private func refilter() {
+        invalidateSearch()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             searchError = nil
-            clips = recents
+            semanticMatches = [:]
+            clips = residentClips()
             return
         }
-        // Run the FTS read off the main thread. The shared DatabaseQueue
-        // serializes access, so a background read no longer blocks the main
-        // thread while a capture write or iCloud export holds the queue.
-        refilterToken &+= 1
         let token = refilterToken
         let database = self.database
         let limit = displayLimit
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // A cancellable task keyed by the generation: cancelled before the read
+        // starts or before publishing, it does nothing.
+        searchTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard !Task.isCancelled else { return }
             let outcome: Result<[Clip], Error>
             do {
                 outcome = .success(try database.searchClips(matching: trimmed, limit: limit))
             } catch {
                 outcome = .failure(error)
             }
+            guard !Task.isCancelled else { return }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.refilterToken == token else { return }
                 switch outcome {
                 case .success(let found):
                     self.clips = found
                     self.searchError = nil
+                    self.scheduleSemanticMerge(query: trimmed, token: token, keyword: found)
                 case .failure(let error):
                     ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
                     // Keep the last results on screen rather than wiping to empty; the
@@ -546,32 +391,33 @@ final class ClipStore: ObservableObject {
 extension Clip {
     /// In-memory match used to scope the search field to the active category
     /// pane (FTS5 only runs against the global history window). Understands the
-    /// same `#`-token grammar as ClipDatabase.searchClips: kind, app, and
-    /// duration tokens filter; the remaining free text is a case-insensitive
-    /// substring match against text, title, and source app name.
+    /// same grammar as ClipDatabase.search except `in:` (the pane already scopes
+    /// the category): kinds, apps, dates, sizes, negations, phrases and free
+    /// text, matched case- and diacritic-insensitively against text, title,
+    /// source app name and OCR text.
     func matchesLocally(query: String) -> Bool {
         let parsed = ClipQueryParser.parse(query)
 
-        if !parsed.kinds.isEmpty, !parsed.kinds.contains(where: { $0.matches(self) }) {
+        if !parsed.kinds.isEmpty, !parsed.kinds.contains(where: { $0.matches(self) }) { return false }
+        if parsed.excludedKinds.contains(where: { $0.matches(self) }) { return false }
+        let name = sourceAppName?.lowercased() ?? ""
+        let bundle = sourceAppBundleID?.lowercased() ?? ""
+        if !parsed.sourceApps.isEmpty,
+            !parsed.sourceApps.contains(where: { name.contains($0) || bundle.contains($0) })
+        {
             return false
         }
-        if !parsed.sourceApps.isEmpty {
-            let name = sourceAppName?.lowercased() ?? ""
-            let bundle = sourceAppBundleID?.lowercased() ?? ""
-            guard parsed.sourceApps.contains(where: { name.contains($0) || bundle.contains($0) })
-            else {
-                return false
-            }
-        }
-        if let since = parsed.since, createdAt < since {
-            return false
+        if parsed.excludedApps.contains(where: { name.contains($0) || bundle.contains($0) }) { return false }
+        if let since = parsed.since, createdAt < since { return false }
+        if let until = parsed.until, createdAt >= until { return false }
+        if !parsed.sizeConstraints.isEmpty {
+            let size = byteSize ?? contentText.utf8.count
+            if !parsed.sizeConstraints.allSatisfy({ $0.matches(size) }) { return false }
         }
 
-        let needle = parsed.text.lowercased()
-        guard !needle.isEmpty else { return true }
-        if contentText.lowercased().contains(needle) { return true }
-        if let title = userTitle, title.lowercased().contains(needle) { return true }
-        if let app = sourceAppName, app.lowercased().contains(needle) { return true }
-        return false
+        let haystacks = [contentText, userTitle ?? "", sourceAppName ?? "", ocrText ?? ""]
+        func has(_ needle: String) -> Bool { haystacks.contains { SearchHighlight.contains($0, needle) } }
+        if parsed.excludedTerms.contains(where: has) || parsed.excludedPhrases.contains(where: has) { return false }
+        return parsed.highlightTerms.allSatisfy(has)
     }
 }

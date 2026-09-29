@@ -12,9 +12,9 @@ enum CaretLocator {
     /// Shows the system Accessibility prompt when not yet trusted.
     @discardableResult
     static func requestPermission() -> Bool {
-        let options: NSDictionary = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as NSString: true
-        ]
+        // The literal value of `kAXTrustedCheckOptionPrompt`: the SDK exposes that
+        // constant as a mutable global, which Swift 6 rejects as shared state.
+        let options: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
         return AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
@@ -22,19 +22,26 @@ enum CaretLocator {
     /// when the focused app does not expose them (Electron hosts, some web
     /// views) or Accessibility permission is missing. Callers fall back to
     /// the mouse location.
-    static func caretScreenRect() -> CGRect? {
+    static func caretScreenRect(applicationPID: pid_t? = nil) -> CGRect? {
         guard isTrusted else { return nil }
 
-        let systemWide = AXUIElementCreateSystemWide()
+        let accessibilityTarget: AXUIElement
+        if let applicationPID {
+            accessibilityTarget = AXUIElementCreateApplication(applicationPID)
+        } else {
+            accessibilityTarget = AXUIElementCreateSystemWide()
+        }
 
         var focusedRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
-            systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef
+            accessibilityTarget, kAXFocusedUIElementAttribute as CFString, &focusedRef
         ) == .success,
             let focusedRef,
             CFGetTypeID(focusedRef) == AXUIElementGetTypeID()
         else { return nil }
-        let focused = focusedRef as! AXUIElement
+        // Swift treats `as?` on CoreFoundation reference types as always
+        // succeeding; the exact CF type check above makes this bridge safe.
+        let focused = unsafeBitCast(focusedRef, to: AXUIElement.self)
 
         var rangeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
@@ -51,9 +58,10 @@ enum CaretLocator {
             let boundsRef,
             CFGetTypeID(boundsRef) == AXValueGetTypeID()
         else { return nil }
+        let bounds = unsafeBitCast(boundsRef, to: AXValue.self)
 
         var rect = CGRect.zero
-        guard AXValueGetValue(boundsRef as! AXValue, .cgRect, &rect) else { return nil }
+        guard AXValueGetValue(bounds, .cgRect, &rect) else { return nil }
 
         // Electron and some web views report success with a zero/garbage rect.
         guard rect.origin != .zero || rect.size != .zero else { return nil }

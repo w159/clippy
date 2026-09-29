@@ -18,6 +18,7 @@ const dir = mkdtempSync(path.join(tmpdir(), "clippy-mcp-test-"));
 const dbPath = path.join(dir, "clippy.sqlite");
 const schema = readFileSync(path.join(here, "schema.sql"), "utf8");
 const seed = new DatabaseSync(dbPath);
+seed.exec("PRAGMA journal_mode = WAL");
 seed.exec(schema);
 // Seed the starter category so the delete-protection check has a target.
 seed
@@ -84,13 +85,85 @@ const check = (condition, message) => {
   if (!condition) fail(message);
 };
 
+async function assertMissingDatabaseRejected() {
+  const missingPath = path.join(dir, "must-not-be-created.sqlite");
+  const code = await new Promise((resolve, reject) => {
+    const probe = spawn("node", [path.join(root, "build", "index.mjs")], {
+      env: { ...process.env, CLIPPY_DB_PATH: missingPath },
+      stdio: "ignore",
+    });
+    probe.once("error", reject);
+    probe.once("close", resolve);
+  });
+  check(code === 1, `server accepted a missing database (exit ${code})`);
+  check(!existsSync(missingPath), "server created a database before Clippy initialized it");
+}
+
+async function assertOutdatedSchemaRejectedWithoutMigration() {
+  const oldPath = path.join(dir, "outdated.sqlite");
+  const oldDb = new DatabaseSync(oldPath);
+  oldDb.exec("CREATE TABLE clips (id INTEGER PRIMARY KEY)");
+  oldDb.close();
+  const code = await new Promise((resolve, reject) => {
+    const probe = spawn("node", [path.join(root, "build", "index.mjs")], {
+      env: { ...process.env, CLIPPY_DB_PATH: oldPath },
+      stdio: "ignore",
+    });
+    probe.once("error", reject);
+    probe.once("close", resolve);
+  });
+  check(code === 1, `server accepted an outdated schema (exit ${code})`);
+  const verify = new DatabaseSync(oldPath);
+  const tables = verify.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()
+    .map((row) => row.name);
+  const columns = verify.prepare("PRAGMA table_info(clips)").all().map((row) => row.name);
+  verify.close();
+  check(!tables.includes("category"), "MCP migrated the outdated database by creating tables");
+  check(columns.length === 1, "MCP altered the outdated clips table");
+}
+
+async function assertDatabaseWriteWaitsForLock() {
+  const locker = spawn("node", [
+    "--input-type=module",
+    "-e",
+    `import { DatabaseSync } from "node:sqlite";
+     const db = new DatabaseSync(process.argv[1]);
+     db.exec("BEGIN IMMEDIATE");
+     process.stdout.write("locked\\n");
+     setTimeout(() => { db.exec("COMMIT"); db.close(); }, 300);`,
+    dbPath,
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+  await new Promise((resolve, reject) => {
+    locker.stdout.once("data", resolve);
+    locker.once("error", reject);
+    locker.once("close", (code) => reject(new Error(`lock holder exited before acquiring lock (${code})`)));
+  });
+  const started = Date.now();
+  const added = await call("clippy_create_clip", {
+    text: "lock wait probe",
+    categoryID: 1,
+  });
+  const elapsed = Date.now() - started;
+  check(added.id, "create_clip failed while waiting for the database lock");
+  check(elapsed >= 150, `write did not wait for the held lock (${elapsed}ms)`);
+  await call("clippy_delete_clips", { ids: [added.id] });
+}
+
 try {
+  await assertMissingDatabaseRejected();
+  await assertOutdatedSchemaRejectedWithoutMigration();
   await rpc("initialize", {
     protocolVersion: "2024-11-05",
     capabilities: {},
     clientInfo: { name: "smoke", version: "0.0.0" },
   });
   notify("notifications/initialized", {});
+  const modeProbe = new DatabaseSync(dbPath);
+  check(
+    modeProbe.prepare("PRAGMA journal_mode").get().journal_mode === "wal",
+    "MCP connection changed the app-owned WAL journal mode",
+  );
+  modeProbe.close();
 
   // -------------------------------------------------------------------------
   // tools/list: presence and schema dialect
@@ -112,10 +185,13 @@ try {
     // AI actions
     "clippy_list_ai_actions", "clippy_get_ai_action", "clippy_create_ai_action",
     "clippy_update_ai_action", "clippy_delete_ai_action",
-    // deprecated aliases, kept so existing configs keep working
-    "clippy_search", "clippy_get", "clippy_add", "clippy_delete", "clippy_set_category",
   ];
   for (const e of expected) check(names.includes(e), `missing tool ${e}`);
+  check(names.length === expected.length, `unexpected tool count ${names.length}`);
+  // The pre-rename aliases were retired (ARCH-08); none may reappear.
+  for (const gone of ["clippy_search", "clippy_get", "clippy_add", "clippy_delete", "clippy_set_category"]) {
+    check(!names.includes(gone), `retired alias ${gone} is still advertised`);
+  }
 
   // Every advertised schema must be draft-07+. The draft-04 / OpenAPI-3.0
   // boolean form (`exclusiveMinimum: true`) makes MCP clients silently drop the
@@ -135,16 +211,24 @@ try {
       for (const [k, v] of Object.entries(node)) walk(v, `${at}.${k}`);
     };
     walk(tool.inputSchema, tool.name);
-    // Deprecated aliases are one-liners pointing at their replacement; every
-    // live tool has to carry enough text to tell a model when to reach for it.
-    if (!tool.description.startsWith("DEPRECATED")) {
-      check(
-        tool.description.length > 120,
-        `${tool.name}: description is too thin to steer a model`,
-      );
-    }
+    // Every tool has to carry enough text to tell a model when to reach for it.
+    check(
+      tool.description.length > 120,
+      `${tool.name}: description is too thin to steer a model`,
+    );
   }
   console.log("SCHEMA DIALECT: draft-07+ on all", list.result.tools.length, "tools");
+
+  await assertDatabaseWriteWaitsForLock();
+  const rolledBack = await rpc("tools/call", {
+    name: "clippy_create_clip",
+    arguments: { text: "rollback sentinel", categoryID: 999999 },
+  });
+  check(rolledBack.result?.isError === true, "invalid category write was not rejected");
+  check(
+    (await call("clippy_search_clips", { query: "rollback sentinel" })).results.length === 0,
+    "failed multi-statement write left a clip committed",
+  );
 
   // -------------------------------------------------------------------------
   // Clips: create -> search -> get -> update -> delete
@@ -297,12 +381,10 @@ try {
   check((await call("clippy_delete_ai_action", { id: action.id })).deleted, "delete_ai_action failed");
 
   // -------------------------------------------------------------------------
-  // Deprecated aliases still work
+  // Retired aliases are rejected as unknown tools
   // -------------------------------------------------------------------------
-  const legacyAdded = await call("clippy_add", { text: "legacy path", title: "Legacy" });
-  check(legacyAdded.id, "clippy_add alias broke");
-  check((await call("clippy_delete", { id: legacyAdded.id })).deletedCount === 1,
-        "clippy_delete alias broke");
+  const retired = await rpc("tools/call", { name: "clippy_add", arguments: { text: "x" } });
+  check(retired.result && retired.result.isError === true, "retired clippy_add alias still answers");
 
   // -------------------------------------------------------------------------
   // Clip deletion, and the audit trail

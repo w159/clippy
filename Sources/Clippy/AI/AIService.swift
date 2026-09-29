@@ -16,12 +16,16 @@ struct AIProposal: Equatable {
     let label: String
     let original: String?
     let proposed: String
+
+    /// True only for in-place rewrites, the one case where comparing the source
+    /// with the result means anything (AI-10).
+    var showsDiff: Bool { kind == .rewrite && original != nil }
 }
 
 /// High-level AI actions over clips. Depends only on `AIProvider`, so the prompt
 /// construction and response handling are unit-testable with a mock. All writes
 /// happen in the UI layer after the user approves the returned proposal.
-final class AIService {
+final class AIService: Sendable {
     private let provider: AIProvider
 
     init(provider: AIProvider) {
@@ -31,6 +35,7 @@ final class AIService {
     // MARK: - Construction from settings
 
     /// Build a service from the current settings + keychain, or explain why not.
+    @MainActor
     static func fromSettings(_ settings: AppSettings = .shared,
                              keychain: KeychainStore = .shared) -> Result<AIService, AIError> {
         guard settings.aiEnabled else {
@@ -51,7 +56,7 @@ final class AIService {
         }
         let config = AIProviderConfig(baseURL: base, apiKey: key, model: model,
                                       apiVersion: settings.aiAzureAPIVersion)
-        return .success(AIService(provider: AIProviderFactory.make(kind: kind, config: config)))
+        return .success(AIService(provider: AIAgentProviderFactory.make(kind: kind, config: config)))
     }
 
     // MARK: - Actions
@@ -111,44 +116,68 @@ final class AIService {
     /// The action's `promptTemplate` is rendered with `{clip}` and `{instruction}`
     /// before being sent as the user message. Returns an `AIProposal` shaped by
     /// the action's `outputDisposition`.
-    func run(action: AIAction, on clipText: String, instruction: String = "") async throws -> AIProposal {
-        let userPrompt = action.buildPrompt(clip: Self.clamp(clipText, 6000), instruction: instruction)
-        let out = try await provider.complete([
-            AIMessage(role: .user, content: userPrompt),
-        ], options: AICompletionOptions(temperature: action.temperature, maxTokens: action.maxTokens))
-        let trimmed = Self.trim(out)
+    func run(action: AIAction, on clipText: String, instruction: String = "",
+             onPartial: (@Sendable (String) -> Void)? = nil) async throws -> AIProposal {
+        let messages = [AIMessage(role: .user,
+                                  content: action.buildPrompt(clip: Self.clamp(clipText, 6000), instruction: instruction))]
+        let options = AICompletionOptions(temperature: action.temperature, maxTokens: action.maxTokens)
+        let out: String
+        if let onPartial {
+            // Streamed: surface the growing text so the sheet is not a spinner.
+            var text = ""
+            for try await event in provider.stream(messages, options: options) {
+                switch event {
+                case .textDelta(let delta): text += delta
+                case .textReplace(let old, let new): text = AITextReplace.apply(to: text, old: old, new: new)
+                default: continue
+                }
+                onPartial(text)
+            }
+            guard !Self.trim(text).isEmpty else { throw AIError.empty }
+            out = text
+        } else {
+            out = try await provider.complete(messages, options: options)
+        }
+        return Self.proposal(for: action, clipText: clipText, output: Self.trim(out))
+    }
+
+    /// Shape a model reply into a proposal. `original` always records the source
+    /// text; whether a before/after diff is meaningful is `AIProposal.showsDiff`
+    /// (New Clip and Copy produce something unrelated to the source, AI-10).
+    static func proposal(for action: AIAction, clipText: String, output: String) -> AIProposal {
         let kind: AIProposal.Kind
         switch action.outputDisposition {
         case .newClip:          kind = .newClip
         case .copyToClipboard:  kind = .copyToClipboard
         case .proposeEdit:      kind = .rewrite
         }
-        return AIProposal(kind: kind, label: action.name, original: clipText, proposed: trimmed)
+        return AIProposal(kind: kind, label: action.name,
+                          original: clipText, proposed: output)
     }
 
     // MARK: - Response shaping (pure, tested)
 
-    static func trim(_ s: String) -> String {
-        s.trimmingCharacters(in: .whitespacesAndNewlines)
+    static func trim(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Titles must be one short line with no wrapping quotes or trailing period.
     /// Punctuation can sit either inside or outside the quotes (`"Title".`), so
     /// trailing punctuation is trimmed before and after unquoting.
     static func sanitizeTitle(_ raw: String) -> String {
-        func stripTrailingPunctuation(_ x: String) -> String {
-            var s = x
-            while let last = s.last, last == "." || last == "," { s = String(s.dropLast()) }
-            return trim(s)
+        func stripTrailingPunctuation(_ value: String) -> String {
+            var title = value
+            while let last = title.last, last == "." || last == "," { title = String(title.dropLast()) }
+            return trim(title)
         }
-        var s = trim(raw).replacingOccurrences(of: "\n", with: " ")
-        s = stripTrailingPunctuation(s)
-        if s.count >= 2, let first = s.first, let last = s.last,
+        var title = trim(raw).replacingOccurrences(of: "\n", with: " ")
+        title = stripTrailingPunctuation(title)
+        if title.count >= 2, let first = title.first, let last = title.last,
            (first == "\"" && last == "\"") || (first == "'" && last == "'") {
-            s = trim(String(s.dropFirst().dropLast()))
+            title = trim(String(title.dropFirst().dropLast()))
         }
-        s = stripTrailingPunctuation(s)
-        return String(s.prefix(80))
+        title = stripTrailingPunctuation(title)
+        return String(title.prefix(80))
     }
 
     /// Map a model's reply to one of the offered categories (exact, then
@@ -157,19 +186,22 @@ final class AIService {
         let answer = trim(raw)
         if answer.isEmpty || answer.uppercased() == "NONE" { return nil }
         if let exact = categories.first(where: { $0 == answer }) { return exact }
-        if let ci = categories.first(where: { $0.caseInsensitiveCompare(answer) == .orderedSame }) { return ci }
+        if let matched = categories.first(where: { $0.caseInsensitiveCompare(answer) == .orderedSame }) { return matched }
         return categories.first { answer.localizedCaseInsensitiveContains($0) }
     }
 
-    static func clamp(_ s: String, _ max: Int) -> String {
-        s.count <= max ? s : String(s.prefix(max))
+    static func clamp(_ text: String, _ max: Int) -> String {
+        text.count <= max ? text : String(text.prefix(max))
     }
 
     private enum Prompts {
         static let title = "You write very short, descriptive titles (3 to 6 words) for clipboard snippets. Reply with only the title: no quotes, no surrounding text, no trailing punctuation."
         static let rewrite = "You rewrite text exactly as the user instructs. Reply with only the rewritten text and nothing else."
         static let summary = "Summarize the text in one or two plain sentences. Reply with only the summary."
-        static let category = "Assign the item to exactly one category from the provided list. Reply with only the category name copied exactly as written. If none fit, reply with the single word NONE."
+        static let category =
+            "Assign the item to exactly one category from the provided list. "
+            + "Reply with only the category name copied exactly as written. "
+            + "If none fit, reply with the single word NONE."
         static let generate = "You generate a single useful clipboard snippet based on the user's request and the provided context. Reply with only the snippet text, ready to paste."
     }
 }

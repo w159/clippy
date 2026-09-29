@@ -12,4 +12,11 @@ enum PanelSelection: Hashable {
     /// Manage built-in and custom AI actions. Routed to AIActionsManagerView
     /// in the main pane, mirroring the Scripts/Assistant side-pane rows.
     case aiActions
+    /// Smart Suggestions: clipboard history ranked against the frontmost app's
+    /// on-screen context. Routed to the suggestions pane in ClipListView.
+    case suggestions
+    /// Snippet manager pane.
+    case snippets
+    /// Paste stack tray pane.
+    case pasteStack
 }

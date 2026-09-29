@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Run an external executable and capture its output. Used by integrations that
 /// shell out (the 1Password CLI, the Claude CLI, Node.js). stdout and stderr are
@@ -86,7 +87,11 @@ enum Subprocess {
         proc.standardError = Pipe()
         do {
             try proc.run()
-            proc.waitUntilExit()
+            // A login shell can hang on a broken rc file; bound the probe so callers
+            // (Settings install rows, the 1Password view) never spin forever.
+            let deadline = Date().addingTimeInterval(5)
+            while proc.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.02) }
+            if proc.isRunning { proc.terminate(); return nil }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let path = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -113,8 +118,8 @@ enum Subprocess {
     static func launch(executable: String,
                        arguments: [String],
                        environment: [String: String]? = nil,
-                       onStderrLine: @escaping (String) -> Void,
-                       onExit: @escaping (Int32) -> Void) -> Process {
+                       onStderrLine: @escaping @Sendable (String) -> Void,
+                       onExit: @escaping @Sendable (Int32) -> Void) -> Process {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: executable)
         proc.arguments = arguments
@@ -128,29 +133,30 @@ enum Subprocess {
         // Line-buffer stderr: accumulate partial lines across handler calls.
         // The readabilityHandler and terminationHandler fire on different GCD
         // threads, so all access to stderrBuffer is serialised through a lock.
-        let bufferLock = NSLock()
-        var stderrBuffer = ""
-        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+        let stderrBuffer = OSAllocatedUnfairLock(initialState: "")
+        let stderrHandle = stderrPipe.fileHandleForReading
+        stderrHandle.readabilityHandler = { handle in
             guard let chunk = String(data: handle.availableData, encoding: .utf8),
                   !chunk.isEmpty else { return }
-            bufferLock.lock()
-            stderrBuffer += chunk
             // Deliver every complete line; hold the last partial fragment.
-            var lines = stderrBuffer.components(separatedBy: "\n")
-            stderrBuffer = lines.removeLast()
-            bufferLock.unlock()
+            let lines = stderrBuffer.withLock { buffer -> [String] in
+                buffer += chunk
+                var lines = buffer.components(separatedBy: "\n")
+                buffer = lines.removeLast()
+                return lines
+            }
             for line in lines { onStderrLine(line) }
         }
 
-        proc.terminationHandler = { p in
+        proc.terminationHandler = { process in
             // Flush any remaining buffered stderr that arrived without a trailing newline.
-            bufferLock.lock()
-            let remaining = stderrBuffer
-            stderrBuffer = ""
-            bufferLock.unlock()
+            let remaining = stderrBuffer.withLock { buffer -> String in
+                defer { buffer = "" }
+                return buffer
+            }
             if !remaining.isEmpty { onStderrLine(remaining) }
-            stderrPipe.fileHandleForReading.readabilityHandler = nil
-            onExit(p.terminationStatus)
+            stderrHandle.readabilityHandler = nil
+            onExit(process.terminationStatus)
         }
 
         try? proc.run()

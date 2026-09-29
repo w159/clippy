@@ -5,6 +5,7 @@ import AppKit
 extension MarkdownUI.Theme {
     /// A Markdown theme mapped onto Clippy's token + typography system so
     /// assistant replies match the panel, with real fenced code blocks.
+    @MainActor
     static func clippy(tokens: ThemeTokens, settings: AppSettings) -> MarkdownUI.Theme {
         // fontSizeBase is an Int (UserDefaults-backed); FontSize(_:) takes a
         // CGFloat, so convert before scaling to keep the arithmetic in CGFloat.

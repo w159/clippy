@@ -31,21 +31,36 @@ struct ThemedPanelBackground: View {
     let tokens: ThemeTokens
     let opacity: Double
 
+    @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     var body: some View {
-        if opacity >= 0.999 || reduceTransparency {
-            // At full opacity, or when the user has enabled Reduce Transparency
-            // (System Settings > Accessibility > Display), render the solid
-            // theme color and skip the blur. The blur layer depends on desktop
-            // content showing through; reduce-transparency users explicitly opt
-            // out of that, so we honor the preference and render tokens.panel at
-            // full opacity for guaranteed legible contrast.
+        switch settings.panelMaterial.backdrop {
+        case .solid:
             tokens.panel
-        } else {
+        case .glass where reduceTransparency || colorSchemeContrast == .increased:
+            solidFallback
+        case .glass:
             ZStack {
-                VisualEffectBlur(material: .hudWindow, isDark: tokens.isDark)
+                Rectangle().fill(.clear).glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
                 tokens.panel.opacity(opacity)
+            }
+        case .vibrancy where reduceTransparency || colorSchemeContrast == .increased:
+            solidFallback
+        case .vibrancy:
+            ZStack {
+                VisualEffectBlur(material: settings.panelMaterial == .regular ? .hudWindow : .menu, isDark: tokens.isDark)
+                tokens.panel.opacity(opacity)
+            }
+        }
+    }
+
+    /// High-contrast, opaque fallback when material transparency is unavailable.
+    private var solidFallback: some View {
+        tokens.panel.overlay {
+            if colorSchemeContrast == .increased {
+                RoundedRectangle(cornerRadius: 24).strokeBorder(tokens.cardBorder, lineWidth: 1.5)
             }
         }
     }

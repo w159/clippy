@@ -6,7 +6,7 @@ Derived by reading the Swift sources (read-only) and confirming against a copy o
 
 - File: `~/Library/Application Support/Clippy/clippy.sqlite`
 - Computed in `ClipDatabase.init` from `applicationSupportDirectory` + `"Clippy"` + `"clippy.sqlite"` (`ClipDatabase.swift:25-29`).
-- Opened with GRDB's `DatabaseQueue` (`ClipDatabase.swift:34`). GRDB enables WAL journaling by default, so a `clippy.sqlite-wal` and `clippy.sqlite-shm` sit next to it while the app runs.
+- Opened with GRDB's `DatabasePool` (`ClipDatabase.swift:125`). The pool uses WAL journaling, so a `clippy.sqlite-wal` and `clippy.sqlite-shm` sit beside the database while the app runs.
 - Override for the MCP server via env `CLIPPY_DB_PATH`.
 
 ## Media location
@@ -16,7 +16,7 @@ Derived by reading the Swift sources (read-only) and confirming against a copy o
 
 ## Tables
 
-Schema comes from the GRDB migrator (`ClipDatabase.makeMigrator()`, `ClipDatabase.swift:39-138`), evolved across migrations v1..v4. Final column set verified against the live file.
+Schema comes from the GRDB migrator (`ClipDatabase.makeMigrator()`, `ClipDatabase+Migrations.swift`), evolved across migrations v1..v10. Final column set verified against the live file.
 
 ### `clips`  (`ClipDatabase.swift:42-52`, `105-114`, `115-120`; model `Clip.swift:9-27`)
 
@@ -131,5 +131,5 @@ Scripts and AI actions live in files beside `clippy.sqlite`, written by the app'
 
 `Storage/ExternalChangeWatcher.swift` closes both gaps on a 2s poll:
 
-- SQLite `PRAGMA data_version`, which increments on commits from *other* connections and is unchanged for the reading connection's own commits. Clippy uses a single `DatabaseQueue`, so this is a false-positive-free signal. On a change it calls `Database.notifyChanges(in: .fullDatabase)`, GRDB's documented escape hatch for undetected changes.
+- SQLite `PRAGMA data_version`, which increments on commits from *other* connections and is unchanged for the reading connection's own commits. Clippy reads it on the pool's writer connection, so the app's own writes do not trip it. On a change it calls `Database.notifyChanges(in: .fullDatabase)`, GRDB's documented escape hatch for undetected changes.
 - `scripts.json` / `ai-actions.json` modification dates, compared against the store's own last load or save (`JSONFileStore.reloadIfModifiedExternally`).

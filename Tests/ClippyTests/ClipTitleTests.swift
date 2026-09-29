@@ -2,6 +2,7 @@ import XCTest
 import GRDB
 @testable import Clippy
 
+@MainActor
 final class ClipTitleTests: XCTestCase {
 
     // MARK: - Schema migration

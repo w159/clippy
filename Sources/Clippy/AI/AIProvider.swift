@@ -49,8 +49,26 @@ enum AIError: LocalizedError, Equatable {
 /// One chat-completion call. Every backend (Ollama, OpenAI, Anthropic, Azure AI
 /// Foundry) implements this; the rest of the app only depends on this protocol,
 /// which keeps the agentic features testable with a mock.
-protocol AIProvider {
+protocol AIProvider: Sendable {
     func complete(_ messages: [AIMessage], options: AICompletionOptions) async throws -> String
+    /// Streamed variant of `complete` (text deltas only). Providers without real
+    /// streaming inherit a default that yields the whole reply as one delta.
+    func stream(_ messages: [AIMessage], options: AICompletionOptions) -> AsyncThrowingStream<AIStreamEvent, Error>
+}
+
+extension AIProvider {
+    func stream(_ messages: [AIMessage], options: AICompletionOptions) -> AsyncThrowingStream<AIStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    continuation.yield(.textDelta(try await complete(messages, options: options)))
+                    continuation.yield(.done)
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
 }
 
 /// The backends Clippy can talk to. `appleIntelligence` and `ollama` are local
@@ -87,6 +105,12 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
     /// Apple Intelligence has no endpoint or model to choose, so Settings hides
     /// those fields for it entirely rather than showing inert controls.
     var needsEndpointConfiguration: Bool { self != .appleIntelligence }
+
+    /// True when the backend can call Clippy's tools. Apple Intelligence cannot
+    /// yet (Foundation Models needs compile-time `Tool` types, tracked as PLT-04),
+    /// so the assistant hides tool suggestions and says so rather than letting the
+    /// model hallucinate tool results (AI-02).
+    var supportsTools: Bool { self != .appleIntelligence }
 
     /// Keychain account under which this provider's key is stored.
     var keychainAccount: String { "ai.\(rawValue).apiKey" }

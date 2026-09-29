@@ -5,6 +5,7 @@ import XCTest
 /// non-zero size for a directory, so the old viability filter passed folders
 /// through to `MediaStore.storeFile`, where `Data(contentsOf:)` throws EISDIR.
 /// That failure produced no clip, no sound, and 1273 log lines in the field.
+@MainActor
 final class FileCaptureClassificationTests: XCTestCase {
     private var root: URL!
 

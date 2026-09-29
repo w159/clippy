@@ -10,7 +10,7 @@ final class WireMessagesTests: XCTestCase {
         let encoded = AIToolResultSentinel.encode(id: "abc", toolName: "foo", result: "bar")
         let msg = AIMessage(role: .user, content: encoded)
 
-        let wired = OpenAIAgentProvider.wireMessages([msg])
+        let wired = AIMessageBuilder.openAI([msg])
 
         XCTAssertEqual(wired.count, 1)
         let dict = wired[0]
@@ -27,7 +27,7 @@ final class WireMessagesTests: XCTestCase {
     func testPlainUserMessageIsNotTransformed() {
         let msg = AIMessage(role: .user, content: "hello world")
 
-        let wired = OpenAIAgentProvider.wireMessages([msg])
+        let wired = AIMessageBuilder.openAI([msg])
 
         XCTAssertEqual(wired.count, 1)
         let dict = wired[0]

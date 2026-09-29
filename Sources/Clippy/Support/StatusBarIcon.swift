@@ -13,6 +13,46 @@ import AppKit
 // button centers a template image itself, so no manual canvas sizing is needed;
 // the earlier top-crop was the bounce animation's masksToBounds, fixed below.
 enum StatusBarIcon {
+    /// Capture state shown by the icon.
+    enum State: Equatable {
+        case capturing, paused, locked
+
+        /// VoiceOver label and tooltip.
+        var accessibilityLabel: String {
+            switch self {
+            case .capturing: return "Clippy, capturing"
+            case .paused: return "Clippy, capture paused"
+            case .locked: return "Clippy, locked"
+            }
+        }
+
+        /// SF Symbol drawn for the state (locked uses a padlock).
+        var symbolName: String { self == .locked ? "lock.fill" : "paperclip" }
+    }
+
+    /// Menu bar badge text for the paste-stack count: empty when nothing is queued,
+    /// capped at "99+" so the status item stays narrow.
+    static func badgeTitle(stackCount: Int) -> String {
+        stackCount <= 0 ? "" : (stackCount > 99 ? " 99+" : " \(stackCount)")
+    }
+
+    /// VoiceOver / tooltip label with the paste-stack count appended when non-zero.
+    static func accessibilityLabel(state: State, stackCount: Int) -> String {
+        stackCount > 0 ? "\(state.accessibilityLabel), \(stackCount) in paste stack" : state.accessibilityLabel
+    }
+
+    /// Icon for a state: paperclip, slashed paperclip when paused, padlock when locked.
+    static func image(state: State) -> NSImage {
+        if state == .locked {
+            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular, scale: .medium)
+            let lock = NSImage(systemSymbolName: state.symbolName, accessibilityDescription: state.accessibilityLabel)?
+                .withSymbolConfiguration(config) ?? NSImage()
+            lock.isTemplate = true
+            return lock
+        }
+        return image(paused: state == .paused)
+    }
+
     /// The paperclip symbol as a template image. `paused` adds a slash overlay.
     static func image(paused: Bool = false) -> NSImage {
         let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular, scale: .medium)
@@ -59,11 +99,11 @@ enum StatusBarIcon {
         // on completion, so the icon always snaps back to its resting spot. An
         // earlier version mutated `position`, which permanently shifted the icon up.
         let cx = button.bounds.midX, cy = button.bounds.midY
-        func scale(_ s: CGFloat) -> NSValue {
-            var t = CATransform3DMakeTranslation(cx, cy, 0)
-            t = CATransform3DScale(t, s, s, 1)
-            t = CATransform3DTranslate(t, -cx, -cy, 0)
-            return NSValue(caTransform3D: t)
+        func scale(_ factor: CGFloat) -> NSValue {
+            var matrix = CATransform3DMakeTranslation(cx, cy, 0)
+            matrix = CATransform3DScale(matrix, factor, factor, 1)
+            matrix = CATransform3DTranslate(matrix, -cx, -cy, 0)
+            return NSValue(caTransform3D: matrix)
         }
 
         let bounce = CAKeyframeAnimation(keyPath: "transform")

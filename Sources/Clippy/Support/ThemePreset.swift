@@ -175,11 +175,12 @@ enum ThemePreset: String, CaseIterable, Identifiable {
         }
     }
 
-    private func hex(_ s: String) -> Color { Color(themeHex: s) }
+    private func hex(_ value: String) -> Color { Color(themeHex: value) }
 }
 
 // MARK: - Resolver
 
+@MainActor
 enum Theme {
     /// The active token table for the current settings. The single place views
     /// call to learn what color anything should be.
@@ -202,6 +203,9 @@ enum Theme {
             base = systemTokens(settings)
         case .custom:
             base = customSeed
+            // SET-08: `customIsDark` stays the single persisted light/dark switch
+            // for .custom; it is exposed to views through `ThemeTokens.isDark`
+            // (and ClippyTokens.scheme), never read directly by views.
             base.isDark = settings.customIsDark
         default:
             base = settings.themePreset.fixedTokens ?? systemTokens(settings)
@@ -215,22 +219,22 @@ enum Theme {
     /// Replace each token whose matching custom*Hex override is non-empty and
     /// parses. An empty or unparseable override leaves the base value untouched,
     /// so clearing an override (setting its hex to "") restores the preset color.
-    private static func applyOverrides(_ base: ThemeTokens, _ s: AppSettings) -> ThemeTokens {
-        var t = base
-        if let c = override(s.customPanelHex) { t.panel = c }
-        if let c = override(s.customScrollBgHex) { t.scrollBackground = c }
-        if let c = override(s.customCardSurfaceHex) { t.cardSurface = c }
-        if let c = override(s.customCardBorderHex) { t.cardBorder = c }
-        if let c = override(s.customHeaderHex) { t.headerBar = c }
-        if let c = override(s.customFooterHex) { t.footerBar = c }
-        if let c = override(s.customSidebarHex) { t.sidebar = c }
-        if let c = override(s.customScrollbarHex) { t.scrollbar = c }
-        if let c = override(s.customTextPrimaryHex) { t.textPrimary = c }
-        if let c = override(s.customTextSecondaryHex) { t.textSecondary = c }
-        if let c = override(s.customAccentHex) { t.accent = c }
-        if let c = override(s.customSuccessHex) { t.success = c }
-        if let c = override(s.customDangerHex) { t.danger = c }
-        return t
+    private static func applyOverrides(_ base: ThemeTokens, _ settings: AppSettings) -> ThemeTokens {
+        var tokens = base
+        if let color = override(settings.customPanelHex) { tokens.panel = color }
+        if let color = override(settings.customScrollBgHex) { tokens.scrollBackground = color }
+        if let color = override(settings.customCardSurfaceHex) { tokens.cardSurface = color }
+        if let color = override(settings.customCardBorderHex) { tokens.cardBorder = color }
+        if let color = override(settings.customHeaderHex) { tokens.headerBar = color }
+        if let color = override(settings.customFooterHex) { tokens.footerBar = color }
+        if let color = override(settings.customSidebarHex) { tokens.sidebar = color }
+        if let color = override(settings.customScrollbarHex) { tokens.scrollbar = color }
+        if let color = override(settings.customTextPrimaryHex) { tokens.textPrimary = color }
+        if let color = override(settings.customTextSecondaryHex) { tokens.textSecondary = color }
+        if let color = override(settings.customAccentHex) { tokens.accent = color }
+        if let color = override(settings.customSuccessHex) { tokens.success = color }
+        if let color = override(settings.customDangerHex) { tokens.danger = color }
+        return tokens
     }
 
     /// nil for a blank or unparseable hex, so a missing override falls through to
@@ -238,6 +242,14 @@ enum Theme {
     private static func override(_ hex: String) -> Color? {
         hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : parseHexColor(hex)
     }
+
+    /// SET-08: bumps whenever the app's effective appearance flips (Match-system
+    /// theme, Auto appearance at sunset). `AppSettings.theme` memoizes tokens on
+    /// a settings signature, which cannot see an OS-level flip; folding this
+    /// epoch into that signature invalidates the cache. Views that use the
+    /// design-system `clippyTheme` provider re-resolve from the environment
+    /// color scheme and do not depend on it.
+    static var appearanceEpoch: Int { AppearanceEpoch.shared.value }
 
     /// NSAppearance to stamp on the window so AppKit-drawn chrome (scrollbars,
     /// text caret, menus) matches the theme. `.system` defers to the user's
@@ -254,13 +266,13 @@ enum Theme {
 
     /// Base per-surface colors for the .custom preset: seed from Clean Light so
     /// the user edits a sane starting point before any override is applied.
-    static var customSeed: ThemeTokens { ThemePreset.cleanLight.fixedTokens! }
+    nonisolated static var customSeed: ThemeTokens { ThemePreset.cleanLight.fixedTokens! }
 
     /// Tokens that track the live macOS appearance using semantic system colors,
     /// with full-contrast label colors (not the washed-out grays the old build
     /// used for body text).
-    private static func systemTokens(_ s: AppSettings) -> ThemeTokens {
-        let dark = effectiveIsDark(s)
+    private static func systemTokens(_ settings: AppSettings) -> ThemeTokens {
+        let dark = effectiveIsDark(settings)
         return ThemeTokens(
             panel: Color(nsColor: .windowBackgroundColor),
             scrollBackground: Color(nsColor: .underPageBackgroundColor),
@@ -276,18 +288,38 @@ enum Theme {
             // white) that reads as secondary without being heavy. Dark mode keeps the
             // semantic color, which resolves to ~#8E8E9A and already passes at ~5.26:1.
             textSecondary: dark ? Color(nsColor: .secondaryLabelColor) : Color(themeHex: "#6E6E6E"),
-            accent: s.accentColor,
+            accent: settings.accentColor,
             success: Color(nsColor: .systemGreen), danger: Color(nsColor: .systemRed),
             isDark: dark
         )
     }
 
-    private static func effectiveIsDark(_ s: AppSettings) -> Bool {
-        switch s.appearanceMode {
+    private static func effectiveIsDark(_ settings: AppSettings) -> Bool {
+        switch settings.appearanceMode {
         case .light: return false
         case .dark: return true
         case .system:
             return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        }
+    }
+}
+
+// MARK: - Appearance epoch (SET-08)
+
+/// KVO bridge over `NSApplication.effectiveAppearance`. Created lazily on the
+/// first `Theme.appearanceEpoch` read (main thread, after NSApplication exists).
+@MainActor
+final class AppearanceEpoch: NSObject {
+    static let shared = AppearanceEpoch()
+
+    /// Incremented on every effective-appearance change.
+    private(set) var value = 0
+    private var observation: NSKeyValueObservation?
+
+    private override init() {
+        super.init()
+        observation = NSApplication.shared.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            self?.value += 1
         }
     }
 }
@@ -298,8 +330,8 @@ enum Theme {
 /// any parse failure. Callers apply their own fallback so the two distinct
 /// defaults (theme magenta vs category systemGray) stay separate.
 func parseHexColor(_ hex: String) -> Color? {
-    guard let ns = NSColor(themeHex: hex) else { return nil }
-    return Color(nsColor: ns)
+    guard let nsColor = NSColor(themeHex: hex) else { return nil }
+    return Color(nsColor: nsColor)
 }
 
 extension Color {
@@ -321,38 +353,43 @@ extension Color {
 
 extension NSColor {
     convenience init?(themeHex hex: String) {
-        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard let value = UInt64(s, radix: 16) else { return nil }
-        let r, g, b, a: CGFloat
-        switch s.count {
+        var digits = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if digits.hasPrefix("#") { digits.removeFirst() }
+        guard let value = UInt64(digits, radix: 16) else { return nil }
+        let red, green, blue, alpha: CGFloat
+        switch digits.count {
         case 3:
-            r = CGFloat((value >> 8) & 0xF) / 15
-            g = CGFloat((value >> 4) & 0xF) / 15
-            b = CGFloat(value & 0xF) / 15
-            a = 1
+            red = CGFloat((value >> 8) & 0xF) / 15
+            green = CGFloat((value >> 4) & 0xF) / 15
+            blue = CGFloat(value & 0xF) / 15
+            alpha = 1
         case 6:
-            r = CGFloat((value >> 16) & 0xFF) / 255
-            g = CGFloat((value >> 8) & 0xFF) / 255
-            b = CGFloat(value & 0xFF) / 255
-            a = 1
+            red = CGFloat((value >> 16) & 0xFF) / 255
+            green = CGFloat((value >> 8) & 0xFF) / 255
+            blue = CGFloat(value & 0xFF) / 255
+            alpha = 1
         case 8:
-            r = CGFloat((value >> 24) & 0xFF) / 255
-            g = CGFloat((value >> 16) & 0xFF) / 255
-            b = CGFloat((value >> 8) & 0xFF) / 255
-            a = CGFloat(value & 0xFF) / 255
+            red = CGFloat((value >> 24) & 0xFF) / 255
+            green = CGFloat((value >> 16) & 0xFF) / 255
+            blue = CGFloat((value >> 8) & 0xFF) / 255
+            alpha = CGFloat(value & 0xFF) / 255
         default:
             return nil
         }
-        self.init(srgbRed: r, green: g, blue: b, alpha: a)
+        self.init(srgbRed: red, green: green, blue: blue, alpha: alpha)
     }
 
     /// "#RRGGBB" in sRGB. Used to store ColorPicker output back to settings.
     var themeHexString: String {
-        guard let c = usingColorSpace(.sRGB) else { return "#000000" }
-        let r = Int((c.redComponent * 255).rounded())
-        let g = Int((c.greenComponent * 255).rounded())
-        let b = Int((c.blueComponent * 255).rounded())
-        return String(format: "#%02X%02X%02X", r, g, b)
+        guard let converted = usingColorSpace(.sRGB) else { return "#000000" }
+        let red = Int((converted.redComponent * 255).rounded())
+        let green = Int((converted.greenComponent * 255).rounded())
+        let blue = Int((converted.blueComponent * 255).rounded())
+        return String(format: "#%02X%02X%02X", red, green, blue)
     }
+}
+
+extension ThemeTokens {
+    /// Caution state (e.g. a timed-out script). Same values as `ClippyTokens.warning`.
+    var warning: Color { isDark ? Color(themeHex: "#F0B24A") : Color(themeHex: "#8A5A00") }
 }

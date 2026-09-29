@@ -11,9 +11,12 @@ import {
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { DatabaseSync } from "node:sqlite";
-import { openDatabase, resolveDatabasePath, resolveSupportDir } from "./db.js";
+import { inWriteTransaction, openDatabase, resolveDatabasePath, resolveSupportDir } from "./db.js";
 import { tools, toolByName } from "./tools/index.js";
+import { isAuthorized, resolveToken } from "./auth.js";
 import type { ToolContext } from "./types.js";
+import { appendAudit, clipIDsFor } from "./audit.js";
+import { WITHHELD } from "./sensitive.js";
 
 // ---------------------------------------------------------------------------
 // Bootstrap: open the DB once, fail loud if it is missing.
@@ -46,12 +49,24 @@ const context: ToolContext = { db, dbPath, supportDir: resolveSupportDir(dbPath)
  * Arguments are summarized, never dumped: the point is the audit trail, not a
  * second copy of the content in a log file.
  */
-function audit(name: string, args: unknown, outcome: "ok" | "error"): void {
+function audit(
+  name: string,
+  args: unknown,
+  outcome: "ok" | "error" | "refused",
+  result?: unknown,
+): void {
   const shape =
     args && typeof args === "object" ? Object.keys(args as object).sort().join(",") : "";
   console.error(
     `${new Date().toISOString()} clippy-mcp ${outcome} ${name}${shape ? ` args=[${shape}]` : ""}`,
   );
+  // SEC-08: the same fact goes to the hash-chained audit stream the app verifies
+  // and exports. Tool name, outcome, argument names and clip ids only.
+  appendAudit(context.supportDir, {
+    action: name,
+    detail: `outcome=${outcome}${shape ? ` args=[${shape}]` : ""}`,
+    clipIDs: clipIDsFor(name, args, result),
+  });
 }
 
 function registerTools(server: Server): void {
@@ -83,8 +98,11 @@ function registerTools(server: Server): void {
     }
     try {
       const args = tool.schema.parse(request.params.arguments ?? {});
-      const result = tool.handler(context, args);
-      audit(tool.name, args, "ok");
+      const result = tool.writesDatabase === true
+        ? inWriteTransaction(db, () => tool.handler(context, args))
+        : tool.handler(context, args);
+      const refused = (result as { error?: unknown } | null)?.error === WITHHELD;
+      audit(tool.name, args, refused ? "refused" : "ok", result);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -120,6 +138,17 @@ const useHttp =
   parsedPort <= 65535;
 
 if (useHttp) {
+  // The loopback port is reachable by every local process, so every request
+  // must carry Clippy's per-install bearer token. Refuse to start without one
+  // rather than serving clipboard history unauthenticated. Stdio mode is a
+  // private pipe to the parent process and needs no token.
+  const tokenResult = resolveToken(process.env);
+  if ("error" in tokenResult) {
+    console.error(`clippy-mcp: ${tokenResult.error}`);
+    process.exit(1);
+  }
+  const bearerToken = tokenResult.token;
+
   // -------------------------------------------------------------------------
   // HTTP mode: one StreamableHTTPServerTransport per session, stored by
   // the mcp-session-id header value that the SDK assigns on initialize.
@@ -255,7 +284,18 @@ if (useHttp) {
     async (req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${parsedPort}`);
 
-      // Health check endpoint — no MCP handshake needed.
+      // Authenticate before routing: /health, /mcp and unknown paths all get the
+      // same 401 so an unauthenticated caller learns nothing about the server.
+      if (!isAuthorized(req.headers.authorization, bearerToken)) {
+        res.writeHead(401, {
+          "Content-Type": "application/json",
+          "WWW-Authenticate": 'Bearer realm="clippy-mcp"',
+        });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+
+      // Health check endpoint — no MCP handshake needed (still authenticated above).
       if (url.pathname === "/health" && req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));

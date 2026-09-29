@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import GRDB
 import TOMLKit
 
 // The clippy.toml archive: a human-readable, structured export of every
@@ -27,10 +29,23 @@ import TOMLKit
 //
 //     [[category.clip]]
 //     kind       = "image"
-//     image_path = "/path/to/media/ab12.png"  # re-ingested on import if present
+//     media      = "media/ab12.png"  # path RELATIVE to the archive package
 //
-// Import is idempotent: categories are matched by name and updated in place,
-// and identical text clips are reused rather than duplicated.
+//     [[category.clip]]
+//     kind       = "file"
+//     file_name  = "report.pdf"
+//     file_path  = "/Users/me/report.pdf"   # original location, informational
+//     media      = "media/cd34.pdf"         # bundled bytes, when they were stored
+//
+// On disk the archive is a package directory (`*.clippyarchive`) holding
+// `clippy.toml` plus a `media/` folder with every referenced file, so images and
+// files travel between Macs (DAT-07). All `media` paths are relative and are
+// confined to the package on import (absolute paths and `..` are rejected). The
+// legacy absolute `image_path` key is still read for old archives.
+//
+// Import is idempotent and runs in ONE database transaction: categories are
+// matched by name (case-insensitive) and updated in place, identical clips are
+// reused with newest-wins metadata, and a failure rolls everything back.
 
 // MARK: - Codable model
 
@@ -67,13 +82,20 @@ struct ArchivedClip: Codable, Equatable {
     var kind: String
     var title: String?
     var text: String?
+    /// Legacy absolute path written by pre-package archives. Read-only.
     var imagePath: String?
+    /// Package-relative path of the bundled media (image or file bytes).
+    var media: String?
+    var fileName: String?
+    var filePath: String?
     var sourceApp: String?
     var createdAt: String?
 
     enum CodingKeys: String, CodingKey {
-        case kind, title, text
+        case kind, title, text, media
         case imagePath = "image_path"
+        case fileName = "file_name"
+        case filePath = "file_path"
         case sourceApp = "source_app"
         case createdAt = "created_at"
     }
@@ -84,6 +106,29 @@ struct ImportSummary: Equatable {
     var categories = 0
     var clips = 0
     var skippedImages = 0
+    /// File clips with neither bundled bytes nor an original path.
+    var skippedFiles = 0
+}
+
+/// What `exportPackage` wrote.
+struct ArchiveExportResult: Equatable {
+    var categories = 0
+    var clips = 0
+    var mediaFiles = 0
+    /// Referenced media the store no longer had on disk (those clips import as skipped).
+    var missingMedia: [String] = []
+}
+
+enum ClippyArchiveError: Error, Equatable, LocalizedError {
+    case missingManifest(String)
+    case destinationInvalid
+
+    var errorDescription: String? {
+        switch self {
+        case .missingManifest(let path): return "No clippy.toml found in the archive at \(path)."
+        case .destinationInvalid: return "The archive destination is not a usable folder."
+        }
+    }
 }
 
 // MARK: - icon kind <-> TOML
@@ -112,10 +157,14 @@ enum ClippyArchive {
 
         """
 
+    static let manifestName = "clippy.toml"
+    static let mediaFolder = "media"
+    static let packageExtension = "clippyarchive"
+
     private static var isoFormatter: ISO8601DateFormatter {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
     }
 
     // MARK: Export
@@ -150,8 +199,12 @@ enum ClippyArchive {
                 }
                 if clip.contentKind == .text {
                     out += clipPair("text", quote(clip.contentText))
+                } else if clip.contentKind == .file {
+                    out += clipPair("file_name", quote(clip.contentText))
+                    if let path = clip.filePath { out += clipPair("file_path", quote(path)) }
+                    if let media = clip.mediaFilename { out += clipPair("media", quote("\(mediaFolder)/\(media)")) }
                 } else if let media = clip.mediaFilename {
-                    out += clipPair("image_path", quote(database.media.url(for: media).path))
+                    out += clipPair("media", quote("\(mediaFolder)/\(media)"))
                 }
                 if let app = clip.sourceAppName {
                     out += clipPair("source_app", quote(app))
@@ -160,6 +213,48 @@ enum ClippyArchive {
             }
         }
         return out
+    }
+
+    /// Write the archive as a package directory at `destination`: `clippy.toml`
+    /// plus `media/` with every referenced file. Built in a sibling temp folder
+    /// and swapped in, so a failure never leaves a half-written package.
+    @discardableResult
+    static func exportPackage(from database: ClipDatabase, to destination: URL,
+                              now: Date = Date()) throws -> ArchiveExportResult {
+        let fileManager = FileManager.default
+        let parent = destination.deletingLastPathComponent()
+        guard fileManager.fileExists(atPath: parent.path) else { throw ClippyArchiveError.destinationInvalid }
+        let staging = parent.appendingPathComponent(".\(destination.lastPathComponent).tmp-\(UUID().uuidString)")
+        try fileManager.createDirectory(at: staging.appendingPathComponent(mediaFolder), withIntermediateDirectories: true)
+        do {
+            var result = ArchiveExportResult()
+            let groups = try database.clipsGroupedByCategory()
+            var copied = Set<String>()
+            for group in groups {
+                result.categories += 1
+                for clip in group.clips {
+                    result.clips += 1
+                    guard clip.contentKind != .text, let media = clip.mediaFilename,
+                          copied.insert(media).inserted else { continue }
+                    let source = database.media.url(for: media)
+                    guard fileManager.fileExists(atPath: source.path) else { result.missingMedia.append(media); continue }
+                    try fileManager.copyItem(at: source,
+                                    to: staging.appendingPathComponent(mediaFolder).appendingPathComponent(media))
+                    result.mediaFiles += 1
+                }
+            }
+            let toml = try exportTOML(from: database, now: now)
+            try toml.write(to: staging.appendingPathComponent(manifestName), atomically: true, encoding: .utf8)
+            if fileManager.fileExists(atPath: destination.path) {
+                _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try fileManager.moveItem(at: staging, to: destination)
+            }
+            return result
+        } catch {
+            try? fileManager.removeItem(at: staging)
+            throw error
+        }
     }
 
     // MARK: Hand-written TOML helpers
@@ -208,9 +303,9 @@ enum ClippyArchive {
         var result = ""
         result.reserveCapacity(body.unicodeScalars.count)
         for scalar in body.unicodeScalars {
-            let v = scalar.value
-            if v < 0x20 || v == 0x7F {
-                result += String(format: "\\u%04X", v)
+            let codePoint = scalar.value
+            if codePoint < 0x20 || codePoint == 0x7F {
+                result += String(format: "\\u%04X", codePoint)
             } else {
                 result.unicodeScalars.append(scalar)
             }
@@ -221,47 +316,146 @@ enum ClippyArchive {
 
     // MARK: Import
 
-    /// Parse TOML text and apply it to the database. Returns a summary.
+    /// Import a package directory produced by `exportPackage`.
     @discardableResult
-    static func importTOML(_ text: String, into database: ClipDatabase) throws -> ImportSummary {
+    static func importPackage(at packageURL: URL, into database: ClipDatabase) throws -> ImportSummary {
+        let manifest = packageURL.appendingPathComponent(manifestName)
+        guard let text = try? String(contentsOf: manifest, encoding: .utf8) else {
+            throw ClippyArchiveError.missingManifest(packageURL.path)
+        }
+        return try importTOML(text, into: database, baseURL: packageURL)
+    }
+
+    /// Resolve an archive-relative media path against `base`, refusing anything
+    /// that could escape it (absolute paths, `..`, symlink escapes).
+    static func resolveMedia(_ relative: String, in base: URL) -> URL? {
+        guard !relative.isEmpty, !relative.hasPrefix("/"), !relative.hasPrefix("~") else { return nil }
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: true)
+        guard !parts.isEmpty, !parts.contains(".."), !parts.contains(".") else { return nil }
+        let root = base.resolvingSymlinksInPath().standardizedFileURL
+        let candidate = parts.reduce(root) { $0.appendingPathComponent(String($1)) }
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard candidate.path.hasPrefix(root.path + "/") else { return nil }
+        return candidate
+    }
+
+    /// What Pass 1 (file IO, outside the transaction) prepared for one clip.
+    private enum Staged {
+        case text(String)
+        case image(MediaStore.StoredImage)
+        case file(name: String, path: String?, stored: MediaStore.StoredFile?)
+        case skippedImage
+        case skippedFile
+        case empty
+    }
+
+    /// Parse TOML text and apply it to the database in ONE transaction. Media
+    /// paths are resolved against `baseURL` (the package folder). With no
+    /// `baseURL` (a bare clippy.toml) a `media/<name>` reference falls back to
+    /// the local media store, which restores same-Mac exports.
+    @discardableResult
+    static func importTOML(_ text: String, into database: ClipDatabase,
+                           baseURL: URL? = nil) throws -> ImportSummary {
         let document = try TOMLDecoder().decode(ClippyArchiveDocument.self, from: text)
         let iso = isoFormatter
-        var summary = ImportSummary()
+        let fileManager = FileManager.default
+        let before = Set((try? fileManager.contentsOfDirectory(atPath: database.media.directory.path)) ?? [])
 
-        for category in document.category {
-            let categoryID = try database.upsertImportedCategory(
-                name: category.name,
-                colorHex: category.color,
-                iconKind: CategoryIconKind.fromTOML(category.iconKind),
-                iconValue: category.icon,
-                position: category.position,
-                starter: category.starter
-            )
-            summary.categories += 1
-
-            for clip in (category.clip ?? []) {
-                let created = clip.createdAt.flatMap { iso.date(from: $0) } ?? Date()
-                if clip.kind == "image" {
-                    guard let path = clip.imagePath,
-                          let clipID = try database.upsertImportedImageClip(
-                              fromFileAt: path, title: clip.title,
-                              sourceApp: clip.sourceApp, createdAt: created
-                          )
-                    else { summary.skippedImages += 1; continue }
-                    try database.setClip(clipID, inCategory: categoryID, true)
-                    summary.clips += 1
-                } else {
-                    let value = clip.text ?? ""
-                    guard !value.isEmpty else { continue }
-                    let clipID = try database.upsertImportedTextClip(
-                        text: value, title: clip.title,
-                        sourceApp: clip.sourceApp, createdAt: created
-                    )
-                    try database.setClip(clipID, inCategory: categoryID, true)
-                    summary.clips += 1
-                }
+        func mediaURL(for clip: ArchivedClip) -> URL? {
+            if let rel = clip.media {
+                if let baseURL { return resolveMedia(rel, in: baseURL) }
+                let name = (rel as NSString).lastPathComponent
+                return name.isEmpty || name == ".." ? nil : database.media.url(for: name)
             }
+            return clip.imagePath.map { URL(fileURLWithPath: $0) }
         }
-        return summary
+
+        // Pass 1: read and store media outside the transaction (file IO).
+        var staged: [[Staged]] = []
+        do {
+            for category in document.category {
+                var row: [Staged] = []
+                for clip in category.clip ?? [] {
+                    row.append(stage(clip, mediaURL: mediaURL(for: clip), database: database))
+                }
+                staged.append(row)
+            }
+
+            // Pass 2: everything else, atomically.
+            var summary = ImportSummary()
+            var evicted: [String] = []
+            try database.dbQueue.write { connection in
+                for (index, category) in document.category.enumerated() {
+                    let categoryID = try ClipDatabase.upsertImportedCategory(
+                        connection, name: category.name, colorHex: category.color,
+                        iconKind: CategoryIconKind.fromTOML(category.iconKind),
+                        iconValue: category.icon, position: category.position, starter: category.starter)
+                    summary.categories += 1
+                    for (position, item) in staged[index].enumerated() {
+                        let clip = (category.clip ?? [])[position]
+                        let created = clip.createdAt.flatMap { iso.date(from: $0) } ?? Date()
+                        let clipID: Int64
+                        switch item {
+                        case .text(let value):
+                            clipID = try ClipDatabase.upsertImportedTextClip(
+                                connection, text: value, title: clip.title, sourceApp: clip.sourceApp, createdAt: created)
+                        case .image(let stored):
+                            clipID = try ClipDatabase.upsertImportedImageClip(
+                                connection, stored: stored, title: clip.title, sourceApp: clip.sourceApp, createdAt: created)
+                        case .file(let name, let path, let stored):
+                            clipID = try ClipDatabase.upsertImportedFileClip(
+                                connection, displayName: name, filePath: path, stored: stored,
+                                title: clip.title, sourceApp: clip.sourceApp, createdAt: created)
+                        case .skippedImage: summary.skippedImages += 1; continue
+                        case .skippedFile: summary.skippedFiles += 1; continue
+                        case .empty: continue
+                        }
+                        try ClipDatabase.addImportedMembership(
+                            connection, clipID: clipID, categoryID: categoryID, position: position)
+                        summary.clips += 1
+                    }
+                }
+                // Categorized clips are exempt; this trims only uncategorized overflow.
+                evicted = try ClipDatabase.enforceLimits(connection, cap: AppSettings.storedMaxHistoryItems)
+            }
+            database.media.delete(filenames: evicted)
+            return summary
+        } catch {
+            // Rolled back: drop media this import newly wrote and nothing references.
+            let referenced = (try? database.referencedMediaFilenames()) ?? []
+            let now = Set((try? fileManager.contentsOfDirectory(atPath: database.media.directory.path)) ?? [])
+            database.media.delete(filenames: now.subtracting(before).subtracting(referenced).map { $0 })
+            throw error
+        }
+    }
+
+    /// Pass 1 for one clip. Never throws: an unreadable payload becomes a skip.
+    private static func stage(_ clip: ArchivedClip, mediaURL: URL?, database: ClipDatabase) -> Staged {
+        switch clip.kind {
+        case "image":
+            guard let url = mediaURL, let raw = FileManager.default.contents(atPath: url.path),
+                  let image = NSImage(data: raw), let png = MediaStore.pngData(from: image),
+                  let stored = try? database.media.store(pngData: png) else { return .skippedImage }
+            return .image(stored)
+        case "file":
+            let path = clip.filePath
+            var stored: MediaStore.StoredFile?
+            if let url = mediaURL, FileManager.default.fileExists(atPath: url.path),
+               var file = try? database.media.storeFile(at: url) {
+                let hash = (file.mediaFilename as NSString).deletingPathExtension
+                if let thumb = database.media.imageThumbnail(forFileAt: url, hash: hash) {
+                    file.thumbFilename = thumb.thumbFilename
+                    file.pixelWidth = thumb.pixelWidth
+                    file.pixelHeight = thumb.pixelHeight
+                }
+                stored = file
+            }
+            guard stored != nil || path != nil else { return .skippedFile }
+            let name = clip.fileName ?? path.map { ($0 as NSString).lastPathComponent } ?? "File"
+            return .file(name: name, path: path, stored: stored)
+        default:
+            let value = clip.text ?? ""
+            return value.isEmpty ? .empty : .text(value)
+        }
     }
 }

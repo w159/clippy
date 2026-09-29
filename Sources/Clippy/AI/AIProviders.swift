@@ -42,7 +42,7 @@ enum AIHTTP {
         request.httpMethod = "POST"
         request.timeoutInterval = 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -87,7 +87,7 @@ struct OpenAIProvider: AIProvider {
             headers: ["Authorization": "Bearer \(config.apiKey)"],
             body: [
                 "model": config.model,
-                "messages": AIHTTP.messagePayload(messages),
+                "messages": AIHTTP.messagePayload(AIMessageBuilder.plainText(messages)),
                 "temperature": options.temperature,
                 "max_tokens": options.maxTokens,
             ]
@@ -109,7 +109,7 @@ struct AnthropicProvider: AIProvider {
             "model": config.model,
             "max_tokens": options.maxTokens,
             "temperature": options.temperature,
-            "messages": AIHTTP.messagePayload(turns),
+            "messages": AIHTTP.messagePayload(AIMessageBuilder.plainText(turns)),
         ]
         if !system.isEmpty { body["system"] = system }
 
@@ -136,9 +136,9 @@ struct OllamaProvider: AIProvider {
             headers: [:],
             body: [
                 "model": config.model,
-                "messages": AIHTTP.messagePayload(messages),
+                "messages": AIHTTP.messagePayload(AIMessageBuilder.plainText(messages)),
                 "stream": false,
-                "options": ["temperature": options.temperature],
+                "options": OllamaOptions.payload(options),
             ]
         )
         return try AIHTTP.string(data, at: ["message", "content"])
@@ -157,7 +157,7 @@ struct AzureFoundryProvider: AIProvider {
             url: url,
             headers: ["api-key": config.apiKey],
             body: [
-                "messages": AIHTTP.messagePayload(messages),
+                "messages": AIHTTP.messagePayload(AIMessageBuilder.plainText(messages)),
                 "temperature": options.temperature,
                 "max_tokens": options.maxTokens,
             ]
@@ -177,5 +177,15 @@ enum AIProviderFactory {
         case .anthropic: return AnthropicProvider(config: config)
         case .azureFoundry: return AzureFoundryProvider(config: config)
         }
+    }
+}
+
+// MARK: - Ollama options
+
+/// Builds Ollama's `options` object. Ollama ignores `max_tokens`; its equivalent
+/// is `num_predict`, so without it the action/agent token limit did nothing (AI-11).
+enum OllamaOptions {
+    static func payload(_ options: AICompletionOptions) -> [String: Any] {
+        ["temperature": options.temperature, "num_predict": options.maxTokens]
     }
 }

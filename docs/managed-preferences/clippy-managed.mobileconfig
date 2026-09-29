@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Sample configuration profile locking Clippy security settings. Replace the UUIDs
+     and PayloadOrganization before deploying. Domain: com.jerry.clippy. -->
+<plist version="1.0">
+<dict>
+    <key>PayloadType</key><string>Configuration</string>
+    <key>PayloadVersion</key><integer>1</integer>
+    <key>PayloadIdentifier</key><string>com.jerry.clippy.managed</string>
+    <key>PayloadUUID</key><string>9C33324E-6EE8-4B14-A7A9-211C4382DE93</string>
+    <key>PayloadDisplayName</key><string>Clippy managed preferences</string>
+    <key>PayloadOrganization</key><string>Example Firm</string>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key><string>com.apple.ManagedClient.preferences</string>
+            <key>PayloadVersion</key><integer>1</integer>
+            <key>PayloadIdentifier</key><string>com.jerry.clippy.managed.prefs</string>
+            <key>PayloadUUID</key><string>8BE9770D-2CF0-482C-95D4-DB565F62ED92</string>
+            <key>PayloadContent</key>
+            <dict>
+                <key>com.jerry.clippy</key>
+                <dict>
+                    <key>Forced</key>
+                    <array>
+                        <dict>
+                            <key>mcx_preference_settings</key>
+                            <dict>
+    <key>aiEnabled</key><false/>
+    <key>aiAgentAllowScripts</key><false/>
+    <key>aiAgentAllowCodeExecution</key><false/>
+    <key>aiAgentAllowWebSearch</key><false/>
+    <key>aiAutoSuggestTitles</key><false/>
+    <key>mcpEnabled</key><false/>
+    <key>iCloudSyncEnabled</key><false/>
+    <key>captureImages</key><true/>
+    <key>captureFiles</key><true/>
+    <key>suggestionsEnabled</key><false/>
+    <key>suggestionsUseWindowText</key><false/>
+    <key>onePasswordAutoClearClipboard</key><true/>
+    <key>onePasswordAutoClearDelaySecs</key><integer>30</integer>
+    <key>security.appLock.enabled</key><true/>
+    <key>security.appLock.idleMinutes</key><integer>5</integer>
+</dict>
+                        </dict>
+                    </array>
+                </dict>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>

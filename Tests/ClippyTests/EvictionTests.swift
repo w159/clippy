@@ -1,6 +1,7 @@
 import XCTest
 @testable import Clippy
 
+@MainActor
 final class EvictionTests: XCTestCase {
     /// Categorized clips are exempt from the history cap.
     func testCapEvictionSkipsCategorizedClips() throws {

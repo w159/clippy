@@ -2,6 +2,7 @@ import XCTest
 import AppKit
 @testable import Clippy
 
+@MainActor
 final class ThemeTests: XCTestCase {
 
     // MARK: - Hex round-trip

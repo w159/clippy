@@ -5,6 +5,7 @@ import XCTest
 // the Settings field used to reach `UInt16(port)` in isPortFree and trap, taking
 // down the whole app. The fixes clamp the setting on write and guard the range
 // in isPortFree.
+@MainActor
 final class McpServerControllerTests: XCTestCase {
 
     func testIsPortFreeRejectsOutOfRangePortsWithoutCrashing() {

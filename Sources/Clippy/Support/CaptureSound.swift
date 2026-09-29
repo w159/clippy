@@ -32,6 +32,10 @@ enum CaptureSound: String, CaseIterable, Identifiable {
 /// Single responsibility: resolve NSSound, set volume, fire play().
 /// NSSound.play() is asynchronous and non-blocking; it returns immediately
 /// and the system mixes the audio independently of the caller.
+///
+/// Main-actor isolated: NSSound is not Sendable and every caller (capture
+/// pipeline, Settings pickers) is on the main thread, so the id cache needs no lock.
+@MainActor
 final class SoundPlayer {
 
     /// Cache of NSSound instances keyed by catalog id (see SoundCatalog).
@@ -58,12 +62,12 @@ final class SoundPlayer {
 
     /// Clamps a raw volume value to the valid NSSound range [0.0, 1.0].
     /// Extracted for unit testing without instantiating NSSound.
-    static func clampVolume(_ raw: Float) -> Float {
+    nonisolated static func clampVolume(_ raw: Float) -> Float {
         min(1.0, max(0.0, raw))
     }
 
     /// Converts a 0-100 integer slider value to the 0.0-1.0 Float NSSound expects.
-    static func sliderToVolume(_ slider: Int) -> Float {
+    nonisolated static func sliderToVolume(_ slider: Int) -> Float {
         clampVolume(Float(slider) / 100.0)
     }
 }

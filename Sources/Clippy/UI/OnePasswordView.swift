@@ -9,17 +9,20 @@ struct OnePasswordView: View {
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var items: [OPItem] = []
-    @State private var loading = false
-    @State private var error: String?
+    /// Owns the list/detail loads and the state machine (OPW-01, OPW-02).
+    @StateObject private var model = OnePasswordViewModel(
+        makeService: { OnePasswordService(vault: AppSettings.shared.onePasswordVault) })
     @State private var creating = false
     @State private var newTitle = ""
     @State private var newValue = ""
     @State private var status: String?
-    @State private var expandedItemID: String?
-    @State private var detail: OPItemDetail?
-    @State private var detailLoading = false
-    @State private var detailError: String?
+    @State private var searchQuery = ""
+    @State private var toastMessage: String?
+    @State private var isCreating = false
+    @State private var toastTask: Task<Void, Never>?
+    @State private var statusTask: Task<Void, Never>?
+    @FocusState private var searchFocused: Bool
+    @FocusState private var titleFocused: Bool
 
     private var service: OnePasswordService { OnePasswordService(vault: settings.onePasswordVault) }
 
@@ -29,86 +32,133 @@ struct OnePasswordView: View {
             Divider()
             content
         }
-        .onAppear { reload() }
+        .onAppear { model.reload() }
+        .onDisappear {
+            toastTask?.cancel()
+            statusTask?.cancel()
+        }
+        .onChange(of: model.state) { _, state in if state == .ready { searchFocused = true } }
+        .onChange(of: creating) { _, isOn in if isOn { titleFocused = true } }
+        // Switching vaults in Settings must reload the list; onAppear alone left the
+        // old vault's items on screen.
+        .onChange(of: settings.onePasswordVault) { _, _ in model.reload() }
+        .onChange(of: searchQuery) { _, _ in
+            if let expandedItemID, !filteredItems.contains(where: { $0.id == expandedItemID }) {
+                model.collapse()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let toastMessage {
+                ClippyToast(toastMessage, severity: .success, dismiss: { self.toastMessage = nil })
+                    .padding(12)
+                    .transition(.opacity)
+            }
+        }
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: toastMessage)
+        .clippyDesignSystem()
     }
 
+    private var loading: Bool { model.state == .loading }
+    private var expandedItemID: String? { model.expandedItemID }
+
     private var tokens: ThemeTokens { settings.theme }
+    private var filteredItems: [OPItem] {
+        OnePasswordFilter.filter(model.items, query: searchQuery, vault: settings.onePasswordVault)
+    }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Label {
-                Text("1Password \u{00B7} \(settings.onePasswordVault)")
+                Text("1Password · \(settings.onePasswordVault)")
                     .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(1)
             } icon: {
                 Image(systemName: "key.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(tokens.accent, tokens.textSecondary)
             }
-                .font(PanelTypography.body(settings).weight(.semibold))
-            Spacer()
-            Button { creating.toggle() } label: {
-                Image(systemName: "plus").symbolRenderingMode(.hierarchical)
-            }
-                .help("New secret")
-                .accessibilityLabel("New secret")
-            Button { reload() } label: {
-                Image(systemName: "arrow.clockwise")
-                    .symbolRenderingMode(.hierarchical)
-                    // Spin the refresh glyph while a reload is in flight; the
-                    // variableColor cycle reads as "working" and stops on load.
-                    .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
-            }
-                .help("Refresh")
-                .accessibilityLabel("Refresh")
-                .disabled(loading)
+            .font(PanelTypography.body(settings).weight(.semibold))
+            TextField("Search items", text: $searchQuery)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search 1Password items by title or vault")
+                .focused($searchFocused)
+                .disabled(model.state != .ready)
+            IconButton("plus", label: "New secret", state: creating ? .selected : .rest) { creating.toggle() }
+            IconButton("arrow.clockwise", label: "Refresh", state: loading ? .disabled : .rest) { model.reload() }
+                .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
         }
         .padding(10)
     }
 
     @ViewBuilder
     private var content: some View {
-        if !OnePasswordService.isInstalled {
-            message("The 1Password CLI (op) was not found.",
-                    detail: "Install 1Password 8 and turn on the command-line tool in its Developer settings.")
-        } else if let error {
-            message("Could not reach 1Password", detail: error)
-        } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    if creating { newSecretForm }
-                    if let status {
-                        Text(status).font(.caption).foregroundStyle(tokens.textSecondary)
-                    }
-                    if loading {
-                        ProgressView().controlSize(.small)
-                    } else if items.isEmpty {
-                        Text("No secrets in this vault yet. Use + to add one.")
-                            .font(.callout).foregroundStyle(tokens.textSecondary)
-                    } else {
-                        ForEach(items) { item in
-                            itemRow(item)
-                            if expandedItemID == item.id {
-                                itemDetailPanel(item)
-                                    .transition(.opacity.combined(with: .move(edge: .top)))
-                            }
-                        }
+        switch model.state {
+        case .notInstalled:
+            OnePasswordStatePanel(state: .notInstalled, retry: { model.reload() }, signIn: { model.signIn() })
+        case .needsSignIn(let detail):
+            OnePasswordStatePanel(state: .needsSignIn(detail), signingIn: model.signingIn,
+                                  retry: { model.reload() }, signIn: { model.signIn() })
+        case .error(let detail):
+            OnePasswordStatePanel(state: .error(detail), retry: { model.reload() }, signIn: { model.signIn() })
+        case .loading:
+            if model.items.isEmpty {
+                OnePasswordStatePanel(state: .loading, retry: { model.reload() }, signIn: { model.signIn() })
+            } else {
+                // Keep the previous list on screen while refreshing so nothing jumps.
+                itemList.opacity(0.6).allowsHitTesting(false)
+            }
+        case .empty:
+            OnePasswordStatePanel(state: .empty, retry: { model.reload() }, signIn: { model.signIn() })
+        case .ready:
+            itemList
+        }
+    }
+
+    private var itemList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                if creating { newSecretForm }
+                if let status { Text(status).font(.caption).foregroundStyle(tokens.textSecondary) }
+                if filteredItems.isEmpty {
+                    Text(searchQuery.isEmpty ? "No items in this vault." : "No items match this search.")
+                        .font(.callout).foregroundStyle(tokens.textSecondary)
+                        .frame(maxWidth: .infinity).padding(.vertical, 20)
+                }
+                ForEach(filteredItems) { item in
+                    OnePasswordItemRow(item: item, isExpanded: expandedItemID == item.id,
+                                       toggle: { model.toggleExpand(item) })
+                    if expandedItemID == item.id {
+                        OnePasswordItemDetailPanel(
+                            loading: model.detailLoading, error: model.detailError, detail: model.detail,
+                            service: service, onAutoClear: { showAutoClearToast() },
+                            onRetry: { model.retryDetail() })
                     }
                 }
-                .padding(10)
             }
+            .padding(10)
         }
     }
 
     private var newSecretForm: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField("Title", text: $newTitle).textFieldStyle(.roundedBorder)
-            SecureField("Secret value", text: $newValue).textFieldStyle(.roundedBorder)
+            TextField("Title", text: $newTitle)
+                .textFieldStyle(.roundedBorder)
+                .focused($titleFocused)
+                .onSubmit { create() }
+            SecureField("Secret value", text: $newValue)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { create() }
             HStack {
-                Button("Create") { create() }
-                    .disabled(newTitle.isEmpty || newValue.isEmpty)
+                Spacer()
                 Button("Cancel") { creating = false; newTitle = ""; newValue = "" }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(isCreating)
+                Button("Create") { create() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newTitle.isEmpty || newValue.isEmpty || isCreating)
             }
         }
+        .disabled(isCreating)
         .padding(8)
         .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
         .overlay(
@@ -117,349 +167,55 @@ struct OnePasswordView: View {
         )
     }
 
-    // MARK: - Item row (collapsed)
-
-    private func itemRow(_ item: OPItem) -> some View {
-        let isExpanded = expandedItemID == item.id
-        return Button {
-            toggleExpand(item)
-        } label: {
-            HStack {
-                Image(systemName: "lock.doc")
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.accent)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.title)
-                    Text(item.category.replacingOccurrences(of: "_", with: " ").capitalized).font(.caption2).foregroundStyle(tokens.textSecondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.textSecondary)
-                    // One fixed chevron rotated, not two swapped glyphs, so the
-                    // expand/collapse change animates smoothly instead of popping.
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isExpanded)
-            }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(
-                isExpanded
-                    ? tokens.accent.opacity(0.10)
-                    : tokens.cardBorder.opacity(0.15),
-                in: RoundedRectangle(cornerRadius: 6)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.title)
-        .accessibilityValue(isExpanded ? "expanded" : "collapsed")
-        .accessibilityHint("Shows or hides the fields for this item.")
-        .accessibilityAddTraits(.isButton)
-    }
-
-    // MARK: - Item detail panel (expanded)
-
-    @ViewBuilder
-    private func itemDetailPanel(_ item: OPItem) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if detailLoading {
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text("Loading fields...").font(.caption).foregroundStyle(tokens.textSecondary)
-                }
-                .padding(.horizontal, 8)
-            } else if let detailError {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(tokens.danger)
-                        // Bounce once when an error surfaces so it draws the eye.
-                        // Keyed on the message so a new error re-triggers the bounce.
-                        .symbolEffect(.bounce, value: reduceMotion ? "" : detailError)
-                    Text(detailError).font(.caption).foregroundStyle(tokens.textSecondary)
-                }
-                .padding(.horizontal, 8)
-            } else if let detail {
-                itemDetailFields(detail)
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.bottom, 4)
-    }
-
-    @ViewBuilder
-    private func itemDetailFields(_ detail: OPItemDetail) -> some View {
-        ForEach(Array(detail.sectionedFields.enumerated()), id: \.offset) { _, bucket in
-            let (section, fields) = bucket
-            if let section {
-                Text(section.label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(tokens.textSecondary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
-            }
-            ForEach(fields) { field in
-                FieldRow(field: field, itemID: detail.id, service: service,
-                         autoClear: settings.onePasswordAutoClearClipboard,
-                         autoClearSecs: settings.onePasswordAutoClearDelaySecs)
-            }
-        }
-    }
-
-    private func message(_ title: String, detail: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "key.slash")
-                .font(.system(size: 28, weight: .light))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tokens.textSecondary)
-            Text(title).font(PanelTypography.body(settings).weight(.semibold))
-            Text(detail).font(PanelTypography.metadata(settings)).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
-    }
-
     // MARK: - Actions
 
-    private func toggleExpand(_ item: OPItem) {
-        if expandedItemID == item.id {
-            // Collapse: clear reveal state by discarding detail entirely.
-            expandedItemID = nil
-            detail = nil
-            detailError = nil
-        } else {
-            expandedItemID = item.id
-            detail = nil
-            detailError = nil
-            loadDetail(item)
+    private func showAutoClearToast() {
+        toastMessage = "1Password cleared the clipboard"
+        toastTask?.cancel()
+        toastTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            toastMessage = nil
         }
     }
 
-    private func loadDetail(_ item: OPItem) {
-        detailLoading = true
-        Task {
-            do {
-                let d = try await service.fetchItemDetail(itemID: item.id)
-                await MainActor.run {
-                    // Only apply if the user hasn't switched to a different item.
-                    if expandedItemID == item.id {
-                        detail = d
-                    }
-                    detailLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    if expandedItemID == item.id {
-                        detailError = error.localizedDescription
-                    }
-                    detailLoading = false
-                }
-            }
-        }
-    }
-
-    private func reload() {
-        guard OnePasswordService.isInstalled else { return }
-        loading = true
-        error = nil
-        expandedItemID = nil
-        detail = nil
-        Task {
-            do {
-                let fetched = try await service.listItems()
-                await MainActor.run { items = fetched; loading = false }
-            } catch {
-                await MainActor.run { self.error = error.localizedDescription; loading = false }
-            }
+    /// Shows `message` under the header, then clears it so it never goes stale.
+    private func flashStatus(_ message: String) {
+        status = message
+        statusTask?.cancel()
+        statusTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            status = nil
         }
     }
 
     private func create() {
+        guard !isCreating, !newTitle.isEmpty, !newValue.isEmpty else { return }
         let title = newTitle, value = newValue
+        isCreating = true
         status = "Creating \(title)..."
         Task {
             do {
                 try await service.createSecret(title: title, value: value)
                 await MainActor.run {
+                    isCreating = false
                     creating = false; newTitle = ""; newValue = ""
-                    status = "Created \(title)."
-                    reload()
+                    flashStatus("Created \(title).")
+                    model.reload()
                 }
             } catch {
-                await MainActor.run { status = error.localizedDescription }
+                await MainActor.run {
+                    isCreating = false
+                    flashStatus(error.localizedDescription)
+                }
             }
         }
     }
 }
 
-// MARK: - FieldRow
 
-/// One field in the expanded item detail. Handles concealed reveal toggle,
-/// TOTP fetch-on-demand, copy-with-concealed-marker, and auto-clear scheduling.
-private struct FieldRow: View {
-    let field: OPField
-    let itemID: String
-    let service: OnePasswordService
-    let autoClear: Bool
-    let autoClearSecs: Int
-
-    @ObservedObject private var settings = AppSettings.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private var tokens: ThemeTokens { settings.theme }
-
-    @State private var revealed = false
-    @State private var copying = false
-    @State private var copyError: String?
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(field.label)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(tokens.textSecondary)
-                fieldValueView
-            }
-            Spacer(minLength: 8)
-            copyButton
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 5))
-        .onDisappear {
-            // Reset reveal state when the row leaves the view hierarchy
-            // (item collapsed or view dismissed).
-            revealed = false
-        }
-    }
-
-    @ViewBuilder
-    private var fieldValueView: some View {
-        if field.type.isOTP {
-            Text("TOTP - fetched on copy")
-                .font(.caption)
-                .foregroundStyle(tokens.textSecondary)
-                .italic()
-        } else if field.type.isConcealed {
-            if revealed, let v = field.value {
-                Text(v)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-            } else {
-                HStack(spacing: 4) {
-                    Text(String(repeating: "\u{2022}", count: 8))
-                        .font(.caption)
-                        .foregroundStyle(tokens.textSecondary)
-                    Button {
-                        revealed.toggle()
-                    } label: {
-                        Image(systemName: revealed ? "eye.slash" : "eye")
-                            .font(.caption2)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(tokens.accent)
-                            // Cross-fade eye <-> eye.slash on the reveal toggle.
-                            .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
-                    }
-                    .buttonStyle(.plain)
-                    .help(revealed ? "Hide" : "Reveal")
-                    // Expose reveal state to VoiceOver so the button's purpose
-                    // is clear without seeing the eye/eye.slash glyph swap.
-                    .accessibilityLabel(revealed ? "Hide" : "Reveal")
-                    .accessibilityValue(revealed ? "shown" : "hidden")
-                }
-            }
-        } else if let v = field.value {
-            Text(v)
-                .font(.caption)
-                .textSelection(.enabled)
-                .lineLimit(3)
-        } else {
-            Text("(empty)")
-                .font(.caption)
-                .foregroundStyle(tokens.textSecondary)
-                .italic()
-        }
-
-        if let err = copyError {
-            Text(err)
-                .font(.caption2)
-                .foregroundStyle(.red)
-        }
-    }
-
-    private var copyButton: some View {
-        Button {
-            performCopy()
-        } label: {
-            if copying {
-                ProgressView().controlSize(.mini)
-            } else {
-                Text("Copy")
-            }
-        }
-        .controlSize(.small)
-        .disabled(copying || (field.value == nil && !field.type.isOTP))
-        .help(field.value == nil && field.type.isConcealed ? "This field has no value stored in 1Password." : "")
-    }
-
-    private func performCopy() {
-        copying = true
-        copyError = nil
-
-        if field.type.isOTP {
-            // TOTP: fetch on demand, never cache.
-            Task {
-                do {
-                    let code = try await service.fetchTOTP(itemID: itemID)
-                    await MainActor.run {
-                        writeToPasteboard(code, concealed: true)
-                        copying = false
-                    }
-                } catch {
-                    await MainActor.run {
-                        copyError = error.localizedDescription
-                        copying = false
-                    }
-                }
-            }
-        } else if field.type.isConcealed {
-            // For concealed fields the value was fetched with the item detail
-            // (op already prompted for auth). Copy directly.
-            guard let v = field.value else { copying = false; return }
-            writeToPasteboard(v, concealed: true)
-            copying = false
-        } else {
-            guard let v = field.value else { copying = false; return }
-            writeToPasteboard(v, concealed: false)
-            copying = false
-        }
-    }
-
-    /// Write to the pasteboard. Concealed writes include the ConcealedType
-    /// marker so the clipboard monitor never records the value in history.
-    /// If auto-clear is enabled, a task checks the changeCount after the delay
-    /// and clears the pasteboard only if it still holds this exact write.
-    private func writeToPasteboard(_ value: String, concealed: Bool) {
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(value, forType: .string)
-        if concealed {
-            pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
-        }
-
-        if concealed && autoClear {
-            let changeCount = pb.changeCount
-            let delay = autoClearSecs
-            Task {
-                try? await Task.sleep(for: .seconds(UInt64(delay)))
-                await MainActor.run {
-                    // Only clear if the pasteboard hasn't been written to since.
-                    if NSPasteboard.general.changeCount == changeCount {
-                        NSPasteboard.general.clearContents()
-                    }
-                }
-            }
-        }
-    }
+#Preview("1Password") {
+    OnePasswordView()
+        .frame(width: 720, height: 520)
 }

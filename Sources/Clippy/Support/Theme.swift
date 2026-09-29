@@ -114,6 +114,19 @@ enum PanelMaterialStyle: String, CaseIterable, Identifiable {
         case .opaque: return nil
         }
     }
+
+    /// LAY-14: the real consumer of the persisted `panelMaterial` setting.
+    /// The five raw values are preserved; they resolve to one of three panel
+    /// backdrops (docs/design/01-principles-and-tokens.md section 2.2):
+    /// ultraThin/thin -> Liquid Glass, regular/thick -> AppKit vibrancy,
+    /// opaque -> solid. See `ThemedPanelBackground`.
+    var backdrop: PanelBackdropStyle {
+        switch self {
+        case .ultraThin, .thin: return .glass
+        case .regular, .thick: return .vibrancy
+        case .opaque: return .solid
+        }
+    }
 }
 
 // MARK: - Card style
@@ -199,8 +212,15 @@ enum PanelFontFamily: String, CaseIterable, Identifiable {
     /// the list only contains fonts the system actually has.
     var isAvailable: Bool {
         guard let name = familyName else { return true }
-        return NSFontManager.shared.availableFontFamilies.contains(name)
+        return Self.installedFamilies.contains(name)
     }
+
+    /// LAY-13: the installed family set, read once. `availableFontFamilies`
+    /// builds a fresh array on every call and `isAvailable` runs on every
+    /// PanelTypography.make, i.e. once per Text per render. Fonts installed
+    /// while the app runs are picked up on next launch, which is acceptable
+    /// for a picker of well-known system families.
+    private static let installedFamilies: Set<String> = Set(NSFontManager.shared.availableFontFamilies)
 }
 
 // MARK: - Typography helper
@@ -216,6 +236,7 @@ enum PanelFontFamily: String, CaseIterable, Identifiable {
 ///   title    +0, weight .medium (clip title / header label)
 ///   metadata -1  (date stamps, kind badges, section headers)
 ///   micro    -2  (count badges, caption2 equivalents)
+@MainActor
 struct PanelTypography {
     // Prevent instantiation; all members are static helpers.
     private init() {}

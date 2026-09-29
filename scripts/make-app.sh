@@ -34,11 +34,19 @@ FEED_URL="https://raw.githubusercontent.com/${REPO_SLUG}/main/appcast.xml"
 PUBLIC_KEY_FILE="scripts/sparkle-public-key.txt"
 
 swift build -c release
+swift build -c release --product clippy-cli
 
 APP="build/Clippy.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resources"
 cp .build/release/Clippy "$APP/Contents/MacOS/Clippy"
+
+# Command line tool (FEAT-12). The build product is named clippy-cli (a product
+# named "clippy" would collide with "Clippy" on case-insensitive volumes); it
+# ships as Contents/Resources/bin/clippy. Copied before codesign so the app's
+# signature seals it.
+mkdir -p "$APP/Contents/Resources/bin"
+cp .build/release/clippy-cli "$APP/Contents/Resources/bin/clippy"
 
 # Copy the pre-built icon into the bundle's Resources directory.
 # The .icns is generated once via: swift assets/generate-icon.swift
@@ -66,6 +74,37 @@ elif [[ "${REQUIRE_MCP:-0}" == "1" ]]; then
     exit 1
 else
     echo "warning: $MCP_BUILT not found; building app without the bundled MCP server" >&2
+fi
+
+# -----------------------------------------------------------------------
+# App Intents metadata (FEAT-11). Xcode normally runs appintentsmetadataprocessor;
+# SwiftPM does not, so run it here over the release build's Swift const-value
+# files and ship Metadata.appintents in Resources. Best-effort: on failure the app
+# still works but Shortcuts will not list Clippy's actions. Whether the system
+# registers them can only be confirmed by running the built bundle.
+CONST_DIR="$(find .build -type d -path '*Clippy-p.build/Objects-normal/arm64' -path '*Release*' 2>/dev/null | head -n 1)"
+if [[ -n "$CONST_DIR" && -f "$CONST_DIR/Clippy.SwiftFileList" ]] && xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
+    AI_TMP="$(mktemp -d)"
+    ls "$CONST_DIR"/*.swiftconstvalues > "$AI_TMP/constvals.txt"
+    : > "$AI_TMP/meta.txt"
+    if xcrun appintentsmetadataprocessor \
+        --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")" \
+        --module-name Clippy --sdk-root "$(xcrun --show-sdk-path)" \
+        --xcode-version "$(xcodebuild -version | awk '/Build/{print $3}')" \
+        --platform-family macOS --deployment-target 26.0 --bundle-identifier com.jerry.clippy \
+        --output "$AI_TMP/out" --target-triple arm64-apple-macos26.0 \
+        --binary-file "$PWD/.build/release/Clippy" --dependency-file "$AI_TMP/dep.d" \
+        --stringsdata-file "$AI_TMP/x.stringsdata" --swift-const-vals-list "$AI_TMP/constvals.txt" \
+        --source-files "$CONST_DIR/Clippy.SwiftFileList" --metadata-file-list "$AI_TMP/meta.txt" \
+        --force --compile-time-extraction >/dev/null 2>&1 && [[ -d "$AI_TMP/out/Metadata.appintents" ]]; then
+        cp -R "$AI_TMP/out/Metadata.appintents" "$APP/Contents/Resources/Metadata.appintents"
+        echo "Bundled App Intents metadata (registration with Shortcuts unverified)"
+    else
+        echo "warning: appintentsmetadataprocessor failed; Shortcuts actions will not register" >&2
+    fi
+    rm -rf "$AI_TMP"
+else
+    echo "warning: App Intents const-value files or processor not found; skipping metadata" >&2
 fi
 
 # Sparkle ships as a binary xcframework inside the SwiftPM artifacts dir; the
@@ -124,6 +163,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>26.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.jerry.clippy.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>clippy</string>
+            </array>
+        </dict>
+    </array>
     <key>NSHumanReadableCopyright</key>
     <string>Local-only clipboard manager.</string>
 ${SPARKLE_KEYS}
@@ -172,6 +222,10 @@ if [[ -n "$CODESIGN_IDENTITY" ]]; then
     # 5. The framework bundle itself (covers all remaining resources)
     codesign --force --sign "$CODESIGN_IDENTITY" --options runtime --timestamp \
         "$SPARKLE_FW"
+
+    # 5b. The bundled CLI (a nested Mach-O, signed before the outer app)
+    codesign --force --sign "$CODESIGN_IDENTITY" --options runtime --timestamp \
+        "$APP/Contents/Resources/bin/clippy"
 
     # 6. The app bundle last (outer envelope covers everything above)
     codesign --force --sign "$CODESIGN_IDENTITY" --options runtime --timestamp \

@@ -12,8 +12,17 @@ enum ClipKind: Equatable {
     case image
     case text
 
+    /// Characters examined before giving up on classification.
+    private static let detectionWindow = 4096
+
     static func detect(_ rawText: String) -> ClipKind {
-        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Prefix before trimming (CAP-07): a multi-megabyte clip must not be
+        // copied and trimmed in full just to learn it is too long to classify.
+        // 4096 characters is twice the classification limit, leaving room for
+        // surrounding whitespace on a value that is itself short enough.
+        let window = rawText.drop(while: \.isWhitespace).prefix(detectionWindow)
+        guard window.count < detectionWindow else { return .text }
+        let text = window.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.count <= 2048 else { return .text }
 
         let isSingleToken = !text.contains(where: \.isWhitespace)

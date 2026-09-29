@@ -61,34 +61,34 @@ extension AIAction: Codable {
     }
 
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(UUID.self, forKey: .id)
-        name = try c.decode(String.self, forKey: .name)
-        symbolName = try c.decode(String.self, forKey: .symbolName)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        symbolName = try container.decode(String.self, forKey: .symbolName)
         // Old JSON has no `iconKind`; default to .symbol so existing actions
         // that stored an SF Symbol name in `symbolName` continue to render correctly.
-        iconKind = try c.decodeIfPresent(CategoryIconKind.self, forKey: .iconKind) ?? .symbol
-        promptTemplate = try c.decode(String.self, forKey: .promptTemplate)
-        temperature = try c.decode(Double.self, forKey: .temperature)
-        maxTokens = try c.decode(Int.self, forKey: .maxTokens)
-        outputDisposition = try c.decode(AIActionOutputDisposition.self, forKey: .outputDisposition)
-        isBuiltIn = try c.decode(Bool.self, forKey: .isBuiltIn)
+        iconKind = try container.decodeIfPresent(CategoryIconKind.self, forKey: .iconKind) ?? .symbol
+        promptTemplate = try container.decode(String.self, forKey: .promptTemplate)
+        temperature = try container.decode(Double.self, forKey: .temperature)
+        maxTokens = try container.decode(Int.self, forKey: .maxTokens)
+        outputDisposition = try container.decode(AIActionOutputDisposition.self, forKey: .outputDisposition)
+        isBuiltIn = try container.decode(Bool.self, forKey: .isBuiltIn)
         // Old JSON has no sortOrder; default to 0 so migration backfill runs in load().
-        sortOrder = try c.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder) ?? 0
     }
 
     func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(id, forKey: .id)
-        try c.encode(name, forKey: .name)
-        try c.encode(iconKind, forKey: .iconKind)
-        try c.encode(symbolName, forKey: .symbolName)
-        try c.encode(promptTemplate, forKey: .promptTemplate)
-        try c.encode(temperature, forKey: .temperature)
-        try c.encode(maxTokens, forKey: .maxTokens)
-        try c.encode(outputDisposition, forKey: .outputDisposition)
-        try c.encode(isBuiltIn, forKey: .isBuiltIn)
-        try c.encode(sortOrder, forKey: .sortOrder)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(iconKind, forKey: .iconKind)
+        try container.encode(symbolName, forKey: .symbolName)
+        try container.encode(promptTemplate, forKey: .promptTemplate)
+        try container.encode(temperature, forKey: .temperature)
+        try container.encode(maxTokens, forKey: .maxTokens)
+        try container.encode(outputDisposition, forKey: .outputDisposition)
+        try container.encode(isBuiltIn, forKey: .isBuiltIn)
+        try container.encode(sortOrder, forKey: .sortOrder)
     }
 }
 
@@ -177,7 +177,8 @@ extension AIAction {
         AIAction(id: UUID(uuidString: "A1000000-0000-0000-0000-000000000008")!,
                  name: "Suggest Category",
                  iconKind: .symbol, symbolName: "folder",
-                 promptTemplate: "Assign this item to exactly one category from the provided list. Reply with only the category name. If none fit, reply NONE.\n\nCategories:\n{instruction}\n\nItem:\n{clip}",
+                 promptTemplate: "Assign this item to exactly one category from the provided list. Reply with only the category name. If none fit, "
+                     + "reply NONE.\n\nCategories:\n{instruction}\n\nItem:\n{clip}",
                  temperature: 0.0, maxTokens: 24,
                  outputDisposition: .proposeEdit, isBuiltIn: true, sortOrder: 7),
     ]
@@ -187,6 +188,7 @@ extension AIAction {
 
 /// Persists user-defined and built-in AI actions as a JSON file, following the
 /// same pattern as ScriptStore. Injectable `fileURL` for tests.
+@MainActor
 final class AIActionStore: ObservableObject {
     static let shared = AIActionStore()
 
@@ -233,9 +235,9 @@ final class AIActionStore: ObservableObject {
     // MARK: - CRUD
 
     func add(_ action: AIAction) {
-        var a = action
-        a.sortOrder = (actions.map(\.sortOrder).max() ?? -1) + 1
-        store.add(a)
+        var updated = action
+        updated.sortOrder = (actions.map(\.sortOrder).max() ?? -1) + 1
+        store.add(updated)
         actions = store.items.sorted { $0.sortOrder < $1.sortOrder }
     }
 
@@ -275,8 +277,8 @@ final class AIActionStore: ObservableObject {
         // The generic store only reorders the array; sortOrder renumbering is
         // AIAction-specific and stays here.
         var reordered = store.items
-        for i in reordered.indices { reordered[i].sortOrder = i }
-        for a in reordered { store.update(a) }
+        for index in reordered.indices { reordered[index].sortOrder = index }
+        for item in reordered { store.update(item) }
         actions = store.items.sorted { $0.sortOrder < $1.sortOrder }
     }
 }

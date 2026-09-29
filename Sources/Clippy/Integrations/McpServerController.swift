@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import Network
+import os
 
 // MARK: - Status
 
@@ -32,35 +33,106 @@ enum McpServerStatus {
     }
 }
 
+// MARK: - Port status
+
+/// What the Settings port row should say (SET-03). Derived from the running server
+/// first, so it can never read "available" while our own server holds the port.
+enum McpPortStatus: Equatable {
+    /// Not a bindable port number.
+    case invalid
+    /// Nothing is listening; the server can bind it.
+    case available
+    /// Clippy's own MCP server is listening on it.
+    case inUseByClippy
+    /// Another process holds it.
+    case inUseByOther
+
+    /// Pure derivation: `serverPort` is the port our running server reports, if any.
+    static func derive(port: Int, serverPort: Int?, isFree: Bool) -> McpPortStatus {
+        guard (1...65535).contains(port) else { return .invalid }
+        if serverPort == port { return .inUseByClippy }
+        return isFree ? .available : .inUseByOther
+    }
+
+    var summary: String {
+        switch self {
+        case .invalid:       return "Enter a port between 1024 and 65535"
+        case .available:     return "Available"
+        case .inUseByClippy: return "In use by the Clippy server"
+        case .inUseByOther:  return "In use by another process"
+        }
+    }
+}
+
 // MARK: - Controller
 
+@MainActor
 final class McpServerController: ObservableObject {
     static let shared = McpServerController()
 
     @Published var status: McpServerStatus = .stopped
+    /// Status of the configured port, derived from the running server (SET-03).
+    @Published private(set) var portStatus: McpPortStatus = .available
 
-    // Serial queue that owns the child-process reference. Every read and write of
-    // `process` and `startInFlight` happens here, so the node process can never be
-    // terminated, leaked, or double-launched by two queues racing. `status` stays
-    // on the main queue (SwiftUI observes it), so we never mutate it from here.
-    private let lifecycleQueue = DispatchQueue(label: "com.bytesavvy.clippy.mcp.lifecycle")
-    private var process: Process?
-    // Atomic "a start is already underway" sentinel, guarded by lifecycleQueue.
-    // Set the instant a launch is committed; cleared when the start resolves
-    // (running, failed, port-in-use, or the child exits). This is the real guard
-    // against double-launch, not the async `.starting` status flip.
-    private var startInFlight = false
-    private var cancellables = Set<AnyCancellable>()
+    private let lifecycle: McpLifecycle
     private let settings = AppSettings.shared
+    private let tokenProvider: McpTokenProvider
+    private var cancellables = Set<AnyCancellable>()
 
-    private init() {}
+    // Commands run strictly in submission order: each awaits the one before it.
+    // Without this, `stop()` followed by `start()` could reach the actor reversed.
+    private var chain: Task<Void, Never>?
+
+    // Pid of the live child, mirrored outside the lifecycle actor so `stop()` can
+    // signal it synchronously. The app-terminate path cannot wait for an async hop.
+    private var livePid: Int32?
+
+    private init() {
+        self.lifecycle = McpLifecycle(launcher: McpServerController.productionLauncher)
+        self.tokenProvider = McpTokenProvider.shared
+    }
+
+    /// Test seam: build a controller with a fake launcher and token store.
+    init(launcher: @escaping McpLauncher, tokenProvider: McpTokenProvider,
+         terminationGrace: TimeInterval = 0.2) {
+        self.lifecycle = McpLifecycle(launcher: launcher, terminationGrace: terminationGrace)
+        self.tokenProvider = tokenProvider
+    }
+
+    /// Spawns the real node child.
+    static let productionLauncher: McpLauncher = { spec, onStderrLine, onExit in
+        var env = ProcessInfo.processInfo.environment
+        for (key, value) in spec.environmentOverrides { env[key] = value }
+        // node:sqlite is unflagged since Node 22.13 but still emits an
+        // ExperimentalWarning; silence it so a clean stderr means a clean start.
+        let proc = Subprocess.launch(
+            executable: spec.nodePath,
+            arguments: ["--disable-warning=ExperimentalWarning", spec.scriptPath],
+            environment: env,
+            onStderrLine: onStderrLine,
+            onExit: onExit)
+        return proc.isRunning ? McpProcessChild(proc) : nil
+    }
+
+    private func enqueue(_ operation: @escaping @MainActor () async -> Void) {
+        let previous = chain
+        chain = Task {
+            await previous?.value
+            await operation()
+        }
+    }
+
+    private func setStatus(_ new: McpServerStatus) {
+        status = new
+        refreshPortStatus()
+    }
 
     // MARK: - Node binary lookup
 
     /// Locate the node binary. GUI apps launched from Finder get a stripped PATH,
     /// so we check known Homebrew / system paths before falling back to a login shell
     /// (which picks up nvm, volta, asdf, etc.).
-    static func findNodeBinary() -> String? {
+    nonisolated static func findNodeBinary() -> String? {
         Subprocess.findBinary(named: "node", candidates: [
             "/opt/homebrew/bin/node",
             "/usr/local/bin/node",
@@ -75,7 +147,7 @@ final class McpServerController: ObservableObject {
     /// then falls back to the dev/SwiftPM source tree so `swift run` works
     /// without a packaged app. make-app.sh bundles a single esbuild .mjs that
     /// uses Node's built-in node:sqlite, so there is no node_modules to ship.
-    static func findServerScript() -> String? {
+    nonisolated static func findServerScript() -> String? {
         // Production: bundled inside the app's Resources directory.
         if let resourceURL = Bundle.main.resourceURL {
             let bundled = resourceURL.appendingPathComponent("clippy-mcp/index.mjs")
@@ -103,7 +175,7 @@ final class McpServerController: ObservableObject {
     /// Returns true when nothing is bound to 127.0.0.1:\(port) yet.
     func isPortFree(_ port: Int) -> Bool {
         // If our own process is already holding it, report free so start() can no-op.
-        if case .running(let p) = status, p == port { return true }
+        if case .running(let runningPort) = status, runningPort == port { return true }
 
         // Out-of-range ports cannot be bound; report not-free rather than letting
         // UInt16(port) below trap on an integer overflow and crash the app.
@@ -132,195 +204,176 @@ final class McpServerController: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Release the in-flight start claim on the owning queue. Called from every
-    /// early-return failure path in _start() so a failed launch never wedges the
-    /// sentinel and blocks a later start.
-    private func clearStartInFlight() {
-        lifecycleQueue.async { [weak self] in
-            self?.startInFlight = false
-        }
-    }
-
+    /// Start the server (no-op when running or starting).
     func start() {
-        if status.isRunning { return }
-        if case .starting = status { return }
-        _start()
+        enqueue { [weak self] in await self?.startNow() }
     }
 
-    private func _start() {
-        // Atomically claim the start so two near-simultaneous triggers cannot both
-        // launch. The async `.starting` status flip below happens too late to act
-        // as a guard; the synchronous sentinel on lifecycleQueue is the real gate.
-        let claimed = lifecycleQueue.sync { () -> Bool in
-            if startInFlight || process != nil { return false }
-            startInFlight = true
-            return true
-        }
-        guard claimed else { return }
+    /// Stop the server. Kills by pid and waits for exit before the status flips.
+    func stop() {
+        ClippyLog.info("MCP server stopping", category: ClippyLog.mcp)
+        // Signal the stored pid right now (synchronously), then let the actor wait
+        // for exit and escalate to SIGKILL if needed.
+        let pid = livePid
+        livePid = nil
+        if let pid, pid > 0 { Darwin.kill(pid, SIGTERM) }
+        enqueue { [weak self] in await self?.stopNow() }
+    }
 
+    /// Stop, wait for the port to be released, start again.
+    func restart() {
+        enqueue { [weak self] in
+            await self?.stopNow()
+            await self?.startNow()
+        }
+    }
+
+    private func stopNow() async {
+        await lifecycle.stop()
+        setStatus(.stopped)
+    }
+
+    private func startNow() async {
+        if status.isRunning { return }
         let port = settings.mcpPort
 
-        guard let nodePath = McpServerController.findNodeBinary() else {
-            let msg = "Node.js not found. Install Node to run the MCP server."
-            ClippyLog.error("MCP start failed: \(msg)", category: ClippyLog.mcp)
-            clearStartInFlight()
-            DispatchQueue.main.async { [weak self] in
-                self?.status = .failed(msg)
-            }
+        // Binary lookups can spawn a login shell (seconds on a slow rc file), so they
+        // run off the main actor.
+        guard let nodePath = await Self.locateNodeBinary() else {
+            fail("Node.js not found. Install Node to run the MCP server.")
             return
         }
-
-        guard let scriptPath = McpServerController.findServerScript() else {
-            let msg = "MCP server script not found in the app bundle. "
-                + "(Dev builds: run npm run build in integrations/clippy-mcp.)"
-            ClippyLog.error("MCP start failed: \(msg)", category: ClippyLog.mcp)
-            clearStartInFlight()
-            DispatchQueue.main.async { [weak self] in
-                self?.status = .failed(msg)
-            }
+        guard let scriptPath = await Self.locateServerScript() else {
+            fail("MCP server script not found in the app bundle. "
+                + "(Dev builds: run npm run build in integrations/clippy-mcp.)")
             return
         }
-
+        let token: String
+        do {
+            token = try await Self.readToken(tokenProvider)
+        } catch {
+            // The server refuses to run unauthenticated, so a Keychain failure is fatal to start.
+            fail("Could not read the MCP access token from the Keychain.")
+            return
+        }
         guard isPortFree(port) else {
-            clearStartInFlight()
-            DispatchQueue.main.async { [weak self] in
-                self?.status = .portInUse(port: port)
-            }
+            setStatus(.portInUse(port: port))
             return
         }
+        setStatus(.starting)
 
-        DispatchQueue.main.async { [weak self] in
-            self?.status = .starting
-        }
-
-        let dbPath = ClipDatabase.shared.databaseURL.path
-
-        var env = ProcessInfo.processInfo.environment
-        env["CLIPPY_MCP_PORT"] = "\(port)"
-        env["CLIPPY_DB_PATH"] = dbPath
-
-        // Collect stderr lines for the failure diagnostic; the health poll snapshot
-        // closure captures this array and reads it at failure time. stderr arrives on
-        // launch's background drain thread while the poll reads from a URLSession
-        // callback thread, so guard both sides with a lock.
-        let stderrLock = NSLock()
-        var stderrLines: [String] = []
-
-        // node:sqlite is unflagged since Node 22.13 but still emits an
-        // ExperimentalWarning; silence it so a clean stderr means a clean start.
-        let proc = Subprocess.launch(
-            executable: nodePath,
-            arguments: ["--disable-warning=ExperimentalWarning", scriptPath],
-            environment: env,
+        let spec = McpLaunchSpec(nodePath: nodePath, scriptPath: scriptPath, port: port,
+                                 databasePath: ClipDatabase.shared.databaseURL.path, token: token)
+        // stderr arrives on the launch drain thread; the health poll reads it from
+        // another. Guard both sides.
+        let stderrLines = OSAllocatedUnfairLock<[String]>(initialState: [])
+        let outcome = await lifecycle.start(
+            spec,
             onStderrLine: { line in
-                stderrLock.lock()
-                stderrLines.append(line)
-                stderrLock.unlock()
+                stderrLines.withLock { $0.append(line) }
             },
-            onExit: { [weak self] _ in
-                guard let self else { return }
-                // The child is gone: release the process slot and the in-flight
-                // claim on the owning queue so a later start can proceed cleanly.
-                self.lifecycleQueue.async {
-                    self.process = nil
-                    self.startInFlight = false
-                }
-                DispatchQueue.main.async {
-                    // Only flip to stopped if we were the one running (not already restarted)
-                    if case .running = self.status {
-                        self.status = .stopped
-                    }
-                }
-            }
-        )
+            onExit: { [weak self] generation in
+                Task { await self?.childExited(generation: generation) }
+            })
 
-        // Publish the live reference and clear the in-flight claim on the owning
-        // queue. The launch above already started the child; pollHealth only reads
-        // status, so it is safe to dispatch this asynchronously.
-        lifecycleQueue.async { [weak self] in
-            self?.process = proc
-            self?.startInFlight = false
+        switch outcome {
+        case .alreadyRunning:
+            return
+        case .launchFailed:
+            fail("Could not launch the MCP server process.")
+        case .started(let generation):
+            livePid = await lifecycle.runningPid
+            await pollHealth(port: port, token: token, generation: generation, stderrSnapshot: {
+                stderrLines.withLock { $0 }
+            })
         }
-
-        // Poll /health until the server is up (max ~2.5s with 5 retries).
-        // The closure captures stderrLines by reference so the failure diagnostic
-        // sees all lines that arrived by the time we give up.
-        pollHealth(port: port, retriesLeft: 5, stderrSnapshot: {
-            stderrLock.lock()
-            defer { stderrLock.unlock() }
-            return stderrLines
-        })
     }
 
-    private func pollHealth(port: Int, retriesLeft: Int, stderrSnapshot: @escaping () -> [String]) {
-        let url = URL(string: "http://127.0.0.1:\(port)/health")!
-        let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
-            guard let self else { return }
-            let ok = (response as? HTTPURLResponse)?.statusCode == 200
-            if ok {
-                // Capture any startup warnings that arrived before /health responded.
-                // Logging here preserves diagnostics without delaying the .running transition.
-                let startupStderr = stderrSnapshot()
-                    .joined(separator: "\n")
+    private nonisolated static func locateNodeBinary() async -> String? { findNodeBinary() }
+    private nonisolated static func locateServerScript() async -> String? { findServerScript() }
+    private nonisolated static func readToken(_ provider: McpTokenProvider) async throws -> String {
+        try provider.token()
+    }
+
+    private func fail(_ message: String) {
+        ClippyLog.error("MCP start failed: \(message)", category: ClippyLog.mcp)
+        setStatus(.failed(message))
+    }
+
+    /// The child exited on its own. Ignored when a stop/start already superseded it.
+    private func childExited(generation: Int) async {
+        guard await lifecycle.isCurrent(generation) else { return }
+        switch status {
+        case .running: setStatus(.stopped)
+        case .starting: setStatus(.failed("The MCP server exited during startup."))
+        default: break
+        }
+    }
+
+    /// Poll /health until the server answers 200 (max ~5s). Every step re-checks the
+    /// generation, so once `stop()` runs nothing here can report `.running`.
+    private func pollHealth(port: Int, token: String, generation: Int,
+                            stderrSnapshot: @escaping @Sendable () -> [String]) async {
+        for attempt in 0..<10 {
+            guard await lifecycle.isCurrent(generation) else { return }
+            if await Self.healthOK(port: port, token: token) {
+                // Re-check after the network hop: stop() may have run meanwhile.
+                guard await lifecycle.isCurrent(generation) else { return }
+                let startupStderr = stderrSnapshot().joined(separator: "\n")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if !startupStderr.isEmpty {
                     ClippyLog.info("MCP server startup stderr: \(startupStderr)", category: ClippyLog.mcp)
                 }
                 ClippyLog.info("MCP server running on port \(port)", category: ClippyLog.mcp)
-                DispatchQueue.main.async { self.status = .running(port: port) }
-            } else if retriesLeft > 0 {
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                    self.pollHealth(port: port, retriesLeft: retriesLeft - 1, stderrSnapshot: stderrSnapshot)
-                }
-            } else {
-                // Snapshot the stderr lines collected so far for the diagnostic message.
-                let detail = stderrSnapshot()
-                    .joined(separator: "\n")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                let msg = detail.isEmpty ? "Server did not respond to /health after launch." : detail
-                ClippyLog.error("MCP server failed to start: \(msg)", category: ClippyLog.mcp)
-                DispatchQueue.main.async { self.status = .failed(msg) }
+                setStatus(.running(port: port))
+                return
             }
+            if attempt < 9 { try? await Task.sleep(nanoseconds: 500_000_000) }
         }
-        task.resume()
+        guard await lifecycle.isCurrent(generation) else { return }
+        let detail = stderrSnapshot().joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        fail(detail.isEmpty ? "Server did not respond to /health after launch." : detail)
     }
 
-    func stop() {
-        ClippyLog.info("MCP server stopping", category: ClippyLog.mcp)
-        // Terminate and release the child on its owning queue. Clear any pending
-        // start claim too, so a stop during startup cannot wedge the sentinel.
-        lifecycleQueue.sync {
-            process?.terminate()
-            process = nil
-            startInFlight = false
-        }
-        DispatchQueue.main.async { [weak self] in
-            self?.status = .stopped
-        }
+    /// GET /health with the bearer token; true only for HTTP 200.
+    nonisolated static func healthOK(port: Int, token: String) async -> Bool {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/health") else { return false }
+        var request = URLRequest(url: url, timeoutInterval: 2)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+        return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
-    func restart() {
-        // Capture the live process reference on the owning queue before stop()
-        // nils it out, so we can wait on the exact child we are replacing.
-        let dying = lifecycleQueue.sync { process }
-        stop()
-        DispatchQueue.global().async { [weak self] in
-            // Wait for the old process to actually exit so the OS reclaims the
-            // bound port before _start() tries to bind again. A fixed delay is
-            // not reliable because SIGTERM delivery and teardown time vary.
-            // waitUntilExit() blocks the background thread (never the main thread).
-            // We bound the wait to 2s so a stuck child cannot stall the restart
-            // indefinitely; if it times out we proceed and let _start() handle
-            // any portInUse outcome normally.
-            if let dying {
-                let exited = DispatchSemaphore(value: 0)
-                DispatchQueue.global().async {
-                    dying.waitUntilExit()
-                    exited.signal()
-                }
-                _ = exited.wait(timeout: .now() + 2.0)
+    // MARK: - Port status (SET-03)
+
+    /// Recompute `portStatus` for the configured port from the running server. Cheap
+    /// (one bind probe); call from the port field's change handler and on appear.
+    func refreshPortStatus() {
+        let port = settings.mcpPort
+        var serverPort: Int?
+        if case .running(let live) = status { serverPort = live }
+        portStatus = McpPortStatus.derive(port: port, serverPort: serverPort,
+                                          isFree: isPortFree(port))
+    }
+
+    // MARK: - Token rotation (SEC-03)
+
+    /// Replace the bearer token, restart the server with it, and re-write every
+    /// installed client config. The old token stops working immediately.
+    func rotateToken() {
+        enqueue { [weak self] in
+            guard let self else { return }
+            do {
+                try self.tokenProvider.rotate()
+            } catch {
+                self.fail("Could not rotate the MCP access token.")
+                return
             }
-            self?._start()
+            await self.stopNow()
+            if self.settings.mcpEnabled { await self.startNow() }
+            await McpInstallService.resyncInstalledClients(port: self.settings.mcpPort,
+                                                           tokenProvider: self.tokenProvider)
         }
     }
 
@@ -329,89 +382,85 @@ final class McpServerController: ObservableObject {
     /// Call once from AppDelegate after launch. Starts the server if enabled,
     /// and wires up Combine sinks so future settings changes take effect live.
     func syncWithSettings() {
-        if settings.mcpEnabled {
-            _start()
-        }
+        if settings.mcpEnabled { start() }
 
         settings.$mcpEnabled
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
-                if enabled { self?._start() } else { self?.stop() }
+                if enabled { self?.start() } else { self?.stop() }
             }
             .store(in: &cancellables)
 
+        // A port change restarts the server and re-points every installed client
+        // at the new URL; without the re-sync their configs go stale (MCP-03).
         settings.$mcpPort
             .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self, self.settings.mcpEnabled else { return }
-                self.restart()
+            .sink { [weak self] port in
+                guard let self else { return }
+                self.refreshPortStatus()
+                guard self.settings.mcpEnabled else { return }
+                self.enqueue { [weak self] in
+                    guard let self else { return }
+                    await self.stopNow()
+                    await self.startNow()
+                    await McpInstallService.resyncInstalledClients(port: port,
+                                                                   tokenProvider: self.tokenProvider)
+                }
             }
             .store(in: &cancellables)
     }
 
     // MARK: - Test connection
 
-    /// Hits /health (and optionally /mcp for a tools/list) to verify the server
-    /// is reachable. Calls completion on the main thread.
-    func testConnection(completion: @escaping (Result<Int, Error>) -> Void) {
+    /// Hits /health, then MCP tools/list, both with the bearer token, and reports the
+    /// tool count. A non-200 anywhere is a failure, never "0 tools". Completion runs on main.
+    func testConnection(completion: @escaping @MainActor (Result<Int, Error>) -> Void) {
         guard case .running(let port) = status else {
             completion(.failure(McpError.serverNotRunning))
             return
         }
-
-        let healthURL = URL(string: "http://127.0.0.1:\(port)/health")!
-        URLSession.shared.dataTask(with: healthURL) { [weak self] _, response, error in
-            guard let self else { return }
-            if let error {
-                DispatchQueue.main.async { completion(.failure(error)) }
-                return
-            }
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                DispatchQueue.main.async {
-                    completion(.failure(McpError.healthCheckFailed))
+        let provider = tokenProvider
+        Task {
+            let result: Result<Int, Error>
+            do {
+                let token = try await Self.readToken(provider)
+                guard await Self.healthOK(port: port, token: token) else {
+                    throw McpError.healthCheckFailed
                 }
-                return
+                result = .success(try await Self.fetchToolCount(port: port, token: token))
+            } catch {
+                result = .failure(error)
             }
-            // Attempt an MCP tools/list to get the tool count
-            self.fetchToolCount(port: port, completion: completion)
-        }.resume()
+            completion(result)
+        }
     }
 
-    private func fetchToolCount(port: Int, completion: @escaping (Result<Int, Error>) -> Void) {
-        guard let url = URL(string: "http://127.0.0.1:\(port)/mcp") else {
-            DispatchQueue.main.async { completion(.success(0)) }
-            return
-        }
-
-        // MCP JSON-RPC: initialize then tools/list
-        // We send tools/list directly; the HTTP MCP transport accepts it without
-        // a preceding initialize when the server supports stateless requests.
-        var request = URLRequest(url: url)
+    nonisolated static func fetchToolCount(port: Int, token: String) async throws -> Int {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/mcp") else { return 0 }
+        var request = URLRequest(url: url, timeoutInterval: 5)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = [
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": [:]
-        ]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error {
-                DispatchQueue.main.async { completion(.failure(error)) }
-                return
-            }
-            let count = McpServerController.parseToolCount(from: data)
-            DispatchQueue.main.async { completion(.success(count)) }
-        }.resume()
+        // The streamable-HTTP transport requires both types in Accept.
+        request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": [String: Any]()] as [String: Any])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw McpError.httpStatus(code) }
+        return parseToolCount(from: data)
     }
 
-    private static func parseToolCount(from data: Data?) -> Int {
-        guard let data,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+    /// Tool count from a tools/list body, which is plain JSON or a single SSE `data:` frame.
+    nonisolated static func parseToolCount(from data: Data?) -> Int {
+        guard var data else { return 0 }
+        if let text = String(data: data, encoding: .utf8), text.hasPrefix("event:") || text.hasPrefix("data:"),
+           let line = text.split(separator: "\n").first(where: { $0.hasPrefix("data:") }) {
+            data = Data(line.dropFirst(5).trimmingCharacters(in: .whitespaces).utf8)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let result = json["result"] as? [String: Any],
               let tools = result["tools"] as? [[String: Any]] else { return 0 }
         return tools.count
@@ -423,6 +472,7 @@ final class McpServerController: ObservableObject {
 enum McpError: LocalizedError {
     case serverNotRunning
     case healthCheckFailed
+    case httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
@@ -430,6 +480,10 @@ enum McpError: LocalizedError {
             return "MCP server is not running. Enable it in Settings first."
         case .healthCheckFailed:
             return "Server responded but /health returned an unexpected status."
+        case .httpStatus(let code):
+            return code == 401
+                ? "The server rejected the access token (HTTP 401). Rotate the token and reinstall the client."
+                : "The server returned HTTP \(code) for tools/list."
         }
     }
 }

@@ -1,6 +1,7 @@
 import XCTest
 @testable import Clippy
 
+@MainActor
 final class ImageClipTests: XCTestCase {
     private func storeImage(_ db: ClipDatabase, data: Data) throws -> Clip {
         let stored = try db.media.store(pngData: data)

@@ -1,9 +1,42 @@
 import Foundation
 import GRDB
+import os
 
 // MARK: - Categories
 
+/// Why a category create/rename was rejected (SBR-03/04, DAT-14). The database
+/// enforces it with a case-insensitive unique index; these are checked first so
+/// the UI gets a readable message rather than a raw SQLite constraint error.
+enum CategoryError: Error, Equatable, LocalizedError {
+    case emptyName
+    case duplicateName(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyName: return "A category needs a name."
+        case .duplicateName(let name): return "A category named \u{201C}\(name)\u{201D} already exists."
+        }
+    }
+}
+
 extension ClipDatabase {
+    /// Every category name, for the editor's `existingNames` duplicate check.
+    func categoryNames() throws -> [String] {
+        try dbQueue.read { try String.fetchAll($0, sql: "SELECT name FROM category ORDER BY sortOrder, createdAt") }
+    }
+
+    /// Throws when `name` is empty or collides (case-insensitively) with another
+    /// category. `excluding` is the category being renamed.
+    static func validateCategoryName(_ name: String, excluding id: Int64?, in db: Database) throws {
+        guard !name.isEmpty else { throw CategoryError.emptyName }
+        let clash = try Bool.fetchOne(
+            db,
+            sql: "SELECT EXISTS(SELECT 1 FROM category WHERE name = ? COLLATE NOCASE AND id IS NOT ?)",
+            arguments: [name, id]
+        ) ?? false
+        if clash { throw CategoryError.duplicateName(name) }
+    }
+
     func categories() throws -> [Category] {
         try dbQueue.read { db in
             try Category.order(Column("sortOrder"), Column("createdAt")).fetchAll(db)
@@ -31,7 +64,9 @@ extension ClipDatabase {
         iconKind: CategoryIconKind,
         iconValue: String
     ) throws -> Category {
-        try dbQueue.write { db in
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return try dbQueue.write { db in
+            try Self.validateCategoryName(name, excluding: nil, in: db)
             let maxOrder = try Int.fetchOne(db, sql: "SELECT IFNULL(MAX(sortOrder), -1) FROM category") ?? -1
             var category = Category(
                 id: nil,
@@ -49,7 +84,10 @@ extension ClipDatabase {
     }
 
     func updateCategory(_ category: Category) throws {
-        try dbQueue.write { db in
+        var category = category
+        category.name = category.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        try dbQueue.write { [category] db in
+            try Self.validateCategoryName(category.name, excluding: category.id, in: db)
             try category.update(db)
         }
     }
@@ -87,7 +125,7 @@ extension ClipDatabase {
             // non-optional targetID so the signature matches.
             let newIDs = reorderIDs(ids, draggedID: id, before: targetID)
             // Build a lookup so we can avoid a linear scan per row.
-            let catByID = Dictionary(uniqueKeysWithValues: cats.compactMap { c in c.id.map { ($0, c) } })
+            let catByID = Dictionary(uniqueKeysWithValues: cats.compactMap { category in category.id.map { ($0, category) } })
             for (index, catID) in newIDs.enumerated() {
                 guard var updated = catByID[catID], updated.sortOrder != index else { continue }
                 updated.sortOrder = index
@@ -244,10 +282,14 @@ extension ClipDatabase {
 // Process-lifetime cache of the starter category's last-known attributes, so
 // delete + Cmd+P recreate restores the user's name/color/icon instead of the
 // hardcoded defaults. Held as a file-private var; nil means "no snapshot."
-private struct StarterSnapshot {
+private struct StarterSnapshot: Sendable {
     let name: String
     let colorHex: String
     let iconKind: CategoryIconKind
     let iconValue: String
-    fileprivate static var last: StarterSnapshot?
+    private static let slot = OSAllocatedUnfairLock<StarterSnapshot?>(initialState: nil)
+    fileprivate static var last: StarterSnapshot? {
+        get { slot.withLock { $0 } }
+        set { slot.withLock { $0 = newValue } }
+    }
 }

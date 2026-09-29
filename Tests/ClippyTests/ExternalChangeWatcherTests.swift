@@ -6,6 +6,7 @@ import GRDB
 /// ValueObservation cannot see that, so a clip added over MCP used to stay
 /// invisible in the panel until the next in-app write or an app restart.
 /// `data_version` is the signal that closes the gap.
+@MainActor
 final class ExternalChangeWatcherTests: XCTestCase {
     /// No file-store reloaders: these tests must not touch the user's real
     /// scripts.json / ai-actions.json through the shared singletons.

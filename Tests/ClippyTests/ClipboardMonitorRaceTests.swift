@@ -8,6 +8,7 @@ import XCTest
 /// the changeCount on that first empty look, so the copy was lost for good -
 /// no clip, no mascot bounce, no capture sound. Repro measured 5 of 6 copies
 /// dropped against a 300ms fill gap.
+@MainActor
 final class ClipboardMonitorRaceTests: XCTestCase {
 
     private func makeScratchPasteboard() -> NSPasteboard {

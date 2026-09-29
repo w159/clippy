@@ -16,6 +16,8 @@ final class AIActionRunner: ObservableObject {
     }
 
     @Published var phase: Phase = .idle
+    /// Text streamed so far by `run(action:on:instruction:)`, shown while running.
+    @Published private(set) var partialText = ""
 
     /// The in-flight action task so a user can cancel a long run (audit [MEDIUM]).
     private var runningTask: Task<Void, Never>?
@@ -29,7 +31,9 @@ final class AIActionRunner: ObservableObject {
     /// Start an action. `work` builds the proposal from the configured service;
     /// returning nil means "nothing to propose" (e.g. no matching category).
     func run(_ work: @escaping (AIService) async throws -> AIProposal?) {
+        guard phase != .running else { return }
         lastWork = work
+        partialText = ""
         switch AIService.fromSettings() {
         case .failure(let error):
             phase = .failed(error.localizedDescription)
@@ -48,6 +52,16 @@ final class AIActionRunner: ObservableObject {
                 } catch {
                     self?.phase = .failed(error.localizedDescription)
                 }
+            }
+        }
+    }
+
+    /// Run a custom action with streamed output: the sheet shows the reply as it
+    /// arrives instead of a spinner (AI-12).
+    func run(action: AIAction, on text: String, instruction: String = "") {
+        run { [weak self] service in
+            try await service.run(action: action, on: text, instruction: instruction) { partial in
+                Task { @MainActor in self?.partialText = partial }
             }
         }
     }
@@ -86,8 +100,9 @@ struct AIActionSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             content
         }
+        .foregroundStyle(tokens.textPrimary)
         .padding(20)
-        .frame(width: 460)
+        .frame(minWidth: 460, idealWidth: 480)
     }
 
     @ViewBuilder
@@ -96,6 +111,8 @@ struct AIActionSheet: View {
         case .idle:
             EmptyView()
         case .running:
+            // Reserve the result area before the first token arrives; streaming then fills it in place.
+            box(runner.partialText, minHeight: 180)
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 Text("Asking the model...")
@@ -124,7 +141,7 @@ struct AIActionSheet: View {
         case .proposal(let proposal):
             Text(proposal.label)
                 .font(.headline)
-            if let original = proposal.original {
+            if proposal.showsDiff, let original = proposal.original {
                 diff(original: original, proposed: proposal.proposed)
             } else {
                 box(proposal.proposed)
@@ -142,7 +159,7 @@ struct AIActionSheet: View {
         }
     }
 
-    private func box(_ text: String) -> some View {
+    private func box(_ text: String, minHeight: CGFloat = 0) -> some View {
         ZStack(alignment: .topTrailing) {
             ScrollView {
                 Text(text)
@@ -151,26 +168,56 @@ struct AIActionSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
             }
-            .frame(maxHeight: 220)
+            .frame(minHeight: minHeight, maxHeight: 220)
             .padding(8)
             .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(tokens.cardBorder))
             // Audit [POLISH]: copy-button overlay on each diff/proposal box.
-            ClipboardCopyButton(text: text, tokens: tokens)
-                .padding(6)
+            if !text.isEmpty {
+                ClipboardCopyButton(text: text, tokens: tokens)
+                    .padding(6)
+            }
         }
     }
 
-    // Two stacked full-text boxes are a weak diff (no word-level highlighting);
-    // word-level spans are tracked as a follow-up. Boxes are themed, labeled,
-    // and each carries a copy button below.
+    /// In-place rewrites only (the caller passes `original` just for those): a
+    /// word-level diff with removals struck through in red and additions in green,
+    /// followed by the clean result with a copy button.
     private func diff(original: String, proposed: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Before").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
-            box(original)
-            Text("After").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
+            Text("Changes").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
+            ScrollView {
+                Text(Self.attributedDiff(original: original, proposed: proposed, tokens: tokens))
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+            .frame(maxHeight: 180)
+            .padding(8)
+            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(tokens.cardBorder))
+            Text("Result").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
             box(proposed)
         }
+    }
+
+    static func attributedDiff(original: String, proposed: String, tokens: ThemeTokens) -> AttributedString {
+        var out = AttributedString()
+        for span in AIWordDiff.diff(old: original, new: proposed) {
+            var piece = AttributedString(span.text)
+            switch span.kind {
+            case .same:
+                break
+            case .removed:
+                piece.foregroundColor = tokens.danger
+                piece.strikethroughStyle = .single
+            case .added:
+                piece.foregroundColor = tokens.success
+                piece.backgroundColor = tokens.success.opacity(0.15)
+            }
+            out += piece
+        }
+        return out
     }
 }
 
@@ -181,6 +228,7 @@ private struct ClipboardCopyButton: View {
     let text: String
     let tokens: ThemeTokens
     @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
 
     var body: some View {
         Button {
@@ -188,8 +236,13 @@ private struct ClipboardCopyButton: View {
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             copied = true
-            // Revert the checkmark after a short delay.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+            // Revert the checkmark after a short delay, cancelling an older reset.
+            resetTask?.cancel()
+            resetTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
+                copied = false
+            }
         } label: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 11))
@@ -199,5 +252,6 @@ private struct ClipboardCopyButton: View {
         .buttonStyle(.plain)
         .help("Copy")
         .accessibilityLabel(copied ? "Copied" : "Copy")
+        .onDisappear { resetTask?.cancel() }
     }
 }

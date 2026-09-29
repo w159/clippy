@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import os from "node:os";
 import path from "node:path";
@@ -48,18 +49,72 @@ export function resolveSupportDir(dbPath: string): string {
 // ---------------------------------------------------------------------------
 
 export function openDatabase(dbPath: string): DatabaseSync {
-  // node:sqlite enables foreign-key constraints by default; we still set the
-  // pragma explicitly so the intent survives any future default change.
+  // Clippy owns creation, WAL setup, and every migration. Refuse to create an
+  // empty database when the app has not been launched or the path is wrong.
+  if (!existsSync(dbPath)) {
+    throw new Error("database file does not exist; launch Clippy once so it can create it");
+  }
   const db = new DatabaseSync(dbPath);
-  // The app uses WAL; match it so our connection cooperates with the app's.
-  db.exec("PRAGMA journal_mode = WAL;");
-  db.exec("PRAGMA foreign_keys = ON;");
-  // Two writers share this file: Clippy and this process. Without a busy timeout
-  // a write that lands while the app holds the lock fails immediately with
-  // SQLITE_BUSY, which surfaces to the user as a tool that randomly errors. 5s is
-  // far longer than any write Clippy makes (a capture is a single small insert).
-  db.exec("PRAGMA busy_timeout = 5000;");
+  try {
+    // Wait for the app's short writes rather than failing immediately with SQLITE_BUSY.
+    db.exec("PRAGMA busy_timeout = 5000;");
+    db.exec("PRAGMA foreign_keys = ON;");
+    requireAppSchema(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
   return db;
+}
+
+/** Refuse to run against a database that lacks the schema MCP handlers require. */
+export function requireAppSchema(db: DatabaseSync): void {
+  const requiredColumns: Record<string, string[]> = {
+    clips: ["contentText", "typeIdentifier", "sourceAppName", "createdAt", "contentKind", "userTitle", "ocrText"],
+    category: ["name", "colorHex", "iconKind", "iconValue", "sortOrder", "isStarter", "createdAt"],
+    clip_category: ["clipID", "categoryID", "addedAt"],
+  };
+  const requiredTables = [...Object.keys(requiredColumns), "clips_fts", "smart_collections"];
+  const presentTables = new Set(
+    (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]).map(
+      (row) => row.name,
+    ),
+  );
+  const missingTables = requiredTables.filter((name) => !presentTables.has(name));
+  const missingColumns: string[] = [];
+  for (const [table, columns] of Object.entries(requiredColumns)) {
+    if (!presentTables.has(table)) continue;
+    const presentColumns = new Set(
+      (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((row) => row.name),
+    );
+    for (const column of columns) {
+      if (!presentColumns.has(column)) missingColumns.push(`${table}.${column}`);
+    }
+  }
+  if (missingTables.length > 0 || missingColumns.length > 0) {
+    const details = [
+      missingTables.length > 0 ? `missing tables: ${missingTables.join(", ")}` : "",
+      missingColumns.length > 0 ? `missing columns: ${missingColumns.join(", ")}` : "",
+    ].filter(Boolean).join("; ");
+    throw new Error(`database schema is not ready for MCP (${details}); launch/update Clippy first`);
+  }
+}
+
+/** Run a mutating tool atomically, taking the SQLite write lock before any reads. */
+export function inWriteTransaction<T>(db: DatabaseSync, body: () => T): T {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = body();
+    db.exec("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Preserve the original failure if SQLite already ended the transaction.
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

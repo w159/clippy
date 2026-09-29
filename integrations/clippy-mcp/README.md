@@ -52,11 +52,21 @@ because the previous approval was for the previous body.
 `clippy_delete_ai_action(id)` over `ai-actions.json`. Prompt templates must
 contain `{clip}`. Built-in actions can be edited but not deleted.
 
-### Deprecated aliases
+### Retired aliases
 
 `clippy_search`, `clippy_get`, `clippy_add`, `clippy_delete`, and
-`clippy_set_category` still work on their original schemas and forward to their
-replacements. They will be removed once pinned client configs have moved.
+`clippy_set_category` were removed. Use `clippy_search_clips`, `clippy_get_clip`,
+`clippy_create_clip`, `clippy_delete_clips`, and `clippy_assign_clips`.
+
+### HTTP transport and authentication
+
+With `CLIPPY_MCP_PORT` set the server listens on `127.0.0.1:<port>` (`/mcp`,
+`/health`). Every request, including `/health`, must send
+`Authorization: Bearer <token>`, where the token is the per-install secret in the
+`CLIPPY_MCP_TOKEN` environment variable (at least 32 characters; Clippy generates
+it and stores it in the Keychain). Without the variable the server refuses to
+start; a missing or wrong token gets `401`. The stdio transport (no
+`CLIPPY_MCP_PORT`) is a private pipe to the parent process and needs no token.
 
 The FTS index (`clips_fts`) is kept in sync automatically by Clippy's own database triggers, so clip writes need no manual FTS maintenance.
 
@@ -147,9 +157,8 @@ never trip it) and the two JSON files' modification dates, then calls
 ## Safety
 
 - All SQL uses parameterized statements; user input is never interpolated into SQL.
-- WAL mode is set on connect to cooperate with the app's connection, plus
-  `busy_timeout = 5000` so a write landing while the app holds the lock waits
-  instead of failing with `SQLITE_BUSY`.
+- Clippy owns database creation, WAL mode, and schema migrations. MCP refuses a missing or incompatible schema and never creates or migrates the database.
+- MCP does not change `journal_mode`; each SQLite-mutating tool runs atomically in `BEGIN IMMEDIATE`, with `busy_timeout = 5000` so short app writes can finish before MCP proceeds.
 - Scripts written here are disabled until a human enables them (see above).
 - Search and list results carry 300-character previews; full clip text requires
   `clippy_get_clip` on a specific id, so a broad search does not dump a whole

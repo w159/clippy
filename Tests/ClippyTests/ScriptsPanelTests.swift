@@ -3,6 +3,7 @@ import XCTest
 
 /// Tests for the Scripts panel persistence layer: ClipDatabase.insertTextClip
 /// and ClipStore.saveScriptOutput. UI rendering is not tested here.
+@MainActor
 final class ScriptsPanelTests: XCTestCase {
 
     // MARK: - ClipDatabase.insertTextClip
@@ -33,8 +34,8 @@ final class ScriptsPanelTests: XCTestCase {
         let store = ClipStore(database: db)
 
         let expectation = expectation(description: "clip appears in store")
-        // The observation is .immediate so it fires synchronously on the first
-        // delivery; subsequent writes arrive async. We poll briefly.
+        // The initial DB observation is asynchronous; poll until the inserted
+        // clip is published to the store.
         var fulfilled = false
         let poller = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
             if store.clips.contains(where: { $0.contentText == "from test" }), !fulfilled {

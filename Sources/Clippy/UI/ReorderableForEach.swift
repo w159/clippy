@@ -204,7 +204,7 @@ extension View {
 // last row; it appends the dragged item to the end. The hover indicator is a
 // 2pt accent line at the top of the trailing zone, mirroring the per-row line.
 
-struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Equatable>: ViewModifier {
+struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Equatable & Sendable>: ViewModifier {
     let kind: String?
     @Binding var isTargeted: Bool
     let onMove: (ID) -> Void
@@ -249,7 +249,7 @@ extension View {
     ///     source rows. Defaults to `nil`.
     ///   - isTargeted: Binding for the insertion-line indicator.
     ///   - onMove:     Called with the dragged id when the drop lands. Append it.
-    func reorderTrailingDropDestination<ID: LosslessStringConvertible & Equatable>(
+    func reorderTrailingDropDestination<ID: LosslessStringConvertible & Equatable & Sendable>(
         kind: String? = nil,
         isTargeted: Binding<Bool>,
         onMove: @escaping (ID) -> Void

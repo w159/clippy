@@ -3,6 +3,11 @@ import Foundation
 /// One low-level event from a provider's streamed response.
 enum AIStreamEvent {
     case textDelta(String)
+    /// The provider revised text it already streamed: swap `old` (a suffix of the
+    /// text emitted so far) for `new` instead of appending.
+    case textReplace(old: String, new: String)
+    /// Token counts, when the provider reports them. May arrive more than once.
+    case usage(AIUsage)
     case toolCalls([AIToolCall])
     case done
 }
@@ -10,6 +15,14 @@ enum AIStreamEvent {
 /// One high-level event from the streaming agent loop, consumed by the UI.
 enum AIAgentEvent {
     case textDelta(String)
+    case textReplace(old: String, new: String)
+    /// A tool call is about to run. Carries the full call so the UI can show
+    /// arguments (AI-12 tool transparency).
+    case toolCall(AIToolCall)
+    /// The result the tool returned (already truncated by the tool), for transcript replay.
+    case toolResult(id: String, name: String, result: String)
+    /// Usage for one provider call; the UI sums these across the turn.
+    case usage(AIUsage)
     case toolStarted(String)
     case toolFinished(String)
 }
@@ -25,7 +38,9 @@ enum AIStreamingHTTP {
         overallTimeout: TimeInterval = 120,
         idleTimeout: TimeInterval = 30
     ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
+        // `[String: Any]` is not Sendable, so serialize before entering the detached task.
+        let encodedBody = Result { try JSONSerialization.data(withJSONObject: body) }
+        return AsyncThrowingStream { continuation in
             let work = Task.detached {
                 guard let url = URL(string: urlString) else {
                     continuation.finish(throwing: AIError.badURL(urlString)); return
@@ -34,11 +49,10 @@ enum AIStreamingHTTP {
                 request.httpMethod = "POST"
                 request.timeoutInterval = overallTimeout
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
-                do {
-                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
-                } catch {
-                    continuation.finish(throwing: error); return
+                for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
+                switch encodedBody {
+                case .success(let data): request.httpBody = data
+                case .failure(let error): continuation.finish(throwing: error); return
                 }
 
                 let lastActivity = ActivityClock()
@@ -101,8 +115,8 @@ enum AIRetry {
     /// True for errors a retry can plausibly fix. Idle timeouts are NOT retryable
     /// (the stream already hung once; retrying would likely hang again).
     static func isTransient(_ error: Error) -> Bool {
-        if let ai = error as? AIError {
-            switch ai {
+        if let aiError = error as? AIError {
+            switch aiError {
             case .http(let code, _) where retryableStatuses.contains(code):
                 return true
             default:

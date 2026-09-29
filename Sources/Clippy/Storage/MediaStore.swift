@@ -1,6 +1,9 @@
 import AppKit
 import CryptoKit
 import Foundation
+import ImageIO
+import PDFKit
+import UniformTypeIdentifiers
 
 enum MediaStoreError: Error {
     case undecodableImage
@@ -11,7 +14,7 @@ enum MediaStoreError: Error {
 /// Owns the on-disk directory for image clip payloads and thumbnails.
 /// The database stores filenames only; the filename is the SHA-256 of the
 /// PNG bytes, which makes storing the same image twice naturally idempotent.
-final class MediaStore {
+final class MediaStore: Sendable {
     struct StoredImage: Equatable {
         let mediaFilename: String
         let thumbFilename: String
@@ -46,6 +49,18 @@ final class MediaStore {
         directory.appendingPathComponent(filename)
     }
 
+    /// Directory name for sidecar data (capture flavors, sensitive flags) inside
+    /// the media directory. `sweepOrphans` never touches it; sidecar files are
+    /// keyed by `Clip.contentKey`, not by media filename, and pruned separately.
+    static let sidecarDirectoryName = "_sidecar"
+
+    /// Sidecar directory, created on first use.
+    var sidecarDirectory: URL {
+        let dir = directory.appendingPathComponent(Self.sidecarDirectoryName, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     /// Writes the image and a small thumbnail; both must exist before the
     /// caller commits a database row, so a row never references missing bytes.
     func store(pngData: Data) throws -> StoredImage {
@@ -54,14 +69,22 @@ final class MediaStore {
         }
         let hash = SHA256.hash(data: pngData).map { String(format: "%02x", $0) }.joined()
         let mediaFilename = "\(hash).png"
-        let thumbFilename = "\(hash)-thumb.jpg"
         let mediaURL = url(for: mediaFilename)
-        let thumbURL = url(for: thumbFilename)
         if !FileManager.default.fileExists(atPath: mediaURL.path) {
             try pngData.write(to: mediaURL, options: .atomic)
         }
-        if !FileManager.default.fileExists(atPath: thumbURL.path) {
-            try Self.thumbnailJPEG(from: rep).write(to: thumbURL, options: .atomic)
+        // Alpha images get a PNG thumbnail (a JPEG has no alpha and rendered
+        // transparent pixels black); opaque ones stay JPEG. Reuse whichever
+        // already exists for this hash so a re-store is idempotent.
+        let thumbFilename: String
+        if FileManager.default.fileExists(atPath: url(for: "\(hash)-thumb.png").path) {
+            thumbFilename = "\(hash)-thumb.png"
+        } else if FileManager.default.fileExists(atPath: url(for: "\(hash)-thumb.jpg").path) {
+            thumbFilename = "\(hash)-thumb.jpg"
+        } else {
+            let thumb = try Self.thumbnail(from: rep)
+            thumbFilename = "\(hash)-thumb.\(thumb.isPNG ? "png" : "jpg")"
+            try thumb.data.write(to: url(for: thumbFilename), options: .atomic)
         }
         return StoredImage(
             mediaFilename: mediaFilename,
@@ -117,23 +140,23 @@ final class MediaStore {
             let pixelHeight = properties[kCGImagePropertyPixelHeight] as? Int
         else { return nil }
 
-        let thumbFilename = "\(hash)-thumb.jpg"
-        let thumbURL = url(for: thumbFilename)
-        if !FileManager.default.fileExists(atPath: thumbURL.path) {
-            let opts: [CFString: Any] = [
-                kCGImageSourceThumbnailMaxPixelSize: Int(Self.thumbnailMaxEdge),
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-            ]
-            guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, opts as CFDictionary),
-                let jpeg = NSBitmapImageRep(cgImage: cgThumb)
-                    .representation(using: .jpeg, properties: [.compressionFactor: 0.8])
-            else { return nil }
-            do {
-                try jpeg.write(to: thumbURL, options: .atomic)
-            } catch {
-                return nil
-            }
+        for existing in ["\(hash)-thumb.png", "\(hash)-thumb.jpg"]
+        where FileManager.default.fileExists(atPath: url(for: existing).path) {
+            return (existing, pixelWidth, pixelHeight)
+        }
+        let opts: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: Int(Self.thumbnailMaxEdge),
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, opts as CFDictionary),
+            let thumb = try? Self.encodeThumbnail(cgThumb)
+        else { return nil }
+        let thumbFilename = "\(hash)-thumb.\(thumb.isPNG ? "png" : "jpg")"
+        do {
+            try thumb.data.write(to: url(for: thumbFilename), options: .atomic)
+        } catch {
+            return nil
         }
         return (thumbFilename, pixelWidth, pixelHeight)
     }
@@ -149,7 +172,7 @@ final class MediaStore {
     /// belong to a capture whose database row is still in flight.
     func sweepOrphans(referencedFilenames: Set<String>) {
         let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        for filename in onDisk where !referencedFilenames.contains(filename) {
+        for filename in onDisk where !referencedFilenames.contains(filename) && filename != Self.sidecarDirectoryName {
             let fileURL = url(for: filename)
             if let modified = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
                 .contentModificationDate,
@@ -171,17 +194,31 @@ final class MediaStore {
         return rep.representation(using: .png, properties: [:])
     }
 
+    /// An encoded thumbnail and its container.
+    struct EncodedThumbnail {
+        let data: Data
+        let isPNG: Bool
+    }
+
+    /// Aspect-fit thumbnail (never cropped) inside a `thumbnailMaxEdge` box.
     /// CGContext (not NSImage.lockFocus) so this is safe off the main thread;
     /// capture may run from background callers.
-    private static func thumbnailJPEG(from rep: NSBitmapImageRep) throws -> Data {
-        let width = CGFloat(rep.pixelsWide)
-        let height = CGFloat(rep.pixelsHigh)
-        guard width > 0, height > 0, let cgImage = rep.cgImage else {
+    private static func thumbnail(from rep: NSBitmapImageRep) throws -> EncodedThumbnail {
+        guard rep.pixelsWide > 0, rep.pixelsHigh > 0, let cgImage = rep.cgImage else {
             throw MediaStoreError.thumbnailFailed
         }
+        return try encodeThumbnail(cgImage)
+    }
+
+    /// Scales `cgImage` to fit the thumbnail box (never upscaling) and encodes it:
+    /// PNG when the image carries alpha, JPEG over a white background otherwise.
+    static func encodeThumbnail(_ cgImage: CGImage) throws -> EncodedThumbnail {
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        guard width > 0, height > 0 else { throw MediaStoreError.thumbnailFailed }
         let scale = min(1, thumbnailMaxEdge / max(width, height))
-        let targetWidth = max(1, Int(width * scale))
-        let targetHeight = max(1, Int(height * scale))
+        let targetWidth = max(1, Int((width * scale).rounded()))
+        let targetHeight = max(1, Int((height * scale).rounded()))
         guard
             let context = CGContext(
                 data: nil,
@@ -194,12 +231,61 @@ final class MediaStore {
             )
         else { throw MediaStoreError.thumbnailFailed }
         context.interpolationQuality = .high
+        let hasAlpha = imageHasAlpha(cgImage)
+        if !hasAlpha {
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        }
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
         guard let scaled = context.makeImage() else { throw MediaStoreError.thumbnailFailed }
-        guard
-            let jpeg = NSBitmapImageRep(cgImage: scaled)
-                .representation(using: .jpeg, properties: [.compressionFactor: 0.8])
-        else { throw MediaStoreError.thumbnailFailed }
-        return jpeg
+        let rep = NSBitmapImageRep(cgImage: scaled)
+        let encoded = hasAlpha
+            ? rep.representation(using: .png, properties: [:])
+            : rep.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
+        guard let data = encoded else { throw MediaStoreError.thumbnailFailed }
+        return EncodedThumbnail(data: data, isPNG: hasAlpha)
+    }
+
+    /// True when the image has an alpha channel that is not entirely opaque
+    /// padding (`noneSkip*` and `none` are opaque).
+    static func imageHasAlpha(_ image: CGImage) -> Bool {
+        switch image.alphaInfo {
+        case .none, .noneSkipFirst, .noneSkipLast: return false
+        default: return true
+        }
+    }
+
+    // MARK: - Encoded-data decoding (OCR-06)
+
+    /// PNG bytes for any ImageIO-decodable data (JPEG, HEIC, TIFF, GIF, PNG...),
+    /// decoded straight from the encoded bytes with no NSImage/TIFF round trip.
+    /// PNG input passes through untouched, so the stored file is byte-identical
+    /// to what the source app put on the pasteboard.
+    static func pngData(fromEncoded data: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+            CGImageSourceGetCount(source) > 0
+        else { return nil }
+        if CGImageSourceGetType(source) == UTType.png.identifier as CFString { return data }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ] as CFDictionary) else { return nil }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination) ? output as Data : nil
+    }
+
+    /// PNG of the first page of PDF data, longest edge at most `maxEdge` pixels.
+    /// PDF-only pasteboards (vector copies from Preview, Illustrator) become an
+    /// image clip this way; the PDF itself is kept as a restorable flavor.
+    static func pngData(fromPDF data: Data, maxEdge: CGFloat = 2048) -> Data? {
+        guard let page = PDFDocument(data: data)?.page(at: 0) else { return nil }
+        let bounds = page.bounds(for: .mediaBox)
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let scale = min(maxEdge / max(bounds.width, bounds.height), 4)
+        let size = CGSize(width: max(1, bounds.width * scale), height: max(1, bounds.height * scale))
+        let image = page.thumbnail(of: size, for: .mediaBox)
+        return pngData(from: image)
     }
 }

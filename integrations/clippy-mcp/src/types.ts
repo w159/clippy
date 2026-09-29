@@ -20,6 +20,8 @@ export interface ToolDef {
    * regulated firm is client data and "who changed what" has to be answerable.
    */
   mutates?: boolean;
+  /** True only for state-changing tools whose handler writes SQLite. */
+  writesDatabase?: boolean;
   handler: (context: ToolContext, args: any) => unknown;
 }
 
@@ -41,6 +43,8 @@ export interface ClipRow {
   pixelWidth: number | null;
   pixelHeight: number | null;
   byteSize: number | null;
+  /** Present on databases migrated past the file-clip column; absent in older schemas. */
+  filePath?: string | null;
 }
 
 export interface CategoryRow {

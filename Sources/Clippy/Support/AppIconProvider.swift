@@ -5,6 +5,7 @@ import SwiftUI
 /// color derived from the icon, which drives per-app card tinting (the
 /// Paste-style look). Everything is cached; icon lookups and pixel
 /// averaging only happen once per app.
+@MainActor
 final class AppIconProvider {
     static let shared = AppIconProvider()
 

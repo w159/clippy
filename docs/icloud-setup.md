@@ -12,7 +12,7 @@ When "Sync clips and categories through iCloud Drive" is on, Clippy writes its
 archive to:
 
 ```
-~/Library/Mobile Documents/com~apple~CloudDocs/Clippy/clippy-sync.toml
+~/Library/Mobile Documents/com~apple~CloudDocs/Clippy/clippy-sync.clippyarchive/clippy.toml
 ```
 
 That folder is the local mirror of your iCloud Drive, so the file uploads
@@ -35,8 +35,9 @@ each other.
 
 - Categories and the clips pinned into them sync (the same data the
   `clippy.toml` export covers). Loose, unpinned history is intentionally local.
-- Image clips sync their metadata via the archive; the image **bytes** are not
-  copied across devices in this version.
+- The archive is a package folder (`clippy-sync.clippyarchive`) holding
+  `clippy.toml` plus a `media/` folder, so image and file clip **bytes** travel
+  with it and import on another Mac through package-relative paths (DAT-07).
 - The merge is content-based and runs on demand; it is not real-time. For a
   personal setup this is plenty; a future version could watch the file for
   changes and sync continuously.

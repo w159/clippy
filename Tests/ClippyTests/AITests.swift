@@ -23,6 +23,7 @@ final class MockAIProvider: AIProvider {
     }
 }
 
+@MainActor
 final class AITests: XCTestCase {
 
     // MARK: - Pure response shaping

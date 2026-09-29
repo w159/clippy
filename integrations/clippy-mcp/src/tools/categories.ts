@@ -58,6 +58,7 @@ export const categoryTools: ToolDef[] = [
       "'terminal.fill', 'key.fill', 'doc.text') so it is recognizable in the " +
       "sidebar. Returns the new id, ready for clippy_assign_clips.",
     mutates: true,
+    writesDatabase: true,
     schema: z.object({
       name: z.string().min(1).describe("What the user calls this group of clips."),
       colorHex: hexColor.optional().describe(`Accent color. Defaults to ${DEFAULT_COLOR}.`),
@@ -107,6 +108,7 @@ export const categoryTools: ToolDef[] = [
       "replaced - renaming keeps every clip filed in it. Only the fields you pass " +
       "change.",
     mutates: true,
+    writesDatabase: true,
     schema: z.object({
       id: categoryID.describe("Category id, from clippy_list_categories."),
       name: z.string().min(1).optional().describe("New name."),
@@ -168,6 +170,7 @@ export const categoryTools: ToolDef[] = [
       "an unused board. Clippy's built-in starter category cannot be deleted. " +
       "To remove the clips as well, call clippy_delete_clips separately.",
     mutates: true,
+    writesDatabase: true,
     schema: z.object({
       id: categoryID.describe("Category id to delete."),
     }),
@@ -203,6 +206,7 @@ export const categoryTools: ToolDef[] = [
       "several categories at once, and adding a clip that is already there is " +
       "harmless. Set member to false to unfile without deleting anything.",
     mutates: true,
+    writesDatabase: true,
     schema: z.object({
       clipIDs: z
         .array(clipID)

@@ -2,6 +2,7 @@ import XCTest
 import GRDB
 @testable import Clippy
 
+@MainActor
 final class CategoryTests: XCTestCase {
     func testMigrationCreatesStarterCategory() throws {
         let db = try makeTestDatabase(self)

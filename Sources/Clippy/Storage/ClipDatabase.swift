@@ -1,20 +1,24 @@
 import Foundation
 import GRDB
+import os
 
 /// All persistence. SQLite via GRDB, with an FTS5 index kept in sync with the
 /// clips table for full-text search. Unencrypted for milestone 1; SQLCipher
 /// swaps in behind this same interface later.
-final class ClipDatabase {
+final class ClipDatabase: Sendable {
     /// The error from the most recent attempt to open the on-disk database, if
     /// it failed. AppDelegate reads this at launch to present a recovery alert
     /// (Show in Finder / Retry / Quit) instead of the process crashing via
     /// fatalError. Reset to nil on a successful retry.
-    static var loadError: Error?
+    static var loadError: Error? {
+        get { loadErrorSlot.withLock { $0 } }
+        set { loadErrorSlot.withLock { $0 = newValue } }
+    }
+    private static let loadErrorSlot = OSAllocatedUnfairLock<Error?>(initialState: nil)
 
-    /// Backing cache for `shared`. guarded by `sharedLock` so concurrent
-    /// first-access from off-main threads is safe.
-    private static var _shared: ClipDatabase?
-    private static let sharedLock = NSLock()
+    /// Backing cache for `shared`. The lock makes concurrent first access from
+    /// off-main threads safe: only one caller opens the database.
+    private static let sharedInstance = OSAllocatedUnfairLock<ClipDatabase?>(initialState: nil)
 
     /// On-disk singleton. Preserved as a non-optional accessor so existing
     /// call sites compile unchanged. When the on-disk database cannot be
@@ -23,19 +27,19 @@ final class ClipDatabase {
     /// recovery alert rather than crashing. Callers that want to handle the
     /// failure explicitly should use `loadShared()`.
     static var shared: ClipDatabase {
-        sharedLock.lock()
-        defer { sharedLock.unlock() }
-        if let cached = _shared { return cached }
-        do {
-            let db = try ClipDatabase()
-            _shared = db
-            return db
-        } catch {
-            loadError = error
-            ClippyLog.error("Clippy could not open its database: \(error)", category: ClippyLog.storage)
-            let sentinel = makeRecoverySentinel()
-            _shared = sentinel
-            return sentinel
+        sharedInstance.withLock { slot in
+            if let cached = slot { return cached }
+            do {
+                let connection = try ClipDatabase()
+                slot = connection
+                return connection
+            } catch {
+                loadError = error
+                ClippyLog.error("Clippy could not open its database: \(error)", category: ClippyLog.storage)
+                let sentinel = makeRecoverySentinel()
+                slot = sentinel
+                return sentinel
+            }
         }
     }
 
@@ -53,17 +57,17 @@ final class ClipDatabase {
     /// the new database on success, nil on continued failure.
     @discardableResult
     static func retryLoad() -> ClipDatabase? {
-        sharedLock.lock()
-        defer { sharedLock.unlock() }
-        do {
-            let db = try ClipDatabase()
-            _shared = db
-            loadError = nil
-            return db
-        } catch {
-            loadError = error
-            ClippyLog.error("Clippy database retry failed: \(error)", category: ClippyLog.storage)
-            return nil
+        sharedInstance.withLock { slot in
+            do {
+                let connection = try ClipDatabase()
+                slot = connection
+                loadError = nil
+                return connection
+            } catch {
+                loadError = error
+                ClippyLog.error("Clippy database retry failed: \(error)", category: ClippyLog.storage)
+                return nil
+            }
         }
     }
 
@@ -81,27 +85,26 @@ final class ClipDatabase {
             .appendingPathComponent("ClippyRecoveryMedia", isDirectory: true)
         try? FileManager.default.createDirectory(at: mediaDir, withIntermediateDirectories: true)
 
-        let queue: DatabaseQueue
-        do {
-            queue = try DatabaseQueue(path: ":memory:")
-            // Best-effort migrations; a failure here leaves an empty in-memory
-            // schema, which is fine because the app is about to show the
-            // recovery alert and will not read/write clips against the sentinel.
-            try? Self.makeMigrator().migrate(queue)
-        } catch {
-            // Extremely unlikely (in-memory open basically never fails); fall
-            // back to a fresh in-memory queue without migrations. Force-try is
-            // safe because :memory: open cannot fail, and this recovery path
-            // must not itself throw.
-            queue = try! DatabaseQueue(path: ":memory:")
+        // Best-effort migrations; a failure leaves an empty in-memory schema,
+        // which is fine because the app shows the recovery alert and never
+        // reads/writes clips against the sentinel.
+        guard let queue = try? DatabaseQueue(path: ":memory:") else {
+            preconditionFailure("SQLite could not open an in-memory database; nothing to recover into")
         }
-        // Temp directory is always writable; the recovery path must not itself
-        // throw, so use a force-try on a guaranteed location.
-        let media = try! MediaStore(directory: mediaDir)
+        try? Self.makeMigrator().migrate(queue)
+        // Fall back to a unique temp directory if the fixed one is unusable.
+        let fallbackDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClippyRecoveryMedia-\(UUID().uuidString)", isDirectory: true)
+        guard let media = (try? MediaStore(directory: mediaDir)) ?? (try? MediaStore(directory: fallbackDir)) else {
+            preconditionFailure("Temporary directory is not writable; cannot build the recovery sentinel")
+        }
         return ClipDatabase(queue: queue, url: dbURL, media: media)
     }
 
-    let dbQueue: DatabaseQueue
+    /// The writer every read and write goes through. A `DatabasePool` (WAL,
+    /// concurrent readers) for the on-disk database; a `DatabaseQueue` only for
+    /// the in-memory recovery sentinel. The name is historical.
+    let dbQueue: DatabaseWriter
     let databaseURL: URL
     let media: MediaStore
 
@@ -119,155 +122,40 @@ final class ClipDatabase {
                 directory: mediaDirectory ?? supportDir.appendingPathComponent("media", isDirectory: true)
             )
         }
-        dbQueue = try DatabaseQueue(path: self.databaseURL.path)
+        dbQueue = try DatabasePool(path: self.databaseURL.path, configuration: Self.makeConfiguration())
         try Self.makeMigrator().migrate(dbQueue)
+    }
+
+    /// Hook run on every new connection before anything else. This is the seam
+    /// for encryption at rest (DAT-12, deferred): a SQLCipher build sets it to
+    /// `{ db in try db.usePassphrase(key) }` and every pool connection (writer
+    /// and readers) is keyed identically, without touching any caller.
+    static var prepareConnection: (@Sendable (Database) throws -> Void)? {
+        get { prepareConnectionSlot.withLock { $0 } }
+        set { prepareConnectionSlot.withLock { $0 = newValue } }
+    }
+    private static let prepareConnectionSlot =
+        OSAllocatedUnfairLock<(@Sendable (Database) throws -> Void)?>(initialState: nil)
+
+    /// WAL journal (implicit for `DatabasePool`) plus a 5s busy timeout, because
+    /// two processes (the app and the MCP server) write to this file (DAT-13).
+    static func makeConfiguration() -> Configuration {
+        var config = Configuration()
+        config.busyMode = .timeout(5)
+        config.prepareDatabase { connection in
+            try prepareConnection?(connection)
+        }
+        return config
     }
 
     /// Private init used by the recovery sentinel: assemble from pre-built
     /// pieces so no on-disk open is attempted.
-    private init(queue: DatabaseQueue, url: URL, media: MediaStore) {
+    private init(queue: DatabaseWriter, url: URL, media: MediaStore) {
         self.dbQueue = queue
         self.databaseURL = url
         self.media = media
     }
 
-    /// Static so tests can run migrations stepwise without building a full ClipDatabase.
-    static func makeMigrator() -> DatabaseMigrator {
-        var migrator = DatabaseMigrator()
-        migrator.registerMigration("v1") { db in
-            try db.create(table: "clips") { t in
-                t.autoIncrementedPrimaryKey("id")
-                t.column("contentText", .text).notNull()
-                t.column("contentRTF", .blob)
-                t.column("contentHTML", .blob)
-                t.column("typeIdentifier", .text).notNull()
-                t.column("sourceAppBundleID", .text)
-                t.column("sourceAppName", .text)
-                t.column("createdAt", .datetime).notNull()
-                t.column("isPinned", .boolean).notNull().defaults(to: false)
-            }
-            try db.create(indexOn: "clips", columns: ["createdAt"])
-            try db.create(virtualTable: "clips_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "clips")
-                t.tokenizer = .unicode61()
-                t.column("contentText")
-            }
-        }
-        migrator.registerMigration("v2-categories") { db in
-            try db.create(table: "category") { t in
-                t.autoIncrementedPrimaryKey("id")
-                t.column("name", .text).notNull()
-                t.column("colorHex", .text).notNull()
-                t.column("iconKind", .text).notNull()
-                t.column("iconValue", .text).notNull()
-                t.column("sortOrder", .integer).notNull().defaults(to: 0)
-                t.column("isStarter", .boolean).notNull().defaults(to: false)
-                t.column("createdAt", .datetime).notNull()
-            }
-            try db.create(table: "clip_category") { t in
-                t.column("clipID", .integer).notNull()
-                    .references("clips", onDelete: .cascade)
-                t.column("categoryID", .integer).notNull()
-                    .references("category", onDelete: .cascade)
-                t.column("addedAt", .datetime).notNull()
-                t.primaryKey(["clipID", "categoryID"])
-            }
-            try db.create(indexOn: "clip_category", columns: ["clipID"])
-            // At most one starter category, enforced by the schema.
-            try db.execute(
-                sql: "CREATE UNIQUE INDEX category_single_starter ON category (isStarter) WHERE isStarter = 1"
-            )
-            // Starter category receives every legacy pinned clip so nothing
-            // is lost; users can rename or restyle it later.
-            try db.execute(
-                sql: """
-                    INSERT INTO category (name, colorHex, iconKind, iconValue, sortOrder, isStarter, createdAt)
-                    VALUES ('Pinned', '#FF9500', 'symbol', 'pin.fill', 0, 1, ?)
-                    """,
-                arguments: [Date()]
-            )
-            let starterID = db.lastInsertedRowID
-            try db.execute(
-                sql: """
-                    INSERT INTO clip_category (clipID, categoryID, addedAt)
-                    SELECT id, ?, ? FROM clips WHERE isPinned = 1
-                    """,
-                arguments: [starterID, Date()]
-            )
-            try db.alter(table: "clips") { t in
-                t.drop(column: "isPinned")
-            }
-        }
-        migrator.registerMigration("v3-image-clips") { db in
-            try db.alter(table: "clips") { t in
-                t.add(column: "contentKind", .text).notNull().defaults(to: "text")
-                t.add(column: "mediaFilename", .text)
-                t.add(column: "thumbFilename", .text)
-                t.add(column: "pixelWidth", .integer)
-                t.add(column: "pixelHeight", .integer)
-                t.add(column: "byteSize", .integer)
-            }
-        }
-        migrator.registerMigration("v4-user-titles") { db in
-            // Add the nullable userTitle column; existing rows stay NULL which
-            // makes them fall back to sourceAppName in the UI (no data loss).
-            try db.alter(table: "clips") { t in
-                t.add(column: "userTitle", .text)
-            }
-            // FTS5 synchronized tables cannot have columns added after creation,
-            // so drop and recreate the virtual table to pick up userTitle.
-            // GRDB's synchronize() creates three triggers on the content table;
-            // they must be dropped explicitly before the FTS table is removed,
-            // otherwise the subsequent CREATE VIRTUAL TABLE will try to create
-            // them again and hit "trigger already exists".
-            try db.execute(sql: "DROP TRIGGER IF EXISTS \"__clips_fts_ai\"")
-            try db.execute(sql: "DROP TRIGGER IF EXISTS \"__clips_fts_ad\"")
-            try db.execute(sql: "DROP TRIGGER IF EXISTS \"__clips_fts_au\"")
-            try db.execute(sql: "DROP TABLE IF EXISTS clips_fts")
-            try db.create(virtualTable: "clips_fts", using: FTS5()) { t in
-                t.synchronize(withTable: "clips")
-                t.tokenizer = .unicode61()
-                t.column("contentText")
-                t.column("userTitle")
-            }
-        }
-        migrator.registerMigration("v5-clip-category-sort-order") { db in
-            // Add per-category clip ordering to the junction table. SQLite's
-            // ALTER TABLE does not support NOT NULL without a default on
-            // existing tables, so DEFAULT 0 is required here.
-            try db.execute(sql: """
-                ALTER TABLE clip_category ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0
-                """)
-            // Backfill: within each category, assign sortOrder by addedAt DESC
-            // so the most-recently-added clip appears first (matching the
-            // pre-reorder visible order). Gap-free 0-based integers per category.
-            try db.execute(sql: """
-                UPDATE clip_category
-                SET sortOrder = (
-                    SELECT COUNT(*) - 1 - ranked.rn
-                    FROM (
-                        SELECT clipID, categoryID,
-                               ROW_NUMBER() OVER (
-                                   PARTITION BY categoryID
-                                   ORDER BY addedAt DESC
-                               ) - 1 AS rn
-                        FROM clip_category AS inner_cc
-                    ) AS ranked
-                    WHERE ranked.clipID = clip_category.clipID
-                      AND ranked.categoryID = clip_category.categoryID
-                )
-                """)
-            try db.create(indexOn: "clip_category", columns: ["categoryID", "sortOrder"])
-        }
-        migrator.registerMigration("v6-file-clips") { db in
-            // Add the nullable filePath column for file clips. Additive only;
-            // existing text and image rows simply get NULL here.
-            try db.alter(table: "clips") { t in
-                t.add(column: "filePath", .text)
-            }
-        }
-        return migrator
-    }
 
     // MARK: - Writes
 
@@ -301,23 +189,24 @@ final class ClipDatabase {
                                 matchedBy request: QueryInterfaceRequest<Clip>) throws {
         let newClip = clip
         var evicted: [String] = []
-        try dbQueue.write { db in
-            if var existing = try request.fetchOne(db) {
+        var savedID: Int64?
+        try dbQueue.write { connection in
+            if var existing = try request.fetchOne(connection) {
                 existing.createdAt = newClip.createdAt
                 existing.sourceAppBundleID = newClip.sourceAppBundleID
                 existing.sourceAppName = newClip.sourceAppName
-                try existing.update(db)
+                try existing.update(connection)
+                savedID = existing.id
                 return
             }
             var inserting = newClip
-            try inserting.insert(db)
-            evicted = try Self.evictOverCap(db, cap: cap)
-            // Absolute ceiling: if total rows still exceed the hard limit after
-            // the normal cap eviction (because categorized clips are exempt from
-            // the cap), delete the oldest categorized clips beyond that ceiling
-            // too. This prevents unbounded growth when users heavily categorize.
-            evicted += try Self.evictAbsoluteCeiling(db)
+            try inserting.insert(connection)
+            savedID = inserting.id
+            evicted = try Self.enforceLimits(connection, cap: cap)
         }
+        // Report the row id (inserted or bumped) to the caller, e.g. for the
+        // clippyClipCaptured notification.
+        clip.id = savedID
         media.delete(filenames: evicted)
     }
 
@@ -325,8 +214,14 @@ final class ClipDatabase {
     /// the media filenames of evicted image clips so callers can remove files.
     /// Clips in any category never count against the cap.
     @discardableResult
-    static func evictOverCap(_ db: Database, cap: Int) throws -> [String] {
+    static func evictOverCap(_ connection: Database, cap: Int) throws -> [String] {
         guard cap > 0 else { return [] }
+        // Common case (under the cap): one cheap count instead of three
+        // NOT IN / top-N passes over the whole table.
+        let uncategorized = try Int.fetchOne(
+            connection,
+            sql: "SELECT COUNT(*) FROM clips WHERE id NOT IN (SELECT clipID FROM clip_category)") ?? 0
+        guard uncategorized > cap else { return [] }
         let doomedSQL = """
             SELECT id FROM clips
             WHERE id NOT IN (SELECT clipID FROM clip_category)
@@ -338,7 +233,7 @@ final class ClipDatabase {
             )
             """
         let filenames = try String.fetchAll(
-            db,
+            connection,
             sql: """
                 SELECT mediaFilename FROM clips
                 WHERE mediaFilename IS NOT NULL AND id IN (\(doomedSQL))
@@ -347,51 +242,68 @@ final class ClipDatabase {
                 WHERE thumbFilename IS NOT NULL AND id IN (\(doomedSQL))
                 """
         )
-        try db.execute(sql: "DELETE FROM clips WHERE id IN (\(doomedSQL))")
+        try connection.execute(sql: "DELETE FROM clips WHERE id IN (\(doomedSQL))")
         return filenames
     }
 
-    /// Hard ceiling across ALL clips (including categorized) so the table can
-    /// never grow without bound even when every clip is in a category and the
-    /// normal cap eviction leaves them all in place.
-    /// Evicts the oldest clips beyond the ceiling and returns their media filenames.
-    private static let absoluteClipCeiling = 10_000
-
+    /// THE eviction chokepoint (DAT-11). Every path that adds rows (capture,
+    /// script/OCR/AI text, archive import, sync) calls this inside the same
+    /// transaction as the insert: first the history cap, then the hard ceiling.
+    /// Returns media filenames freed, for the caller to delete after commit.
     @discardableResult
-    static func evictAbsoluteCeiling(_ db: Database) throws -> [String] {
-        let total = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
-        guard total > absoluteClipCeiling else { return [] }
+    static func enforceLimits(_ connection: Database, cap: Int) throws -> [String] {
+        var evicted = try evictOverCap(connection, cap: cap)
+        evicted += try evictAbsoluteCeiling(connection)
+        return evicted
+    }
 
-        let excess = total - absoluteClipCeiling
-        // Delete the oldest clips (by createdAt) regardless of category membership.
-        let ceilingDoomedSQL = """
+    /// Hard ceiling on total rows. Evicts the oldest *uncategorized* clips beyond
+    /// `ceiling`; pinned/categorized clips are never touched (DAT-06). If those
+    /// alone exceed the ceiling the table stays over it and the store warns.
+    /// Returns the media filenames of evicted clips.
+    @discardableResult
+    static func evictAbsoluteCeiling(_ connection: Database, ceiling: Int = StorageCeiling.current) throws -> [String] {
+        let total = try Int.fetchOne(connection, sql: "SELECT COUNT(*) FROM clips") ?? 0
+        guard total > ceiling else { return [] }
+
+        let excess = total - ceiling
+        let doomedSQL = """
             SELECT id FROM clips
+            WHERE id NOT IN (SELECT clipID FROM clip_category)
             ORDER BY createdAt ASC, id ASC
             LIMIT \(excess)
             """
         let filenames = try String.fetchAll(
-            db,
+            connection,
             sql: """
                 SELECT mediaFilename FROM clips
-                WHERE mediaFilename IS NOT NULL AND id IN (\(ceilingDoomedSQL))
+                WHERE mediaFilename IS NOT NULL AND id IN (\(doomedSQL))
                 UNION ALL
                 SELECT thumbFilename FROM clips
-                WHERE thumbFilename IS NOT NULL AND id IN (\(ceilingDoomedSQL))
+                WHERE thumbFilename IS NOT NULL AND id IN (\(doomedSQL))
                 """
         )
-        try db.execute(sql: "DELETE FROM clips WHERE id IN (\(ceilingDoomedSQL))")
-        if excess > 0 {
-            ClippyLog.info("Absolute ceiling eviction: removed \(excess) clips (total was \(total))",
-                           category: ClippyLog.storage)
-        }
+        try connection.execute(sql: "DELETE FROM clips WHERE id IN (\(doomedSQL))")
+        ClippyLog.info("Ceiling eviction: over by \(excess) (total was \(total))", category: ClippyLog.storage)
         return filenames
+    }
+
+    /// Current row count against the configured ceiling, for the 90% warning.
+    func storageUsage() throws -> StorageUsage {
+        let count = try dbQueue.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM clips") ?? 0 }
+        return StorageUsage(count: count, ceiling: StorageCeiling.current)
+    }
+
+    /// Whether a clip row still exists (OCR completion uses this before writing).
+    func clipExists(id: Int64) throws -> Bool {
+        try dbQueue.read { try Bool.fetchOne($0, sql: "SELECT EXISTS(SELECT 1 FROM clips WHERE id = ?)", arguments: [id]) ?? false }
     }
 
     /// User edited the text in the plain-text editor. The original rich blobs
     /// no longer match the text, so they are dropped on purpose.
     func updateClipText(id: Int64, newText: String) throws {
-        try dbQueue.write { db in
-            try db.execute(
+        try dbQueue.write { connection in
+            try connection.execute(
                 sql: """
                     UPDATE clips
                     SET contentText = ?, contentRTF = NULL, contentHTML = NULL,
@@ -406,8 +318,8 @@ final class ClipDatabase {
     /// Persists a user-assigned display name. Pass nil to clear the custom title
     /// and revert to showing the source app name in the card header.
     func updateClipTitle(id: Int64, userTitle: String?) throws {
-        try dbQueue.write { db in
-            try db.execute(
+        try dbQueue.write { connection in
+            try connection.execute(
                 sql: "UPDATE clips SET userTitle = ? WHERE id = ?",
                 arguments: [userTitle, id]
             )
@@ -418,13 +330,13 @@ final class ClipDatabase {
     /// BEFORE this runs; the row is repointed at them and the now-unreferenced old
     /// files are deleted (unless the new content hashes to the same filename).
     func updateClipImage(id: Int64, stored: MediaStore.StoredImage) throws {
-        let oldFilenames: [String] = try dbQueue.write { db in
-            let existing = try Clip.fetchOne(db, key: id)
-            try db.execute(
+        let oldFilenames: [String] = try dbQueue.write { connection in
+            let existing = try Clip.fetchOne(connection, key: id)
+            try connection.execute(
                 sql: """
                     UPDATE clips
                     SET mediaFilename = ?, thumbFilename = ?, pixelWidth = ?, pixelHeight = ?, byteSize = ?,
-                        typeIdentifier = 'public.png', contentKind = ?
+                        typeIdentifier = 'public.png', contentKind = ?, ocrText = NULL
                     WHERE id = ?
                     """,
                 arguments: [stored.mediaFilename, stored.thumbFilename,
@@ -445,7 +357,8 @@ final class ClipDatabase {
     ///   - sourceAppName: Label shown in the card header. Defaults to "Clippy Scripts"
     ///     for backward compatibility with callers that do not supply one.
     @discardableResult
-    func insertTextClip(_ text: String, sourceAppName: String = "Clippy Scripts") throws -> Int64 {
+    func insertTextClip(_ text: String, sourceAppName: String = "Clippy Scripts",
+                        cap: Int = AppSettings.storedMaxHistoryItems) throws -> Int64 {
         var clip = Clip(
             id: nil,
             contentText: text,
@@ -456,27 +369,30 @@ final class ClipDatabase {
             sourceAppName: sourceAppName,
             createdAt: Date()
         )
-        try dbQueue.write { db in
-            try clip.insert(db)
+        var evicted: [String] = []
+        try dbQueue.write { connection in
+            try clip.insert(connection)
+            evicted = try Self.enforceLimits(connection, cap: cap)
         }
+        media.delete(filenames: evicted)
         return clip.id ?? 0
     }
 
     func deleteClip(id: Int64) throws {
-        let filenames: [String] = try dbQueue.write { db in
-            let clip = try Clip.fetchOne(db, key: id)
-            try Clip.deleteOne(db, key: id)
+        let filenames: [String] = try dbQueue.write { connection in
+            let clip = try Clip.fetchOne(connection, key: id)
+            try Clip.deleteOne(connection, key: id)
             return clip?.mediaFilenames ?? []
         }
         media.delete(filenames: filenames)
     }
 
     func deleteUnclassifiedClips() throws {
-        let filenames: [String] = try dbQueue.write { db in
+        let filenames: [String] = try dbQueue.write { connection in
             let doomed = try Clip
                 .filter(sql: "id NOT IN (SELECT clipID FROM clip_category)")
-                .fetchAll(db)
-            try db.execute(sql: "DELETE FROM clips WHERE id NOT IN (SELECT clipID FROM clip_category)")
+                .fetchAll(connection)
+            try connection.execute(sql: "DELETE FROM clips WHERE id NOT IN (SELECT clipID FROM clip_category)")
             return doomed.flatMap(\.mediaFilenames)
         }
         media.delete(filenames: filenames)
@@ -484,15 +400,15 @@ final class ClipDatabase {
 
     /// Every media filename any clip references, for the launch orphan sweep.
     func referencedMediaFilenames() throws -> Set<String> {
-        try dbQueue.read { db in
+        try dbQueue.read { connection in
             let rows = try Row.fetchAll(
-                db,
+                connection,
                 sql: "SELECT mediaFilename, thumbFilename FROM clips WHERE mediaFilename IS NOT NULL OR thumbFilename IS NOT NULL"
             )
             var names = Set<String>()
             for row in rows {
-                if let m: String = row["mediaFilename"] { names.insert(m) }
-                if let t: String = row["thumbFilename"] { names.insert(t) }
+                if let mediaName: String = row["mediaFilename"] { names.insert(mediaName) }
+                if let thumbName: String = row["thumbFilename"] { names.insert(thumbName) }
             }
             return names
         }
@@ -505,8 +421,11 @@ final class ClipDatabase {
     /// free signal that the MCP server process has touched the database.
     /// See ExternalChangeWatcher.
     func dataVersion() throws -> Int64 {
-        try dbQueue.read { db in
-            try Int64.fetchOne(db, sql: "PRAGMA data_version") ?? 0
+        // On the writer connection: only commits from *other* connections (the
+        // MCP process) move its data_version; pool readers never commit, so our
+        // own writes stay invisible to it.
+        try dbQueue.writeWithoutTransaction { connection in
+            try Int64.fetchOne(connection, sql: "PRAGMA data_version") ?? 0
         }
     }
 
@@ -514,90 +433,17 @@ final class ClipDatabase {
     /// `ValueObservation` refetches. Required because observation is blind to
     /// commits from other processes.
     func notifyExternalChanges() throws {
-        try dbQueue.write { db in
-            try db.notifyChanges(in: .fullDatabase)
+        try dbQueue.write { connection in
+            try connection.notifyChanges(in: .fullDatabase)
         }
     }
 
     // MARK: - Reads
 
     func allClips() throws -> [Clip] {
-        try dbQueue.read { db in
-            try Clip.order(Column("createdAt").desc, Column("id").desc).fetchAll(db)
+        try dbQueue.read { connection in
+            try Clip.order(Column("createdAt").desc, Column("id").desc).fetchAll(connection)
         }
-    }
-
-    /// Searches clips with the `#`-token grammar (see ClipQueryParser). Free text
-    /// goes through FTS5; `#kind` tokens filter contentKind (derived kinds like
-    /// `#link` finish in Swift); `#app` filters match sourceAppName/bundleID; a
-    /// `#duration` token bounds createdAt. Filter-only queries (no free text) are
-    /// supported and ordered newest-first instead of by FTS rank.
-    func searchClips(matching query: String, limit: Int) throws -> [Clip] {
-        let parsed = ClipQueryParser.parse(query)
-        // Derived kinds (#link/#email/#color/#path) match a subset of the text
-        // rows the SQL narrows to, so over-fetch and trim after the Swift pass.
-        let needsKindPostFilter = parsed.kinds.contains(where: \.isDerived)
-        let fetchLimit = needsKindPostFilter ? limit * 4 : limit
-        let fetched = try dbQueue.read { db -> [Clip] in
-            var clauses: [String] = []
-            var args: [DatabaseValueConvertible] = []
-            var joinFTS = false
-            var orderByRank = false
-
-            if !parsed.text.isEmpty, let pattern = FTS5Pattern(matchingAllPrefixesIn: parsed.text) {
-                joinFTS = true
-                orderByRank = true
-                clauses.append("clips_fts MATCH ?")
-                args.append(pattern)
-            }
-
-            if !parsed.kinds.isEmpty {
-                let stored = Set(parsed.kinds.map { $0.storedContentKind.rawValue }).sorted()
-                let placeholders = stored.map { _ in "?" }.joined(separator: ", ")
-                clauses.append("clips.contentKind IN (\(placeholders))")
-                args.append(contentsOf: stored)
-            }
-
-            if !parsed.sourceApps.isEmpty {
-                let perApp = parsed.sourceApps.map { _ in
-                    "(clips.sourceAppName LIKE ? OR clips.sourceAppBundleID LIKE ?)"
-                }
-                clauses.append("(" + perApp.joined(separator: " OR ") + ")")
-                for app in parsed.sourceApps {
-                    let like = "%\(app)%"
-                    args.append(like)
-                    args.append(like)
-                }
-            }
-
-            if let since = parsed.since {
-                clauses.append("clips.createdAt >= ?")
-                args.append(since)
-            }
-
-            // No usable predicate (e.g. only an unmatched FTS pattern): fall back to recent.
-            guard !clauses.isEmpty else {
-                return try Clip.order(Column("createdAt").desc, Column("id").desc)
-                    .limit(limit)
-                    .fetchAll(db)
-            }
-
-            var sql = "SELECT clips.* FROM clips"
-            if joinFTS { sql += " JOIN clips_fts ON clips_fts.rowid = clips.id" }
-            sql += " WHERE " + clauses.joined(separator: " AND ")
-            sql += orderByRank ? " ORDER BY rank" : " ORDER BY clips.createdAt DESC, clips.id DESC"
-            sql += " LIMIT ?"
-            args.append(fetchLimit)
-
-            return try Clip.fetchAll(db, sql: sql, arguments: StatementArguments(args))
-        }
-        guard !parsed.kinds.isEmpty else { return fetched }
-        // OR semantics across kind tokens, mirroring the app-filter behavior.
-        return Array(
-            fetched
-                .filter { clip in parsed.kinds.contains { $0.matches(clip) } }
-                .prefix(limit)
-        )
     }
 
     // MARK: - Category state
@@ -606,13 +452,20 @@ final class ClipDatabase {
     /// v2 and never deleted, so its id is stable for the process lifetime.
     /// Stored here because extensions cannot declare stored properties; the
     /// category API lives in ClipDatabase+Categories.swift.
-    var cachedStarterCategoryID: Int64?
+    var cachedStarterCategoryID: Int64? {
+        get { starterCategoryIDCache.withLock { $0 } }
+        set { starterCategoryIDCache.withLock { $0 = newValue } }
+    }
+    private let starterCategoryIDCache = OSAllocatedUnfairLock<Int64?>(initialState: nil)
 }
 
 extension Clip {
     /// The capture/import dedupe predicate for a text clip: same text, kind text.
     static func duplicateText(of contentText: String) -> QueryInterfaceRequest<Clip> {
-        Clip.filter(Column("contentText") == contentText)
+        // The prefix predicate lets SQLite use clips_text_prefix instead of
+        // comparing every row's (possibly huge) text; equal text implies equal prefix.
+        Clip.filter(sql: "substr(contentText, 1, 64) = ?", arguments: [String(contentText.unicodeScalars.prefix(64))])
+            .filter(Column("contentText") == contentText)
             .filter(Column("contentKind") == ClipContentKind.text.rawValue)
     }
 

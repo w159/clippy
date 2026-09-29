@@ -1,6 +1,7 @@
 import XCTest
 @testable import Clippy
 
+@MainActor
 final class ScriptStoreTests: XCTestCase {
     private func tempURL() -> URL {
         FileManager.default.temporaryDirectory

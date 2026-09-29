@@ -17,6 +17,7 @@ import XCTest
 // hardwired to UserDefaults.standard, matching AppDefaultTests). Original
 // values are captured and restored so the suite does not mutate real settings.
 
+@MainActor
 final class AppSettingsObservationTests: XCTestCase {
     private var settings: AppSettings!
     private var cancellables: Set<AnyCancellable> = []

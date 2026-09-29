@@ -72,13 +72,16 @@ struct AppleIntelligenceProvider: AIAgentProvider {
             .filter { $0.role == .system }
             .map(\.content)
             .joined(separator: "\n\n")
-        let turns = messages.filter { $0.role != .system }
+        // A replayed transcript may carry tool turns from another provider; this one
+        // has no tools, so fold them into readable text first.
+        let turns = AIMessageBuilder.plainText(messages.filter { $0.role != .system })
         guard !turns.isEmpty else { throw AIError.empty }
+        let fitted = AIContextBudget.fit(turns, budgetTokens: Self.turnBudget(instructions: instructions))
 
         let session = instructions.isEmpty
             ? LanguageModelSession()
             : LanguageModelSession(instructions: instructions)
-        return (session, Self.flatten(turns))
+        return (session, Self.flatten(fitted))
     }
 
     /// A single prompt string from the conversation so far. Multi-turn history is
@@ -94,6 +97,15 @@ struct AppleIntelligenceProvider: AIAgentProvider {
                 }
             }
             .joined(separator: "\n\n")
+    }
+
+    /// Tokens available for conversation turns: the model's context window minus
+    /// the instructions and a reserve for the reply. `contextSize` is macOS 26+,
+    /// which is this app's deployment floor.
+    private static func turnBudget(instructions: String) -> Int {
+        SystemLanguageModel.default.contextSize
+            - AIContextBudget.estimateTokens(instructions)
+            - 1024   // reply + framing reserve
     }
 
     private func generationOptions(_ options: AICompletionOptions) -> GenerationOptions {
@@ -114,6 +126,11 @@ struct AppleIntelligenceProvider: AIAgentProvider {
             return text
         } catch let error as AIError {
             throw error
+        } catch let error as LanguageModelSession.GenerationError {
+            if case .exceededContextWindowSize = error {
+                throw AIError.decoding("The conversation is too long for Apple Intelligence's context window. Clear the conversation or attach less text.")
+            }
+            throw AIError.decoding(error.localizedDescription)
         } catch {
             throw AIError.decoding(error.localizedDescription)
         }
@@ -148,18 +165,16 @@ struct AppleIntelligenceProvider: AIAgentProvider {
                         to: prompt, options: generationOptions(options)
                     ) {
                         let snapshot = partial.content
-                        guard snapshot.count > emitted.count,
-                              snapshot.hasPrefix(emitted) else {
-                            // A non-monotonic snapshot means the model revised
-                            // earlier text; resend the whole thing rather than
-                            // emitting a nonsensical diff.
-                            if snapshot != emitted {
-                                continuation.yield(.textDelta(snapshot))
-                                emitted = snapshot
-                            }
+                        switch AISnapshotDiff.step(emitted: emitted, snapshot: snapshot) {
+                        case .none:
                             continue
+                        case .append(let suffix):
+                            continuation.yield(.textDelta(suffix))
+                        case .replace(let old, let new):
+                            // The model revised earlier text: replace, never
+                            // append the whole snapshot again (AI-06).
+                            continuation.yield(.textReplace(old: old, new: new))
                         }
-                        continuation.yield(.textDelta(String(snapshot.dropFirst(emitted.count))))
                         emitted = snapshot
                     }
                     continuation.yield(.done)

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// One 1Password item as surfaced in the sidebar (no secret value until revealed).
 struct OPItem: Identifiable, Equatable {
@@ -78,6 +79,9 @@ enum OnePasswordError: LocalizedError {
     case notInstalled
     case notSignedIn(String)
     case command(String)
+    /// `op` did not answer within the timeout (typically the 1Password app is
+    /// waiting on an unlock prompt that nobody saw).
+    case timedOut
 
     var errorDescription: String? {
         switch self {
@@ -87,7 +91,36 @@ enum OnePasswordError: LocalizedError {
             return "Not signed in to 1Password. \(detail)"
         case .command(let detail):
             return detail
+        case .timedOut:
+            return "1Password did not respond. Unlock the 1Password app and try again."
         }
+    }
+}
+
+// MARK: - Command runner
+
+/// Seam between `OnePasswordService` and the `op` binary, so the service and the
+/// view model can be exercised with a scripted runner instead of a real CLI.
+protocol OpCommandRunner: Sendable {
+    /// True when an `op` executable can be found right now (re-probed each call).
+    var isAvailable: Bool { get }
+
+    /// Run `op` with `args`. `input`, when set, is written to the child's stdin.
+    /// Secrets MUST travel through `input`, never through `args`: argv is world
+    /// readable through `ps`.
+    func run(_ args: [String], input: String?, timeout: TimeInterval) async -> Subprocess.Output
+}
+
+/// Production runner: spawns the real `op` via `Subprocess`.
+struct SubprocessOpRunner: OpCommandRunner {
+    var isAvailable: Bool { OnePasswordService.executablePath() != nil }
+
+    func run(_ args: [String], input: String?, timeout: TimeInterval) async -> Subprocess.Output {
+        guard let exe = OnePasswordService.executablePath() else {
+            return Subprocess.Output(stdout: "", stderr: "op not found", exitCode: -1,
+                                     launchFailed: true, timedOut: false)
+        }
+        return await Subprocess.run(exe, args, input: input, timeout: timeout)
     }
 }
 
@@ -97,9 +130,17 @@ enum OnePasswordError: LocalizedError {
 /// secret values are persisted by Clippy.
 struct OnePasswordService {
     let vault: String
+    let runner: any OpCommandRunner
 
-    init(vault: String) {
+    /// Timeout for read operations (list/get). Long enough for a biometric unlock,
+    /// short enough that the view never spins indefinitely.
+    static let readTimeout: TimeInterval = 20
+    /// Timeout for `op signin`, which waits on the 1Password app's approval prompt.
+    static let signInTimeout: TimeInterval = 60
+
+    init(vault: String, runner: any OpCommandRunner = SubprocessOpRunner()) {
         self.vault = vault.isEmpty ? "Clippy" : vault
+        self.runner = runner
     }
 
     /// Resolve the op executable. GUI apps receive a stripped PATH, so common
@@ -112,36 +153,62 @@ struct OnePasswordService {
         return Subprocess.findBinary(named: "op", candidates: hardcoded)
     }
 
-    /// Resolve the op executable path and the argument list (always an absolute
-    /// path now, so no /usr/bin/env shim is needed).
-    private static func opArgs(base: [String]) -> (String, [String]) {
-        let path = executablePath() ?? "/opt/homebrew/bin/op"
-        return (path, base)
+    /// How long a positive/negative install probe is trusted before the next read
+    /// re-probes. Short, so installing `op` while the app runs is picked up.
+    static let installProbeTTL: TimeInterval = 15
+    private static let probeResult = OSAllocatedUnfairLock<(value: Bool, at: Date)?>(initialState: nil)
+
+    /// Whether the `op` CLI is installed. Cached briefly (the settings UI reads this
+    /// several times per render), then re-probed. Use `refreshInstalled()` to force it.
+    static var isInstalled: Bool {
+        if let cached = probeResult.withLock({ $0 }), Date().timeIntervalSince(cached.at) < installProbeTTL {
+            return cached.value
+        }
+        return refreshInstalled()
     }
 
-    // Cached for the process lifetime: the settings UI reads this several times
-    // per render, and the CLI is not installed or removed mid-session in practice.
-    // Caching turns a dozen filesystem stats per render into one lookup.
-    private static let installedCache: Bool = executablePath() != nil
-    static var isInstalled: Bool { installedCache }
+    /// Re-probe the filesystem/login shell now and update the cache.
+    @discardableResult
+    static func refreshInstalled() -> Bool {
+        let found = executablePath() != nil
+        probeResult.withLock { $0 = (found, Date()) }
+        return found
+    }
 
-    private func op(_ args: [String]) async throws -> String {
-        guard let _ = Self.executablePath() else { throw OnePasswordError.notInstalled }
-        let (exe, fullArgs) = Self.opArgs(base: args)
-        let result = await Subprocess.run(exe, fullArgs)
+    private func op(_ args: [String], input: String? = nil,
+                    timeout: TimeInterval = OnePasswordService.readTimeout) async throws -> String {
+        guard runner.isAvailable else { throw OnePasswordError.notInstalled }
+        let result = await runner.run(args, input: input, timeout: timeout)
+        if result.timedOut { throw OnePasswordError.timedOut }
         guard result.succeeded else {
-            let lower = result.stderr.lowercased()
-            if lower.contains("sign in") || lower.contains("not currently signed in") || lower.contains("authorization") {
-                throw OnePasswordError.notSignedIn(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+            let stderr = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = stderr.lowercased()
+            let signInHints = ["sign in", "signed in", "authorization", "no accounts configured",
+                               "session expired", "authenticate"]
+            if signInHints.contains(where: lower.contains) {
+                throw OnePasswordError.notSignedIn(stderr)
             }
-            throw OnePasswordError.command(result.stderr.isEmpty
+            throw OnePasswordError.command(stderr.isEmpty
                 ? "op exited with code \(result.exitCode)"
-                : result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+                : stderr)
         }
         return result.stdout
     }
 
     // MARK: - Operations
+
+    /// Probe the current session (`op whoami`). Throws `notSignedIn` when there is none.
+    func whoami() async throws {
+        _ = try await op(["whoami", "--format", "json"])
+    }
+
+    /// Ask the 1Password app to authorize this CLI (`op signin`), then confirm the
+    /// session with `op whoami`. With desktop-app integration this raises the
+    /// app's approval prompt; the shell-export output of `op signin` is discarded.
+    func signIn() async throws {
+        _ = try await op(["signin"], timeout: Self.signInTimeout)
+        try await whoami()
+    }
 
     func listItems() async throws -> [OPItem] {
         let json = try await op(["item", "list", "--vault", vault, "--format", "json"])
@@ -179,9 +246,30 @@ struct OnePasswordService {
     }
 
     /// Create a new Password item in the Clippy vault.
+    ///
+    /// The secret is delivered as a JSON item template on stdin, never as an
+    /// `password=<value>` assignment argument, because argv is readable by any local
+    /// process through `ps`.
     func createSecret(title: String, value: String) async throws {
-        _ = try await op(["item", "create", "--category", "Password",
-                          "--title", title, "--vault", vault, "password=\(value)"])
+        let template = Self.itemTemplate(title: title, value: value)
+        _ = try await op(["item", "create", "--vault", vault], input: template)
+    }
+
+    /// JSON item template for `op item create` on stdin (Password category).
+    static func itemTemplate(title: String, value: String) -> String {
+        let object: [String: Any] = [
+            "title": title,
+            "category": "PASSWORD",
+            "fields": [[
+                "id": "password",
+                "type": "CONCEALED",
+                "purpose": "PASSWORD",
+                "label": "password",
+                "value": value,
+            ] as [String: Any]],
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
+        return String(decoding: data, as: UTF8.self)
     }
 
     // MARK: - Parsing (pure, tested)
@@ -212,25 +300,25 @@ struct OnePasswordService {
         // Build a section lookup keyed by section id.
         var sectionByID: [String: OPSection] = [:]
         if let secs = obj["sections"] as? [[String: Any]] {
-            for s in secs {
-                guard let sid = s["id"] as? String else { continue }
-                let label = (s["label"] as? String) ?? sid
+            for sectionEntry in secs {
+                guard let sid = sectionEntry["id"] as? String else { continue }
+                let label = (sectionEntry["label"] as? String) ?? sid
                 sectionByID[sid] = OPSection(id: sid, label: label)
             }
         }
 
         let rawFields = (obj["fields"] as? [[String: Any]]) ?? []
-        let fields: [OPField] = rawFields.compactMap { f in
-            guard let fid = f["id"] as? String else { return nil }
-            let label   = (f["label"] as? String) ?? fid
-            let typeRaw = (f["type"] as? String) ?? "STRING"
+        let fields: [OPField] = rawFields.compactMap { rawField in
+            guard let fid = rawField["id"] as? String else { return nil }
+            let label   = (rawField["label"] as? String) ?? fid
+            let typeRaw = (rawField["type"] as? String) ?? "STRING"
             let fieldType = OPFieldType(raw: typeRaw)
-            let value   = (f["value"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            let purpose = f["purpose"] as? String
+            let value   = (rawField["value"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let purpose = rawField["purpose"] as? String
 
             // Section reference is a nested object: {"id": "...", "label": "..."}
             var section: OPSection?
-            if let sRef = f["section"] as? [String: Any], let sID = sRef["id"] as? String {
+            if let sRef = rawField["section"] as? [String: Any], let sID = sRef["id"] as? String {
                 // Prefer the top-level sections array for canonical label; fall back
                 // to the inline label on the field's section ref.
                 if let known = sectionByID[sID] {
@@ -254,21 +342,21 @@ struct OnePasswordService {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let fields = obj["fields"] as? [[String: Any]] else { return nil }
 
-        func value(_ f: [String: Any]) -> String? {
-            (f["value"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        func value(_ field: [String: Any]) -> String? {
+            (field["value"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         }
-        func isConcealed(_ f: [String: Any]) -> Bool {
-            (f["type"] as? String)?.uppercased() == "CONCEALED"
+        func isConcealed(_ field: [String: Any]) -> Bool {
+            (field["type"] as? String)?.uppercased() == "CONCEALED"
         }
-        func isPassword(_ f: [String: Any]) -> Bool {
-            let id = (f["id"] as? String)?.lowercased()
-            let label = (f["label"] as? String)?.lowercased()
+        func isPassword(_ field: [String: Any]) -> Bool {
+            let id = (field["id"] as? String)?.lowercased()
+            let label = (field["label"] as? String)?.lowercased()
             return id == "password" || label == "password"
         }
 
-        if let f = fields.first(where: { isConcealed($0) && isPassword($0) }), let v = value(f) { return v }
-        if let f = fields.first(where: { isConcealed($0) && value($0) != nil }), let v = value(f) { return v }
-        if let f = fields.first(where: { value($0) != nil }), let v = value(f) { return v }
+        if let field = fields.first(where: { isConcealed($0) && isPassword($0) }), let credential = value(field) { return credential }
+        if let field = fields.first(where: { isConcealed($0) && value($0) != nil }), let credential = value(field) { return credential }
+        if let field = fields.first(where: { value($0) != nil }), let credential = value(field) { return credential }
         return nil
     }
 }

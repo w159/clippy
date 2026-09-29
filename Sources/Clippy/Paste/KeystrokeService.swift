@@ -1,5 +1,6 @@
 import ApplicationServices
 import Carbon.HIToolbox
+import os
 
 /// Simulates a human typing text into the frontmost app via CGEvent.
 ///
@@ -14,25 +15,56 @@ import Carbon.HIToolbox
 /// A small usleep between characters is mandatory: posting events faster than
 /// the target app's event queue drains them causes dropped characters, especially
 /// in Electron apps and remote-desktop sessions.
+@MainActor
 final class KeystrokeService {
 
     // MARK: - Public API
 
-    /// Types `text` into the frontmost app one character at a time.
-    /// No-ops silently when Accessibility permission has not been granted.
+    /// Handle for one typing run. Cancel it from any thread; the run stops before
+    /// the next character.
+    final class TypingHandle: Sendable {
+        private struct State { var cancelled = false; var finished = false }
+        private let state = OSAllocatedUnfairLock(initialState: State())
+
+        var isCancelled: Bool { state.withLock { $0.cancelled } }
+        var isFinished: Bool { state.withLock { $0.finished } }
+
+        func cancel() { state.withLock { $0.cancelled = true } }
+        fileprivate func finish() { state.withLock { $0.finished = true } }
+    }
+
+    private var currentHandle: TypingHandle?
+
+    /// Stops the run in progress, if any.
+    func cancelTyping() {
+        currentHandle?.cancel()
+    }
+
+    /// Types `text` into the frontmost app one character at a time. A new run
+    /// cancels one still in progress so the two never interleave. Returns a
+    /// handle to cancel this run; the handle is already finished when
+    /// Accessibility permission has not been granted (nothing is typed).
     /// Runs on a background thread; never blocks the main thread.
-    func type(_ text: String) {
-        guard AXIsProcessTrusted() else { return }
+    @discardableResult
+    func type(_ text: String) -> TypingHandle {
+        let handle = TypingHandle()
+        guard AXIsProcessTrusted() else { handle.finish(); return handle }
+        let previous = currentHandle
+        currentHandle = handle
+        previous?.cancel()
         let delay = AppSettings.shared.keystrokeSpeed.perCharDelayMicros
-        let source = CGEventSource(stateID: .combinedSessionState)
 
         DispatchQueue.global(qos: .userInitiated).async {
+            // Created on the worker: CGEventSource is not Sendable.
+            let source = CGEventSource(stateID: .combinedSessionState)
             // Iterate by Character (extended grapheme cluster), NOT unicodeScalars.
             // A scalar loop splits combining marks and emoji skin-tone modifiers
             // into separate events, so "cafe\u{0301}" or a skin-tone emoji types
             // mangled. Iterating Characters keeps each user-perceived glyph intact
             // and encodes the whole cluster's UTF-16 in a single key event.
+            defer { handle.finish() }
             for character in text {
+                if handle.isCancelled { break }
                 if character == "\n" {
                     // Newline: post a real Return key so apps that intercept
                     // the Return key (terminal emulators, chat apps) receive it.
@@ -62,11 +94,12 @@ final class KeystrokeService {
                 usleep(delay)
             }
         }
+        return handle
     }
 
     // MARK: - Private helpers
 
-    private static func postKey(_ keyCode: CGKeyCode, source: CGEventSource?) {
+    private nonisolated static func postKey(_ keyCode: CGKeyCode, source: CGEventSource?) {
         guard
             let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
             let keyUp   = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)

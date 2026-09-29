@@ -1,6 +1,7 @@
 import XCTest
 @testable import Clippy
 
+@MainActor
 final class ClippyArchiveTests: XCTestCase {
 
     func testExportImportRoundTrip() throws {

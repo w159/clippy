@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Sample managed preferences for Clippy (preference domain: com.jerry.clippy).
+     Deploy through an MDM "Custom Settings" payload or copy to
+     /Library/Managed Preferences/com.jerry.clippy.plist. Any key present here is
+     FORCED: Clippy reads the managed value and its Settings switch is locked. -->
+<plist version="1.0">
+<dict>
+    <key>aiEnabled</key><false/>
+    <key>aiAgentAllowScripts</key><false/>
+    <key>aiAgentAllowCodeExecution</key><false/>
+    <key>aiAgentAllowWebSearch</key><false/>
+    <key>aiAutoSuggestTitles</key><false/>
+    <key>mcpEnabled</key><false/>
+    <key>iCloudSyncEnabled</key><false/>
+    <key>captureImages</key><true/>
+    <key>captureFiles</key><true/>
+    <key>suggestionsEnabled</key><false/>
+    <key>suggestionsUseWindowText</key><false/>
+    <key>onePasswordAutoClearClipboard</key><true/>
+    <key>onePasswordAutoClearDelaySecs</key><integer>30</integer>
+    <key>security.appLock.enabled</key><true/>
+    <key>security.appLock.idleMinutes</key><integer>5</integer>
+</dict>
+</plist>

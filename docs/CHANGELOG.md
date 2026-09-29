@@ -1,5 +1,83 @@
 # Changelog
 
+## v2.0.0 - 2026-09-29 - Clippy 2: redesigned panel, smarter, and much more capable
+
+Major release. A ground-up UI/UX redesign (new design tokens, glass panel, grid and cards, sidebar,
+settings shell), a wave of new features (paste stack, transforms and snippets, Quick Look and smart
+collections, App Intents / `clippy://` URL scheme / CLI, semantic search, auto-file, translate), OCR and editor
+upgrades, compliance and retention controls, MCP hardening, and the app target now builds in Swift 6 language mode.
+
+Upgrade notes: existing installs update in-app through Sparkle and keep their history. Web search for the AI agent
+is now off by default (opt in under Settings > AI). The old `clipColumns` setting migrates to the new grid
+column mode. The redesigned UI, Accessibility capture, hotkeys, and Shortcuts registration have been verified
+by automated tests and a launch smoke only; report anything that looks off.
+
+
+### Added
+
+- **Smart Suggestions: Clippy ranks your history by what you are doing right now.**
+  When you open the panel, Clippy reads the app you were just using (name, window
+  title, and the text around your cursor) through Accessibility and shows the most
+  relevant clips in a new Suggestions pane, each with a plain-English reason
+  ("Similar to what you're writing", "Shares words: lisbon, flight", "Copied from
+  Mail"). Everything runs on this Mac: Apple's on-device NaturalLanguage sentence
+  embeddings plus keyword overlap, recency, source-app affinity, and clip-kind fit
+  (links and images are favored when you are writing a message). Nothing is sent
+  anywhere, screen text is held in memory only and dropped when the panel closes,
+  password fields and Ignored Apps are never read, and the feature is off by
+  default. Press 1-9 in the pane to paste the Nth suggestion. Right-click any
+  clip and choose **Find Similar Clips** to rank the history against that clip.
+  Settings has a new **Intelligence** tab: master toggle, use of focused-field text
+  (off = app name and window title only), how many suggestions to show, open the
+  pane automatically, Accessibility status with a Grant Access button, and Clear
+  suggestion cache. `Intelligence/*.swift`, `UI/SuggestionsPaneView.swift`,
+  `UI/ClipStore.swift`, `UI/ClipListView.swift`, `UI/CategorySidePane.swift`,
+  `Panel/PanelController.swift`, `Support/AppSettings.swift`, `UI/SettingsView.swift`.
+  Ranking is covered by `Tests/ClippyTests/SuggestionEngineTests.swift`, including a
+  real-embedder regression test: an earlier min-max scaling of the cosine let an
+  unrelated shell command outrank a relevant link, so the score now uses absolute
+  thresholds calibrated on sample data (a heuristic; see ROADMAP INT-03).
+  The in-app behavior (Accessibility capture in a real app, the pane's visuals) has not
+  been exercised end to end yet (ROADMAP INT-01).
+
+### Changed
+
+- **MCP hardened its interim SQLite guardrails while the app is still not the sole
+  writer (ROADMAP ARCH-04).** This does not make the app the single writer; XPC or
+  Unix-socket routing is still the open item. `openDatabase` no longer changes
+  `journal_mode` (the app owns WAL setup) and now refuses to run against a database
+  file that is missing or has an incompatible schema (`requireAppSchema` checks
+  required tables/columns) instead of creating or migrating one, so a stale or
+  pre-launch database fails closed rather than silently diverging from the app's
+  migrator. Every `writesDatabase: true` tool (7 of the 22: `clippy_create_clip`,
+  `clippy_update_clip`, `clippy_delete_clips`, `clippy_create_category`,
+  `clippy_update_category`, `clippy_delete_category`, `clippy_assign_clips`) now runs
+  inside `BEGIN IMMEDIATE` / `COMMIT`, with `ROLLBACK` on any thrown error, dispatched
+  centrally by tool name rather than per-handler. `PRAGMA busy_timeout = 5000` (added
+  previously) still applies so a short app write can finish before MCP's
+  `BEGIN IMMEDIATE` proceeds instead of failing immediately with `SQLITE_BUSY`.
+  `integrations/clippy-mcp/src/db.ts` (`openDatabase`, `requireAppSchema`,
+  `inWriteTransaction`), `integrations/clippy-mcp/src/index.ts` (dispatch). Verified:
+  `npm test` (WAL-contention wait, no-create/no-migration, and rollback checks),
+  `npm run typecheck`, and the 22-tool vendored-bundle parity check all pass.
+
+### Added
+
+- **UI/UX redesign.** Updated the shared design tokens and glass components, panel shell, grid/cards, sidebar, settings shell, and Assistant, Scripts, and 1Password views, following the proposals in `docs/design/`. GUI visuals were not exercised in a running GUI.
+- **Wave 4 features.** Added the paste stack, transforms and snippets, preview column/Quick Look and smart collections; App Intents, URL scheme and CLI; and semantic search, auto-file and translation.
+- **Editors, search, keyboard, compliance and data layer.** Includes editor improvements, search and keyboard interaction updates, compliance/retention work, and data-layer fixes.
+
+### Changed
+
+- **OCR first-use and activity feedback.** Vision warm-up addresses the cold first request; extraction now exposes in-flight activity and avoids duplicate OCR results. (See v1.10.1 below for implementation detail.)
+- **MCP writes remain guarded.** In addition to the interim protections above, MCP uses `BEGIN IMMEDIATE` and a 5-second busy timeout, and does not run database migrations. The app is still not the single writer (ARCH-04).
+- **Swift concurrency mode.** The `Clippy` target is in Swift 6 language mode; `ClippyCLICore`, `clippy-cli`, and `ClippyTests` remain in Swift 5 mode (ARCH-02).
+
+### Verification and limitations
+
+- `swift test`: 1111 tests, 1 skipped (opt-in Vision test), 0 failures.
+- **Not exercised in a running GUI:** GUI visuals, Accessibility capture, hotkeys, Shortcuts/App Intents registration, and Spotlight donation. Mobbin MCP was unavailable (401 OAuth); the redesign is based on web research. `docs/design/05-reference-gaps.md` lists what to pull from Mobbin later.
+
 ## v1.10.1 - 2026-09-29 - Extract Text no longer looks hung
 
 ### Docs
