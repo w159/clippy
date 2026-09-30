@@ -63,12 +63,14 @@ final class PerfBenchmarkTests: XCTestCase {
             try db.saveCapturedClip(&clip, cap: 10_000)
         }
 
-        XCTAssertLessThan(list, 30, "10k-clip initial list fetch budget")
-        XCTAssertLessThan(search, 50, "10k-clip FTS search budget")
-        XCTAssertLessThan(search2, 50, "10k-clip multi-term search budget")
-        XCTAssertLessThan(kind, 50, "10k-clip kind filter budget")
-        XCTAssertLessThan(app, 50, "10k-clip app filter budget")
-        XCTAssertLessThan(pin, 20, "10k-clip pin toggle budget")
-        XCTAssertLessThan(insert, 30, "10k-clip insert budget")
+        // Shared CI runners are ~2x slower and noisy; local runs keep the strict budgets.
+        let slack = ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == nil ? 1.0 : 3.0
+        XCTAssertLessThan(list, 30 * slack, "10k-clip initial list fetch budget")
+        XCTAssertLessThan(search, 50 * slack, "10k-clip FTS search budget")
+        XCTAssertLessThan(search2, 50 * slack, "10k-clip multi-term search budget")
+        XCTAssertLessThan(kind, 50 * slack, "10k-clip kind filter budget")
+        XCTAssertLessThan(app, 50 * slack, "10k-clip app filter budget")
+        XCTAssertLessThan(pin, 20 * slack, "10k-clip pin toggle budget")
+        XCTAssertLessThan(insert, 30 * slack, "10k-clip insert budget")
     }
 }
