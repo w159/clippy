@@ -44,8 +44,11 @@ struct HotKeyRecorderView: View {
                     .accessibilityLabel("\(action.title) shortcut")
                     .accessibilityValue(center.chords[action]?.spokenString ?? "Not set")
                     .accessibilityHint(isRecording ? "Press the new key combination" : "Activate to record a new shortcut")
-                Button("Reset") { center.resetChord(for: action); warning = nil }
-                    .disabled(center.chords[action] == action.defaultChord && center.errors[action] == nil)
+                // Reset only shows once the chord differs from its default (Height/Discord pattern).
+                if !(center.chords[action] == action.defaultChord && center.errors[action] == nil) {
+                    Button("Reset") { center.resetChord(for: action); warning = nil }
+                        .controlSize(.small)
+                }
             }
             .background(RecorderKeyCatcher(isActive: isRecording, onChord: commit, onCancel: { setRecording(false) },
                                            onClear: { center.setChord(nil, for: action); setRecording(false) }))
@@ -63,10 +66,11 @@ struct HotKeyRecorderView: View {
 
     private var fieldLabel: some View {
         Text(isRecording ? "Press shortcut\u{2026}" : (center.chords[action]?.displayString ?? "Not set"))
-            .font(.system(.body, design: .rounded).monospaced())
+            .font(.system(size: 12, weight: .medium, design: .rounded).monospaced())
             .foregroundStyle(isRecording ? tokens.accentText : tokens.textPrimary)
-            .frame(minWidth: 110)
-            .padding(.horizontal, 10).padding(.vertical, 4)
+            .lineLimit(1)
+            .frame(minWidth: 96)
+            .padding(.horizontal, 8).padding(.vertical, 3)
     }
 
     private func commit(_ chord: HotKeyChord) {

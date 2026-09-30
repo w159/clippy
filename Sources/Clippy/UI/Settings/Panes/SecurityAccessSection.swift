@@ -80,7 +80,7 @@ struct SecurityAccessSection: View {
             }
             SettingsRow(title: "Add type") {
                 HStack {
-                    TextField("com.example.type", text: $newType).textFieldStyle(.roundedBorder).frame(width: 200).onSubmit(addType)
+                    TextField("com.example.type", text: $newType).textFieldStyle(.roundedBorder).frame(minWidth: 100, maxWidth: 200).onSubmit(addType)
                     Button("Add", action: addType).disabled(newType.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }

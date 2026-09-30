@@ -13,6 +13,7 @@ struct AISettingsTab: View {
     @State private var keyStatus = ""
     @State private var testResult: StatusOutcome?
     @State private var testing = false
+    @State private var showActions = false
 
     /// The draft API key for the currently selected provider.
     private var currentDraft: String { apiKeyDrafts[settings.aiProvider] ?? "" }
@@ -26,17 +27,23 @@ struct AISettingsTab: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            aiForm
-            Divider()
-            // SET-07: the actions list is its own pane region, never nested in the Form's scroller.
-            DisclosureGroup("AI actions") {
+        aiForm
+        // SET-07: the actions list has its own scroller, so it opens in a resizable sheet instead of
+        // being nested in the Form or squeezing the pane at small window heights.
+        .sheet(isPresented: $showActions) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("AI actions").font(.headline)
+                    Spacer()
+                    Button("Done") { showActions = false }.keyboardShortcut(.defaultAction)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                Divider()
                 AIActionsManagerView()
-                    .frame(minHeight: 220, maxHeight: 320)
             }
-            .settingsRow("ai.actions")
-            .padding(.horizontal, 22).padding(.vertical, 8)
-            .disabled(!settings.aiEnabled)
+            .frame(minWidth: 520, idealWidth: 640, maxWidth: .infinity,
+                   minHeight: 380, idealHeight: 520, maxHeight: .infinity)
+            .clippyDesignSystem()
         }
         .task { refreshKeyStatus() }
         .onChange(of: settings.aiProvider) { _, _ in refreshKeyStatus() }
@@ -99,7 +106,7 @@ struct AISettingsTab: View {
                     TextField("API version", text: $settings.aiAzureAPIVersion)
                 }
                 if settings.aiProvider.needsAPIKey {
-                    SecureField("API key", text: apiKeyBinding, prompt: Text("Paste, then Save"))
+                    SettingsSecretField(typeLabel: "API key", prompt: "Paste, then Save", text: apiKeyBinding)
                         .settingsRow("ai.key")
                     HStack(spacing: 8) {
                         Button("Save key") { saveKey() }
@@ -164,6 +171,15 @@ struct AISettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(tokens.danger)
                 }
+            }
+
+            Section("AI actions") {
+                Button("Manage AI actions\u{2026}") { showActions = true }
+                    .settingsRow("ai.actions")
+                    .disabled(!settings.aiEnabled)
+                Text("Reusable prompts that appear on a clip's menu. Add, edit, reorder or import them.")
+                    .font(.caption)
+                    .foregroundStyle(tokens.textSecondary)
             }
 
             Section("Agent and tools") {

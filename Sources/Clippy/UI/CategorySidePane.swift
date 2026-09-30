@@ -93,13 +93,17 @@ struct CategorySidePane: View {
         expandedRaw = PanelDisclosure.encode(stored)
     }
 
+    private var visibleTools: [SidebarTool] {
+        SidebarTool.visible(onePassword: settings.onePasswordEnabled, suggestions: settings.suggestionsEnabled, ai: settings.aiEnabled)
+    }
+
     private var expanded: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     sectionHeader("Library", .library)
                     if isOpen(.library) { historyRow }
-                    sectionHeader("Categories", .categories)
+                    sectionHeader("Categories", .categories, count: store.categories.count, addLabel: "New category") { isCreating = true }
                     if isOpen(.categories) {
                         ForEach(store.categories) { category in categoryRow(category) }
                         trailingDropZone
@@ -110,9 +114,9 @@ struct CategorySidePane: View {
                             SmartCollectionsSidebarSection(selection: smartCollections, showsTitle: false).padding(.horizontal, 6)
                         }
                     }
-                    sectionHeader("Tools", .tools)
+                    sectionHeader("Tools", .tools, count: visibleTools.count)
                     if isOpen(.tools) {
-                        ForEach(SidebarTool.visible(onePassword: settings.onePasswordEnabled, suggestions: settings.suggestionsEnabled, ai: settings.aiEnabled), id: \.self) { tool in
+                        ForEach(visibleTools, id: \.self) { tool in
                             toolRow(tool)
                         }
                     }

@@ -3,27 +3,47 @@ import SwiftUI
 extension CategorySidePane {
     // MARK: - Pieces
 
-    func sectionHeader(_ title: String, _ section: PanelDisclosure.SidebarSection) -> some View {
+    func sectionHeader(
+        _ title: String, _ section: PanelDisclosure.SidebarSection, count: Int? = nil, addLabel: String? = nil,
+        onAdd: (() -> Void)? = nil
+    ) -> some View {
         let open = isOpen(section)
-        return Button { toggleSection(section) } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .rotationEffect(.degrees(open ? 90 : 0))
-                Text(title)
-                    .font(.caption.weight(.medium))
-                Spacer(minLength: 0)
+        return HStack(spacing: 4) {
+            Button { toggleSection(section) } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                    Text(title)
+                        .font(.caption.weight(.medium))
+                    if let count {
+                        Text("\(count)")
+                            .font(.caption2)
+                            .monospacedDigit()
+                            .foregroundStyle(tokens.textSecondary.opacity(0.8))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
-            .foregroundStyle(tokens.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-            .padding(.bottom, 2)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityLabel(count.map { "\(title), \($0) items" } ?? title)
+            .accessibilityValue(open ? "expanded" : "collapsed")
+            .accessibilityHint("Shows or hides this section.")
+            if let onAdd {
+                Button(action: onAdd) {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .help(addLabel ?? "Add")
+                .accessibilityLabel(addLabel ?? "Add")
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityValue(open ? "expanded" : "collapsed")
-        .accessibilityHint("Shows or hides this section.")
+        .foregroundStyle(tokens.textSecondary)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
     }
 
     func indicator(for row: SidebarDropRow) -> SidebarDropIndicator {

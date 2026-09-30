@@ -33,10 +33,11 @@ extension IntegrationsSettingsTab {
                     Text(mcpController.status.description).font(.caption).foregroundStyle(tokens.textSecondary).textSelection(.enabled)
                 }
             }
-            LabeledContent("Access token") {
-                Button("Rotate token\u{2026}") { showRotateConfirmation = true }
+            SettingsSecretField(typeLabel: "Access token") {
+                await Task.detached { try? McpTokenProvider.shared.token() }.value
             }
             .settingsRow("integrations.mcpToken")
+            Button("Rotate token\u{2026}") { showRotateConfirmation = true }
             SettingsNote(tokenNote ?? "Stored in the Keychain and written into installed client configs. Rotating restarts the server " +
                 "and re-syncs installed clients; the old token stops working immediately.")
             HStack(spacing: 8) {

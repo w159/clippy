@@ -40,6 +40,23 @@ struct AssistantPanelBody: View {
                     onOpenSettings: onOpenSettings)
                 if !viewModel.toolsSupported { AssistantNoToolsBanner(providerName: viewModel.env.providerName()) }
                 content
+                if let confirmation = viewModel.pendingConfirmation {
+                    AssistantConfirmationCard(
+                        toolName: confirmation.toolName, prompt: confirmation.detail,
+                        onChoose: { choice in
+                            switch choice {
+                            case .allowOnce: viewModel.resolveConfirmation(true)
+                            case .allowAlways:
+                                viewModel.setPolicy(.always, for: confirmation.toolName)
+                                viewModel.resolveConfirmation(true)
+                            case .deny: viewModel.resolveConfirmation(false)
+                            }
+                        },
+                        onSkip: { viewModel.resolveConfirmation(false) })
+                        .padding(.horizontal, tokens.metrics.space.three)
+                        .padding(.bottom, tokens.metrics.space.two)
+                        .transition(.opacity)
+                }
                 Divider().overlay(tokens.stroke)
                 inputBar
             }
@@ -56,16 +73,6 @@ struct AssistantPanelBody: View {
             }
             // Esc stops a running reply (the confirmation card handles its own Esc).
             .onExitCommand { if viewModel.state == .streaming { viewModel.stop() } }
-            if let confirmation = viewModel.pendingConfirmation {
-                tokens.surface.opacity(0.75).ignoresSafeArea().onTapGesture { viewModel.cancelPendingConfirmation() }
-                    .transition(.opacity)
-                AssistantConfirmationCard(
-                    toolName: confirmation.toolName, prompt: confirmation.detail,
-                    onAllow: { viewModel.resolveConfirmation(true) },
-                    onDeny: { viewModel.resolveConfirmation(false) })
-                    .padding(tokens.metrics.space.six)
-                    .transition(.opacity)
-            }
         }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: viewModel.pendingConfirmation?.id)
         // Keep the composer ready after a confirmation closes or the conversation is cleared.

@@ -256,4 +256,18 @@ final class SettingsShellLogicTests: XCTestCase {
         XCTAssertEqual(preferences.columnMode, .auto, "second run must not override the user's later choice")
         XCTAssertEqual(persisted(defaults, GridColumnMigration.migratedKey) as? Bool, true)
     }
+
+    func testSidebarSectionsCoverEveryPaneOnceAndNewPanesAreMarked() {
+        let listed = SettingsPaneSection.all.flatMap(\.panes)
+        XCTAssertEqual(listed.count, Set(listed).count)
+        XCTAssertEqual(Set(listed), Set(SettingsPaneID.allCases))
+        XCTAssertTrue(SettingsPaneID.pasteStack.isNew)
+        XCTAssertFalse(SettingsPaneID.general.isNew)
+    }
+
+    func testSecretPlaceholderNeverLeaksValueOrLength() {
+        XCTAssertEqual(SecretFieldLogic.readOnlyDisplay(value: "abc", revealed: false), SecretFieldLogic.placeholderMask)
+        XCTAssertEqual(SecretFieldLogic.readOnlyDisplay(value: "abc", revealed: true), "abc")
+        XCTAssertEqual(SecretFieldLogic.readOnlyDisplay(value: nil, revealed: true), SecretFieldLogic.placeholderMask)
+    }
 }

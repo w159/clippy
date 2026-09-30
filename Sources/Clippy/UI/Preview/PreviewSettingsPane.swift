@@ -26,10 +26,19 @@ struct PreviewSettingsPane: View {
                 Text(LinkPreviewPreferences.disclosure).font(.caption).foregroundStyle(tokens.textSecondary)
                 Text("Never used for sensitive clips or addresses that contain credentials or token parameters.")
                     .font(.caption).foregroundStyle(tokens.textSecondary)
-                TextField("Only these sites (comma separated, optional)", text: $allowText)
-                    .onSubmit { LinkPreviewPreferences.allowHosts = Self.hosts(allowText) }
-                TextField("Never these sites (comma separated)", text: $denyText)
-                    .onSubmit { LinkPreviewPreferences.denyHosts = Self.hosts(denyText) }
+                // Short labels: a long placeholder-as-label wrapped to two lines and squeezed the field.
+                LabeledContent("Only these sites") {
+                    TextField("Only these sites", text: $allowText, prompt: Text("example.com, docs.dev"))
+                        .labelsHidden().multilineTextAlignment(.trailing)
+                        .onSubmit { LinkPreviewPreferences.allowHosts = Self.hosts(allowText) }
+                }
+                LabeledContent("Never these sites") {
+                    TextField("Never these sites", text: $denyText, prompt: Text("example.com, ads.net"))
+                        .labelsHidden().multilineTextAlignment(.trailing)
+                        .onSubmit { LinkPreviewPreferences.denyHosts = Self.hosts(denyText) }
+                }
+                Text("Comma separated. Leave the first empty to allow every site not in the second list.")
+                    .font(.caption).foregroundStyle(tokens.textSecondary)
                 HStack {
                     Text("Cache: \(ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))")
                     Spacer()

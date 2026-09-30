@@ -109,6 +109,71 @@ enum AssistantPresentation {
         return keys.isEmpty ? "no arguments" : keys.joined(separator: ", ")
     }
 
+    /// Lifecycle glyph of a tool step.
+    enum StepStatus: Equatable { case running, done, failed }
+
+    /// Failed when the agent loop reported a tool error; the loop prefixes these.
+    static func status(of step: AssistantToolStep) -> StepStatus {
+        if step.isRunning { return .running }
+        guard let result = step.result else { return .done }
+        return result.hasPrefix("Tool error:") || result.hasPrefix("Error:") ? .failed : .done
+    }
+
+    /// One-line summary chip for a finished call, e.g. "search_clips - 12 lines, 480 characters".
+    static func chipSummary(_ step: AssistantToolStep) -> String {
+        switch status(of: step) {
+        case .running: return "Processing..."
+        case .failed: return "\(step.name) - failed"
+        case .done: return "\(step.name) - \(resultSummary(step.result))"
+        }
+    }
+
+    /// Index of the step marked active in a multi-step checklist: the first running step.
+    static func activeStepIndex(_ steps: [AssistantToolStep]) -> Int? {
+        steps.firstIndex(where: \.isRunning)
+    }
+
+    /// Checklist header, e.g. "2 of 3 steps".
+    static func checklistHeader(_ steps: [AssistantToolStep]) -> String {
+        let finished = steps.filter { !$0.isRunning }.count
+        return "\(finished) of \(steps.count) steps"
+    }
+
+    // MARK: Approval
+
+    /// Choices on the inline approval card, in display order with their 1-3 key hints.
+    enum ApprovalChoice: CaseIterable, Equatable {
+        case allowOnce, allowAlways, deny
+
+        var title: String {
+            switch self {
+            case .allowOnce: return "Allow once"
+            case .allowAlways: return "Allow"
+            case .deny: return "Deny"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .allowOnce: return "Run this call only"
+            case .allowAlways: return "Run it and stop asking for this tool"
+            case .deny: return "Do not run it"
+            }
+        }
+
+        /// Key that picks this choice.
+        var keyHint: String {
+            switch self {
+            case .allowOnce: return "1"
+            case .allowAlways: return "2"
+            case .deny: return "3"
+            }
+        }
+
+        /// Choice for a typed character, nil for anything else.
+        static func choice(forKey key: String) -> ApprovalChoice? { allCases.first { $0.keyHint == key } }
+    }
+
     // MARK: Empty state and composer
 
     /// Prompts the current provider can actually execute. Tool prompts are hidden

@@ -13,12 +13,13 @@ extension ClipListView {
     /// `PanelStatusPolicy`: failures and messages with a Retry stay until
     /// dismissed, others dismiss themselves. VoiceOver is notified by
     /// `PanelStatusOverlay`.
-    func showStatusBanner(_ message: String, severity: StatusSeverity = .info, retry: (() -> Void)? = nil) {
+    func showStatusBanner(_ message: String, severity: StatusSeverity = .info, actionTitle: String = "Retry",
+                          retry: (() -> Void)? = nil) {
         let hasAction = retry != nil
         let item = PanelStatusItem(
             message: message,
             severity: severity.banner,
-            actionTitle: hasAction ? "Retry" : nil,
+            actionTitle: hasAction ? actionTitle : nil,
             isPersistent: PanelStatusPolicy.isPersistent(for: severity, hasAction: hasAction)
         )
         statusItem = item

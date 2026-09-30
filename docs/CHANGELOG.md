@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.0 - 2026-09-30 - Design pass from Mobbin references
+
+### Changed
+
+- **Settings window resizes and no longer clips** (720x480 minimum, 1000x700 default, frame autosave bumped to `ClippySettingsWindow.v2`). Sidebar rows are compact so every pane is reachable; the pane title moved into the title bar; Reset/Export/Import are small neutral buttons; the Scripts pane fills the whole detail area; the script toolbar collapses in three tiers (labelled, icon-only, name on its own row) instead of clipping; the text-editor toolbar collapses into a More menu; AI actions open in a resizable sheet instead of a fixed 320pt disclosure; the shortcut Reset button only appears once a chord differs from its default. `CLIPPY_SETTINGS_SIZE=WxH` with `--screenshot-settings` captures any pane at a given size (`CLIPPY_SETTINGS_SECTION` picks the pane).
+  Verified: swift test 1131 passing; all 17 panes screenshotted at 720x480, first screen only (content below the fold, other window sizes and light themes not yet inspected).
+
+- **Design pass from Mobbin references** (`docs/design/06-mobbin-references.md`). Command palette: Recent first, muted section headers, trailing context labels, keycaps, a live footer of key hints, Tab/Shift-Tab to jump sections. Settings: grouped sidebar with NEW badges, 600pt centered column. Onboarding: dimmed upcoming steps, live-status permission rows, "What you get" checklist, quiet "Continue without granting". Assistant: collapsible tool step cards, step checklist, inline numbered approval card instead of a modal. Secrets (AI key, MCP token, 1Password values): reveal eye inside the field plus a separate Copy button. Sidebar group headers show counts and an add button. Deleting clips shows an Undo action on the toast.
+  Verified by 1131 passing tests; not yet seen in a running GUI.
+
 ## v2.0.0 - 2026-09-29 - Clippy 2: redesigned panel, smarter, and much more capable
 
 Major release. A ground-up UI/UX redesign (new design tokens, glass panel, grid and cards, sidebar,

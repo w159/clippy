@@ -44,13 +44,13 @@ struct SnippetsSettingsPane: View {
                     }
                 }
             }
-            Section("Never expand in these apps (bundle IDs, one per line)") {
+            Section("Excluded apps") {
                 TextEditor(text: $excluded).font(.system(.body, design: .monospaced)).frame(minHeight: 100)
                     .onChange(of: excluded) { _, value in
                         apply { SnippetSettings.excludedBundleIDs = value.split(whereSeparator: \.isNewline)
                             .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }
                     }
-                Text("Password managers and terminals are excluded by default. Expansion also pauses in secure text fields and while Clippy is locked.")
+                Text("Bundle IDs, one per line. Password managers and terminals are excluded by default. Expansion also pauses in secure text fields and while Clippy is locked.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

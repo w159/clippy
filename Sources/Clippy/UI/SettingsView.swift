@@ -18,7 +18,7 @@ struct SettingsView: View {
         .tint(settings.theme.accent)
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
-        .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow"))
+        .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
         .confirmationDialog("Reset \(model.selection.title) settings?", isPresented: $model.showResetConfirmation,
                             titleVisibility: .visible) {
             Button("Reset this pane", role: .destructive) { model.resetSelectedPane() }
@@ -84,6 +84,9 @@ struct SettingsView: View {
                 resultsList
             }
         }
+        .listStyle(.sidebar)
+        .environment(\.sidebarRowSize, .small)
+        .controlSize(.small)
         .searchable(text: $model.query, placement: .sidebar, prompt: "Search settings")
     }
 
@@ -117,15 +120,21 @@ struct SettingsView: View {
     // MARK: - Detail
 
     private var detail: some View {
+        // Scripts is a full editor (its own list, toolbar and output drawer): give it the whole
+        // detail area instead of the title bar, footer and scroller that would clip it.
+        if model.selection == .scripts {
+            return AnyView(SettingsPaneRegistry.view(for: .scripts).background(settings.theme.panel).navigationTitle("Scripts"))
+        }
+        return AnyView(paneDetail)
+    }
+
+    private var paneDetail: some View {
         VStack(spacing: 0) {
-            Text(model.selection.title)
-                .font(SettingsTypography.detailTitle(settings))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22).padding(.vertical, 12)
-                .accessibilityAddTraits(.isHeader)
-            Divider()
             ScrollViewReader { proxy in
                 SettingsPaneRegistry.view(for: model.selection)
+                    .buttonStyle(.bordered)
+                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: model.selection.usesFormColumn ? SettingsPaneID.columnMaxWidth : .infinity, maxHeight: .infinity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onChange(of: model.jumpToken) { _, _ in
                         if let target = model.flashRow { withAnimation { proxy.scrollTo(target, anchor: .center) } }
@@ -135,6 +144,9 @@ struct SettingsView: View {
             footer
         }
         .background(settings.theme.panel)
+        // The pane title lives in the window's title bar instead of a second header row, which
+        // gives the content the vertical space the old row and dead title-bar band wasted.
+        .navigationTitle(model.selection.title)
     }
 
     private var footer: some View {
@@ -143,10 +155,14 @@ struct SettingsView: View {
                 .disabled(!model.selection.isResettable)
             Button("Export\u{2026}") { model.exportPreferences() }
             Button("Import\u{2026}") { model.beginImport() }
-            Spacer()
+            Spacer(minLength: 8)
             if let status = model.status { StatusOutcomeLabel(outcome: status, successColor: settings.theme.success) }
         }
-        .padding(.horizontal, 22).padding(.vertical, 10)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(.secondary)
+        .lineLimit(1)
+        .padding(.horizontal, 22).padding(.vertical, 8)
     }
 }
 
@@ -158,10 +174,27 @@ private struct PaneRow: View {
 
     var body: some View {
         Label {
-            Text(pane.title).foregroundStyle(tokens.textPrimary)
+            HStack(spacing: tokens.metrics.space.two) {
+                Text(pane.title).foregroundStyle(tokens.textPrimary)
+                if pane.isNew { NewPill() }
+            }
         } icon: {
             Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
         }
+    }
+}
+
+/// Small "NEW" marker on recently added panes.
+private struct NewPill: View {
+    @Environment(\.clippyTokens) private var tokens
+
+    var body: some View {
+        Text("NEW")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(tokens.accentText)
+            .padding(.horizontal, tokens.metrics.space.one + 1).padding(.vertical, 1)
+            .background(tokens.selection, in: Capsule())
+            .accessibilityLabel("New")
     }
 }
 

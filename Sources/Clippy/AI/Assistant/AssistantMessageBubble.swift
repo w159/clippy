@@ -61,7 +61,7 @@ struct AssistantMessageBubble: View {
     private var bubble: some View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
             if kind == .assistant {
-                ForEach(message.toolSteps) { step in AssistantToolStepView(step: step) }
+                AssistantToolChecklist(steps: message.toolSteps)
             }
             content
         }

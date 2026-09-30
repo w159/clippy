@@ -17,7 +17,7 @@ struct AssistantToolStepView: View {
                 header
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(AssistantPresentation.stepTitle(step)), arguments: \(AssistantPresentation.stepSubtitle(step))")
+            .accessibilityLabel("\(AssistantPresentation.stepTitle(step)), \(AssistantPresentation.chipSummary(step)), arguments: \(AssistantPresentation.stepSubtitle(step))")
             .accessibilityValue(expanded ? "Expanded" : "Collapsed")
             .accessibilityHint("Shows the result summary")
             if expanded { details }
@@ -28,19 +28,38 @@ struct AssistantToolStepView: View {
         .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.stroke, lineWidth: 0.75))
     }
 
+    private var status: AssistantPresentation.StepStatus { AssistantPresentation.status(of: step) }
+
+    /// Status glyph: spinner while running, check when done, warning when failed.
+    @ViewBuilder
+    private var glyph: some View {
+        switch status {
+        case .running:
+            ProgressView().controlSize(.mini).frame(width: 14, height: 14)
+        case .done:
+            Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.hierarchical).foregroundStyle(tokens.success)
+        case .failed:
+            Image(systemName: "xmark.octagon.fill").symbolRenderingMode(.hierarchical).foregroundStyle(tokens.danger)
+        }
+    }
+
+    /// Collapsed card: glyph, then a running title or the finished one-line chip, then the chevron.
     private var header: some View {
         HStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: step.isRunning ? "gearshape.2" : "checkmark.circle.fill")
-                .symbolRenderingMode(.hierarchical)
-                .symbolEffect(.variableColor, isActive: !reduceMotion && step.isRunning)
-                .foregroundStyle(step.isRunning ? tokens.accentText : tokens.success)
-            Text(AssistantPresentation.stepTitle(step))
-                .font(.callout.weight(.medium))
-                .foregroundStyle(tokens.textPrimary)
-            Text(AssistantPresentation.stepSubtitle(step))
-                .font(.caption.monospaced())
-                .foregroundStyle(tokens.textSecondary)
-                .lineLimit(1)
+            glyph
+            if status == .running {
+                Text(AssistantPresentation.stepTitle(step))
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(tokens.textPrimary)
+                Text("Processing...")
+                    .font(.caption)
+                    .foregroundStyle(tokens.accentText)
+            } else {
+                Text(AssistantPresentation.chipSummary(step))
+                    .font(.callout)
+                    .foregroundStyle(status == .failed ? tokens.danger : tokens.textPrimary)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.semibold))
@@ -53,7 +72,7 @@ struct AssistantToolStepView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 2) {
             detailRow("Arguments", AssistantPresentation.stepSubtitle(step))
-            detailRow("Result", step.isRunning ? "Running" : AssistantPresentation.resultSummary(step.result))
+            detailRow("Result", step.isRunning ? "Running" : (status == .failed ? "Failed" : AssistantPresentation.resultSummary(step.result)))
         }
         .padding(.leading, tokens.metrics.space.six)
     }

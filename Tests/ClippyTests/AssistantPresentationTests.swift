@@ -94,4 +94,30 @@ final class AssistantPresentationTests: XCTestCase {
         XCTAssertFalse(AssistantPresentation.canSend(" \n "))
         XCTAssertTrue(AssistantPresentation.canSend(" hi "))
     }
+
+    func testStepStatusFromLoopResult() {
+        func step(_ result: String?, running: Bool = false) -> AssistantToolStep {
+            AssistantToolStep(id: "s", name: "t", result: result, isRunning: running)
+        }
+        XCTAssertEqual(AssistantPresentation.status(of: step(nil, running: true)), .running)
+        XCTAssertEqual(AssistantPresentation.status(of: step("ok")), .done)
+        XCTAssertEqual(AssistantPresentation.status(of: step("Tool error: boom")), .failed)
+        XCTAssertEqual(AssistantPresentation.status(of: step("Error: unknown tool \"x\".")), .failed)
+    }
+
+    func testChecklistMarksFirstRunningStep() {
+        let steps = [AssistantToolStep(id: "a", name: "a", result: "x", isRunning: false),
+                     AssistantToolStep(id: "b", name: "b", isRunning: true),
+                     AssistantToolStep(id: "c", name: "c", isRunning: true)]
+        XCTAssertEqual(AssistantPresentation.activeStepIndex(steps), 1)
+        XCTAssertEqual(AssistantPresentation.checklistHeader(steps), "1 of 3 steps")
+        XCTAssertNil(AssistantPresentation.activeStepIndex([steps[0]]))
+    }
+
+    func testApprovalKeysMapToChoices() {
+        XCTAssertEqual(AssistantPresentation.ApprovalChoice.choice(forKey: "1"), .allowOnce)
+        XCTAssertEqual(AssistantPresentation.ApprovalChoice.choice(forKey: "2"), .allowAlways)
+        XCTAssertEqual(AssistantPresentation.ApprovalChoice.choice(forKey: "3"), .deny)
+        XCTAssertNil(AssistantPresentation.ApprovalChoice.choice(forKey: "4"))
+    }
 }

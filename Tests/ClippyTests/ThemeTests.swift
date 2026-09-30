@@ -73,21 +73,21 @@ final class ThemeTests: XCTestCase {
 
     func testTokyoNightHasCanonicalHex() {
         // Source: github.com/enkia/tokyo-night-vscode-theme (Night variant).
-        let t = ThemePreset.tokyoNight.fixedTokens!
-        XCTAssertEqual(t.panel.themeHexString, "#1A1B26")
-        XCTAssertEqual(t.scrollBackground.themeHexString, "#16161E")
-        XCTAssertEqual(t.cardSurface.themeHexString, "#24283B")
-        XCTAssertEqual(t.cardBorder.themeHexString, "#292E42")
-        XCTAssertEqual(t.headerBar.themeHexString, "#16161E")
-        XCTAssertEqual(t.footerBar.themeHexString, "#16161E")
-        XCTAssertEqual(t.sidebar.themeHexString, "#16161E")
-        XCTAssertEqual(t.scrollbar.themeHexString, "#414868")
-        XCTAssertEqual(t.textPrimary.themeHexString, "#C0CAF5")
-        XCTAssertEqual(t.textSecondary.themeHexString, "#A9B1D6")
-        XCTAssertEqual(t.accent.themeHexString, "#7AA2F7")
-        XCTAssertEqual(t.success.themeHexString, "#9ECE6A")
-        XCTAssertEqual(t.danger.themeHexString, "#F7768E")
-        XCTAssertTrue(t.isDark)
+        let tokens = ThemePreset.tokyoNight.fixedTokens!
+        XCTAssertEqual(tokens.panel.themeHexString, "#1A1B26")
+        XCTAssertEqual(tokens.scrollBackground.themeHexString, "#16161E")
+        XCTAssertEqual(tokens.cardSurface.themeHexString, "#24283B")
+        XCTAssertEqual(tokens.cardBorder.themeHexString, "#292E42")
+        XCTAssertEqual(tokens.headerBar.themeHexString, "#16161E")
+        XCTAssertEqual(tokens.footerBar.themeHexString, "#16161E")
+        XCTAssertEqual(tokens.sidebar.themeHexString, "#16161E")
+        XCTAssertEqual(tokens.scrollbar.themeHexString, "#414868")
+        XCTAssertEqual(tokens.textPrimary.themeHexString, "#C0CAF5")
+        XCTAssertEqual(tokens.textSecondary.themeHexString, "#A9B1D6")
+        XCTAssertEqual(tokens.accent.themeHexString, "#7AA2F7")
+        XCTAssertEqual(tokens.success.themeHexString, "#9ECE6A")
+        XCTAssertEqual(tokens.danger.themeHexString, "#F7768E")
+        XCTAssertTrue(tokens.isDark)
     }
 
     func testTokyoNightIsSelectableAfterOneDark() {
@@ -103,61 +103,61 @@ final class ThemeTests: XCTestCase {
     // leak state into other tests.
 
     func testOverrideReplacesPanelOnNamedPreset() {
-        let s = AppSettings.shared
-        let savedPreset = s.themePreset
-        let savedPanel = s.customPanelHex
-        defer { s.themePreset = savedPreset; s.customPanelHex = savedPanel }
+        let settings = AppSettings.shared
+        let savedPreset = settings.themePreset
+        let savedPanel = settings.customPanelHex
+        defer { settings.themePreset = savedPreset; settings.customPanelHex = savedPanel }
 
-        s.themePreset = .nord
-        s.customPanelHex = "#123456"
-        XCTAssertEqual(Theme.tokens(s).panel.themeHexString, "#123456")
+        settings.themePreset = .nord
+        settings.customPanelHex = "#123456"
+        XCTAssertEqual(Theme.tokens(settings).panel.themeHexString, "#123456")
     }
 
     func testEmptyOverrideFallsBackToPresetBase() {
-        let s = AppSettings.shared
-        let savedPreset = s.themePreset
-        let savedPanel = s.customPanelHex
-        defer { s.themePreset = savedPreset; s.customPanelHex = savedPanel }
+        let settings = AppSettings.shared
+        let savedPreset = settings.themePreset
+        let savedPanel = settings.customPanelHex
+        defer { settings.themePreset = savedPreset; settings.customPanelHex = savedPanel }
 
-        s.themePreset = .nord
-        s.customPanelHex = ""
-        XCTAssertEqual(Theme.tokens(s).panel.themeHexString,
+        settings.themePreset = .nord
+        settings.customPanelHex = ""
+        XCTAssertEqual(Theme.tokens(settings).panel.themeHexString,
                        ThemePreset.nord.fixedTokens!.panel.themeHexString)
     }
 
     func testAccentOverrideWinsOverAccentTheme() {
-        let s = AppSettings.shared
-        let savedPreset = s.themePreset
-        let savedAccentTheme = s.accentTheme
-        let savedAccent = s.customAccentHex
+        let settings = AppSettings.shared
+        let savedPreset = settings.themePreset
+        let savedAccentTheme = settings.accentTheme
+        let savedAccent = settings.customAccentHex
         defer {
-            s.themePreset = savedPreset
-            s.accentTheme = savedAccentTheme
-            s.customAccentHex = savedAccent
+            settings.themePreset = savedPreset
+            settings.accentTheme = savedAccentTheme
+            settings.customAccentHex = savedAccent
         }
 
-        s.themePreset = .githubDark
-        s.accentTheme = .clippyAmber  // non-system accent applies under the override
-        s.customAccentHex = "#ABCDEF"
-        XCTAssertEqual(Theme.tokens(s).accent.themeHexString, "#ABCDEF")
+        settings.themePreset = .githubDark
+        settings.accentTheme = .clippyAmber  // non-system accent applies under the override
+        settings.customAccentHex = "#ABCDEF"
+        XCTAssertEqual(Theme.tokens(settings).accent.themeHexString, "#ABCDEF")
     }
 
     func testSuccessAndDangerAreOverridable() {
-        let s = AppSettings.shared
-        let savedPreset = s.themePreset
-        let savedSuccess = s.customSuccessHex
-        let savedDanger = s.customDangerHex
+        let settings = AppSettings.shared
+        let savedPreset = settings.themePreset
+        let savedSuccess = settings.customSuccessHex
+        let savedDanger = settings.customDangerHex
         defer {
-            s.themePreset = savedPreset
-            s.customSuccessHex = savedSuccess
-            s.customDangerHex = savedDanger
+            settings.themePreset = savedPreset
+            settings.customSuccessHex = savedSuccess
+            settings.customDangerHex = savedDanger
         }
 
-        s.themePreset = .nord
-        s.customSuccessHex = "#00FF00"
-        s.customDangerHex = "#FF0000"
-        let t = Theme.tokens(s)
-        XCTAssertEqual(t.success.themeHexString, "#00FF00")
-        XCTAssertEqual(t.danger.themeHexString, "#FF0000")
+        settings.themePreset = .nord
+        settings.customSuccessHex = "#00FF00"
+        settings.customDangerHex = "#FF0000"
+        let tokens = Theme.tokens(settings)
+        XCTAssertEqual(tokens.success.themeHexString, "#00FF00")
+        XCTAssertEqual(tokens.danger.themeHexString, "#FF0000")
     }
 }

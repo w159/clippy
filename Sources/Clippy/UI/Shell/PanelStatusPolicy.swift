@@ -19,12 +19,12 @@ enum PanelStatusSeverity: Equatable {
 /// Pure timing and presentation policy for panel status messages.
 enum PanelStatusPolicy {
     /// Seconds before a message dismisses itself; nil when it must stay until
-    /// the user acts (failures, and anything that carries an action).
+    /// the user acts (failures). A non-failure toast with an inline action
+    /// (Undo/View) stays long enough to use it.
     static func autoDismissSeconds(for severity: PanelStatusSeverity, hasAction: Bool) -> TimeInterval? {
-        if hasAction { return nil }
         switch severity {
-        case .success: return 3
-        case .info: return 4
+        case .success: return hasAction ? 6 : 3
+        case .info: return hasAction ? 6 : 4
         case .warning: return 8
         case .failure: return nil
         }

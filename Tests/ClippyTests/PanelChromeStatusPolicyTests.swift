@@ -10,9 +10,11 @@ final class PanelChromeStatusPolicyTests: XCTestCase {
     }
 
     func testActionsKeepMessagesUntilDismissed() {
-        for severity in [PanelStatusSeverity.info, .success, .warning, .failure] {
-            XCTAssertNil(PanelStatusPolicy.autoDismissSeconds(for: severity, hasAction: true))
-            XCTAssertTrue(PanelStatusPolicy.isPersistent(for: severity, hasAction: true))
+        XCTAssertNil(PanelStatusPolicy.autoDismissSeconds(for: .failure, hasAction: true))
+        XCTAssertTrue(PanelStatusPolicy.isPersistent(for: .failure, hasAction: true))
+        for severity in [PanelStatusSeverity.info, .success] {
+            XCTAssertEqual(PanelStatusPolicy.autoDismissSeconds(for: severity, hasAction: true), 6)
+            XCTAssertFalse(PanelStatusPolicy.isPersistent(for: severity, hasAction: true))
         }
         XCTAssertFalse(PanelStatusPolicy.isPersistent(for: .success, hasAction: false))
         XCTAssertTrue(PanelStatusPolicy.isPersistent(for: .failure, hasAction: false))

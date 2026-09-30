@@ -49,6 +49,7 @@ struct OnboardingView: View {
                         .foregroundStyle(step == viewModel.model.current ? tokens.textPrimary : tokens.textSecondary)
                     Spacer(minLength: 0)
                 }
+                .opacity(step.rawValue > viewModel.model.current.rawValue ? 0.55 : 1)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(RoundedRectangle(cornerRadius: 8).fill(step == viewModel.model.current ? tokens.selection : .clear))
                 .accessibilityElement(children: .combine)
@@ -69,15 +70,19 @@ struct OnboardingView: View {
     private var footer: some View {
         HStack {
             Button("Back") { viewModel.back() }.disabled(viewModel.model.isFirst)
+                .buttonStyle(.borderless)
                 .keyboardShortcut(.leftArrow, modifiers: .command)
             Button("Skip for now") { viewModel.skipAll() }
                 .keyboardShortcut(.cancelAction)
                 .accessibilityHint("Closes the walkthrough; reopen it from Help, Show Welcome")
             Spacer()
             if viewModel.model.current.isSkippable {
-                Button("Skip this step") { viewModel.skipStep() }
+                Button(viewModel.model.current.isPermission ? "Continue without granting" : "Skip this step") { viewModel.skipStep() }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(tokens.textSecondary)
             }
             Button(viewModel.model.isLast ? "Get started" : "Continue") { viewModel.advance() }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 20).padding(.vertical, 12)

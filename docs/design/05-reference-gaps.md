@@ -1,6 +1,6 @@
 # Reference gaps: what to pull from Mobbin later (05)
 
-Status: to-do list. Mobbin MCP was OAuth-gated and unavailable, so none of the design docs use Mobbin material. When access exists, pull the items below, save screenshots under `docs/design/reference/` (not created yet), and update the mapped screen in `03-screens.md`. Do not authenticate to anything on behalf of the owner without their instruction.
+Status: partly done, see `06-mobbin-references.md` (Mobbin access worked on 2026-09-29; rows 3, 4, 8, 11, 12, 13, 17, 18, 22, 23 pulled). Remaining rows below are still open. Original status: to-do list. Mobbin MCP was OAuth-gated and unavailable, so none of the design docs use Mobbin material. When access exists, pull the items below, save screenshots under `docs/design/reference/` (not created yet), and update the mapped screen in `03-screens.md`. Do not authenticate to anything on behalf of the owner without their instruction.
 
 Sources actually used instead (fetched this session): <https://pasteapp.io/help/keyboard-shortcuts>, <https://manual.raycast.com/clipboard-history>, <https://www.alfredapp.com/help/features/clipboard/>, <https://tapbots.com/pastebot/>.
 

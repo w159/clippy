@@ -130,3 +130,42 @@ final class PanelShellTests: XCTestCase {
         XCTAssertEqual(EscapeAction.next(hasMultiSelection: false, query: " "), .hidePanel)
     }
 }
+
+final class PaletteLayoutTests: XCTestCase {
+    private func cmd(_ id: String, _ section: PaletteSection) -> ClosurePaletteCommand {
+        ClosurePaletteCommand(id: id, title: id, symbol: "circle", section: section, perform: {})
+    }
+
+    private var sample: [any PaletteCommand] {
+        [cmd("a", .actions), cmd("b", .settings), cmd("c", .navigate), cmd("d", .actions)]
+    }
+
+    func testEmptyQueryGroupsRecentFirstThenSectionsWithoutDuplicates() {
+        let layout = PaletteLayout.build(sample, query: "", recents: ["c", "zz", "c"])
+        XCTAssertEqual(layout.groups.map(\.title), ["Recent", "Actions", "Settings"])
+        XCTAssertEqual(layout.flat.map(\.id), ["c", "a", "d", "b"])
+        XCTAssertEqual(layout.sectionStarts, [0, 1, 3])
+    }
+
+    func testQueryIsSingleHeaderlessRankedList() {
+        let layout = PaletteLayout.build(sample, query: "a", recents: ["c"])
+        XCTAssertEqual(layout.groups.count, 1)
+        XCTAssertNil(layout.groups[0].title)
+        XCTAssertTrue(PaletteLayout.build(sample, query: "nomatch", recents: []).groups.isEmpty)
+    }
+
+    func testTabJumpsBetweenSectionsAndWraps() {
+        let starts = [0, 1, 3]
+        XCTAssertEqual(PaletteLayout.jump(from: 0, sectionStarts: starts, forward: true), 1)
+        XCTAssertEqual(PaletteLayout.jump(from: 2, sectionStarts: starts, forward: true), 3)
+        XCTAssertEqual(PaletteLayout.jump(from: 3, sectionStarts: starts, forward: true), 0)
+        XCTAssertEqual(PaletteLayout.jump(from: 2, sectionStarts: starts, forward: false), 1)
+        XCTAssertEqual(PaletteLayout.jump(from: 0, sectionStarts: starts, forward: false), 3)
+    }
+
+    func testKeyCapsSplitGlyphsAndPlusForms() {
+        XCTAssertEqual(PaletteLayout.keyCaps(for: "\u{21E7}\u{21A9}"), ["\u{21E7}", "\u{21A9}"])
+        XCTAssertEqual(PaletteLayout.keyCaps(for: "Cmd+P"), ["Cmd", "P"])
+        XCTAssertEqual(PaletteLayout.keyCaps(for: "esc"), ["e", "s", "c"])
+    }
+}

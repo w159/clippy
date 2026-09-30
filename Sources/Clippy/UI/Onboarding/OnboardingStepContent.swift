@@ -29,6 +29,28 @@ struct OnboardingStepContent: View {
         }
     }
 
+    /// A permission row: title and detail on the left, live status on the right, action below when needed.
+    private func permissionRow(_ title: String, ok: Bool, okText: String, pendingText: String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(tokens.textPrimary)
+            Spacer(minLength: tokens.metrics.space.three)
+            status(ok ? okText : pendingText, ok: ok)
+        }
+        .padding(tokens.metrics.space.three)
+        .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous).stroke(tokens.stroke, lineWidth: 1))
+    }
+
+    /// The "what you get" checklist for a permission step.
+    private func benefits(_ step: OnboardingStep) -> some View {
+        VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
+            Text("What you get").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
+            ForEach(step.benefits, id: \.self) { item in
+                Label(item, systemImage: "checkmark").font(.callout).foregroundStyle(tokens.textPrimary)
+            }
+        }
+    }
+
     private func status(_ text: String, ok: Bool) -> some View {
         Label(text, systemImage: ok ? "checkmark.circle.fill" : "exclamationmark.circle")
             .foregroundStyle(ok ? tokens.success : tokens.warning)
@@ -46,7 +68,8 @@ struct OnboardingStepContent: View {
                     "Clippy uses Accessibility to send the paste keystroke and to find your text caret so the panel opens " +
                         "beside it. It reads only the caret position, never the content of other apps here. " +
                         "Everything stays on this Mac.")
-            status(viewModel.accessibilityTrusted ? "Access granted" : "Not granted yet", ok: viewModel.accessibilityTrusted)
+            permissionRow("Accessibility", ok: viewModel.accessibilityTrusted, okText: "Access granted", pendingText: "Not granted yet")
+            benefits(.accessibility)
             if !viewModel.accessibilityTrusted {
                 Button("Grant Access") { viewModel.grantAccessibility() }
                 Text("This updates automatically when you return from System Settings.")
@@ -104,14 +127,24 @@ struct OnboardingStepContent: View {
         }
     }
 
+    private var notificationsAllowed: Bool {
+        switch viewModel.notificationStatus {
+        case .authorized, .provisional, .ephemeral: return true
+        default: return false
+        }
+    }
+
     private var notifications: some View {
         Group {
             heading("Notifications (optional)",
                     "Get a notice when Clippy clears a sensitive clip from the clipboard automatically.")
+            permissionRow("Notifications",
+                          ok: notificationsAllowed,
+                          okText: "Allowed", pendingText: viewModel.notificationStatus == .denied ? "Off for Clippy" : "Not asked yet")
+            benefits(.notifications)
             switch viewModel.notificationStatus {
-            case .authorized, .provisional, .ephemeral: status("Notifications allowed", ok: true)
+            case .authorized, .provisional, .ephemeral: EmptyView()
             case .denied:
-                status("Notifications are off for Clippy", ok: false)
                 Text("Enable them in System Settings > Notifications.").font(.caption).foregroundStyle(tokens.textSecondary)
             default:
                 Button {

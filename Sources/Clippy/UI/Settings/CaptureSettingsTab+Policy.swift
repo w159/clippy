@@ -43,7 +43,8 @@ struct CapturePolicySections: View {
             ForEach(blocklist, id: \.self) { type in
                 HStack {
                     Text(type).font(.system(.caption, design: .monospaced))
-                    Spacer()
+                        .lineLimit(1).truncationMode(.middle).help(type)
+                    Spacer(minLength: 8)
                     Button { blocklist.removeAll { $0 == type }; CapturePreferences.typeBlocklist = blocklist } label: {
                         Image(systemName: "minus.circle")
                     }

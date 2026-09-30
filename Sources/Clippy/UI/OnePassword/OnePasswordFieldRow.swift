@@ -23,6 +23,8 @@ struct OnePasswordFieldRow: View {
     @State private var otpWindow: Int?
     @State private var copied = false
     @State private var copiedTask: Task<Void, Never>?
+    @State private var revealed = false
+    @State private var revealing = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
@@ -30,14 +32,90 @@ struct OnePasswordFieldRow: View {
                 Text(field.label)
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(tokens.textSecondary)
-                fieldValueView
+                fieldContainer
             }
-            Spacer(minLength: 8)
             copyButton
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 5))
+        .onDisappear { revealed = false }
+    }
+
+    /// Value area. Masked (OTP / concealed) values sit in an inset field with the
+    /// reveal eye on its trailing edge; copy stays a separate control after it.
+    @ViewBuilder
+    private var fieldContainer: some View {
+        if field.type.isOTP || (field.type.isConcealed && field.value != nil) {
+            HStack(spacing: 6) {
+                fieldValueView.frame(maxWidth: .infinity, alignment: .leading)
+                revealButton
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 4)
+            .padding(.vertical, 2)
+            .background(designTokens.surfaceInset, in: RoundedRectangle(cornerRadius: designTokens.metrics.radius.sm, style: .continuous))
+        } else {
+            fieldValueView
+        }
+        if let err = copyError {
+            Text(err)
+                .font(.caption2)
+                .foregroundStyle(tokens.danger)
+        }
+    }
+
+    private var maskedGlyphs: some View {
+        Text("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(tokens.textSecondary)
+            .accessibilityLabel(field.type.isOTP ? "Hidden one-time code" : "Hidden secret")
+    }
+
+    private var revealButton: some View {
+        Button {
+            if revealed {
+                revealed = false
+            } else if field.type.isOTP && otpCode == nil {
+                fetchOTPForReveal()
+            } else {
+                revealed = true
+            }
+        } label: {
+            if revealing {
+                ProgressView().controlSize(.mini)
+            } else {
+                Image(systemName: revealed ? "eye.slash" : "eye").font(.system(size: 12))
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tokens.textSecondary)
+        .frame(width: 24, height: 24)
+        .contentShape(Rectangle())
+        .disabled(revealing)
+        .accessibilityLabel(revealed ? "Hide \(field.label)" : "Reveal \(field.label)")
+        .help(revealed ? "Hide value" : "Reveal value")
+    }
+
+    private func fetchOTPForReveal() {
+        revealing = true
+        copyError = nil
+        Task {
+            do {
+                let code = try await service.fetchTOTP(itemID: itemID)
+                await MainActor.run {
+                    otpCode = code
+                    otpWindow = TOTPCountdown.windowIndex(at: Date())
+                    revealed = true
+                    revealing = false
+                }
+            } catch {
+                await MainActor.run {
+                    copyError = error.localizedDescription
+                    revealing = false
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -47,23 +125,32 @@ struct OnePasswordFieldRow: View {
                 // The timeline drives expiry: `body` itself does not re-run each second.
                 TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
                     if TOTPCountdown.windowIndex(at: timeline.date) == otpWindow {
-                        OTPCodeDisplay(code: liveCode, date: timeline.date)
+                        if revealed {
+                            OTPCodeDisplay(code: liveCode, date: timeline.date)
+                        } else {
+                            maskedGlyphs
+                        }
                     } else {
                         Text("Code expired. Copy for a new one.")
                             .font(.caption)
                             .foregroundStyle(tokens.textSecondary)
-                            .onAppear { otpCode = nil; otpWindow = nil }
+                            .onAppear { otpCode = nil; otpWindow = nil; revealed = false }
                     }
                 }
             } else {
-                Text("Copy to fetch current code")
-                    .font(.caption)
-                    .foregroundStyle(tokens.textSecondary)
+                maskedGlyphs
             }
         } else if field.type.isConcealed {
             if let secret = field.value {
-                MaskedText(secret, sensitive: true)
-                    .font(.system(.caption, design: .monospaced))
+                if revealed {
+                    Text(secret)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(3)
+                        .privacySensitive()
+                } else {
+                    maskedGlyphs
+                }
             } else {
                 Label("Sensitive field", systemImage: "lock.fill")
                     .font(.caption)
@@ -79,12 +166,6 @@ struct OnePasswordFieldRow: View {
                 .font(.caption)
                 .foregroundStyle(tokens.textSecondary)
                 .italic()
-        }
-
-        if let err = copyError {
-            Text(err)
-                .font(.caption2)
-                .foregroundStyle(tokens.danger)
         }
     }
 

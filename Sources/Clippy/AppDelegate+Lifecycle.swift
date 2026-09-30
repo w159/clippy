@@ -114,7 +114,15 @@ extension AppDelegate {
             let path = CommandLine.arguments[flagIndex + 1]
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 self?.openSettings()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                // CLIPPY_SETTINGS_SIZE=WxH resizes the window (after the frame saver has restored its
+                // autosaved frame) so minimum-size layouts can be captured.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if let raw = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_SIZE"] {
+                        let parts = raw.split(separator: "x").compactMap { Double($0) }
+                        if parts.count == 2 { self?.settingsWindow?.setContentSize(NSSize(width: parts[0], height: parts[1])) }
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                     // Render the window's frame view (not just contentView) so the sidebar's
                     // AppKit-backed list/search field resolve the window's effective appearance
                     // and key/active state, matching what a user sees on screen.

@@ -44,8 +44,8 @@ struct IntegrationsSettingsTab: View {
             Section("Categories and pins") {
                 LabeledContent("Pinned archive") {
                     HStack {
-                        Button("Export clippy.toml...") { exportTOML() }
-                        Button("Import clippy.toml...") { importTOML() }
+                        Button("Export\u{2026}") { exportTOML() }.help("Export clippy.toml")
+                        Button("Import\u{2026}") { importTOML() }.help("Import clippy.toml")
                     }
                 }
                 .settingsRow("integrations.archive")

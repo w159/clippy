@@ -165,30 +165,12 @@ final class SuggestionEngine: @unchecked Sendable {
         var seen = Set<String>()
         var candidates: [Candidate] = []
         for clip in clips.sorted(by: { $0.createdAt > $1.createdAt }) {
-            if let id = clip.id, id == query.excludedClipID { continue }
-            if let bundle = clip.sourceAppBundleID, ignored.contains(bundle) { continue }
-            guard let key = Self.contentKey(clip) else { continue }
-            let text = Self.normalized(clip.contentText)
-            if !text.isEmpty, text == query.excludedText { continue }
-            var demoted = false
-            if !feedback.isEmpty {
-                let feedbackKey = clip.contentKey
-                if feedback.neverKeys.contains(feedbackKey) { continue }
-                demoted = feedback.demotedKeys.contains(feedbackKey)
-            }
-            guard seen.insert(key).inserted else { continue }
+            guard let key = Self.eligibleKey(clip, query: query, ignored: ignored),
+                let demoted = Self.demotion(for: clip, feedback: feedback),
+                seen.insert(key).inserted
+            else { continue }
             var candidate = Candidate(clip: clip, embedding: nil, demoted: demoted)
-            let embedded = Self.embedText(for: clip)
-            if !embedded.isEmpty {
-                if queryEmbedding != nil { candidate.embedding = embedding(for: clip) }
-                let clipWords = Self.words(embedded)
-                var ordered: [String] = []
-                var unique = Set<String>()
-                for word in clipWords where unique.insert(word).inserted { ordered.append(word) }
-                candidate.sharedWords = ordered.filter { queryWordSet.contains($0) }
-                candidate.keyword = min(
-                    1, Double(candidate.sharedWords.count) / Double(min(max(ordered.count, 1), 4)))
-            }
+            enrich(&candidate, hasQueryEmbedding: queryEmbedding != nil, queryWordSet: queryWordSet)
             candidates.append(candidate)
         }
 
@@ -208,60 +190,98 @@ final class SuggestionEngine: @unchecked Sendable {
             }
         }
 
-        var results: [Suggestion] = []
-        for candidate in candidates {
-            let embedNorm =
-                !candidate.compared
-                ? 0.0
-                : min(
-                    1,
-                    max(
-                        0,
-                        (candidate.cosine - SuggestionTuning.embeddingFloor)
-                            / SuggestionTuning.embeddingSpan))
-            let age = max(0, now.timeIntervalSince(candidate.clip.createdAt))
-            let recency = pow(0.5, age / SuggestionTuning.recencyHalfLife)
-            let app: Double =
-                (query.bundleID != nil && candidate.clip.sourceAppBundleID == query.bundleID) ? 1 : 0
-            let kind = Self.kindFit(candidate.clip, writing: query.writingContext)
-
-            let parts: [(Double, Factor)] = [
-                (Weight.embedding * embedNorm, .embedding),
-                (Weight.keyword * candidate.keyword, .keyword),
-                (Weight.recency * recency, .recency),
-                (Weight.app * app, .app),
-                (Weight.kind * kind, .kind),
-            ]
-            var total = min(1, max(0, parts.reduce(0) { $0 + $1.0 }))
-            if candidate.demoted { total *= SuggestionTuning.notRelevantWeight }
-            guard total >= SuggestionTuning.minScore else { continue }
-            // Reason = the most meaningful signal that actually applies, in
-            // priority order. Recency is a background signal every clip has, so
-            // it only explains a suggestion when nothing else does (picking the
-            // largest weighted term would label almost everything "Recently
-            // copied").
-            let dominant: Factor
-            if embedNorm >= 0.3 {
-                dominant = .embedding
-            } else if !candidate.sharedWords.isEmpty {
-                dominant = .keyword
-            } else if app == 1 {
-                dominant = .app
-            } else if query.writingContext, kind == 1 {
-                dominant = .kind
-            } else {
-                dominant = .recency
-            }
-            let reason = Self.reason(dominant, candidate: candidate, query: query)
-            results.append(
-                Suggestion(
-                    clip: candidate.clip, score: total, reason: reason,
-                    embeddingLanguage: candidate.compared ? queryEmbedding?.language : nil))
+        var results = candidates.compactMap {
+            Self.suggestion(for: $0, query: query, now: now, queryLanguage: queryEmbedding?.language)
         }
         results.sort {
             $0.score != $1.score ? $0.score > $1.score : $0.clip.createdAt > $1.clip.createdAt
         }
         return Array(results.prefix(limit))
+    }
+
+    /// De-duplication key when the clip may be suggested at all (not ignored,
+    /// not the query's own clip/text, has content); nil when excluded.
+    private static func eligibleKey(_ clip: Clip, query: Query, ignored: Set<String>) -> String? {
+        if let id = clip.id, id == query.excludedClipID { return nil }
+        if let bundle = clip.sourceAppBundleID, ignored.contains(bundle) { return nil }
+        guard let key = contentKey(clip) else { return nil }
+        let text = normalized(clip.contentText)
+        if !text.isEmpty, text == query.excludedText { return nil }
+        return key
+    }
+
+    /// Whether feedback demotes the clip; nil when the user marked it "never".
+    private static func demotion(for clip: Clip, feedback: DismissalSnapshot) -> Bool? {
+        guard !feedback.isEmpty else { return false }
+        let feedbackKey = clip.contentKey
+        if feedback.neverKeys.contains(feedbackKey) { return nil }
+        return feedback.demotedKeys.contains(feedbackKey)
+    }
+
+    /// Fills the candidate's embedding and keyword-overlap signals.
+    private func enrich(_ candidate: inout Candidate, hasQueryEmbedding: Bool, queryWordSet: Set<String>) {
+        let embedded = Self.embedText(for: candidate.clip)
+        guard !embedded.isEmpty else { return }
+        if hasQueryEmbedding { candidate.embedding = embedding(for: candidate.clip) }
+        var ordered: [String] = []
+        var unique = Set<String>()
+        for word in Self.words(embedded) where unique.insert(word).inserted { ordered.append(word) }
+        candidate.sharedWords = ordered.filter { queryWordSet.contains($0) }
+        candidate.keyword = min(
+            1, Double(candidate.sharedWords.count) / Double(min(max(ordered.count, 1), 4)))
+    }
+
+    /// Weighted score for one candidate; nil when below the minimum.
+    private static func suggestion(
+        for candidate: Candidate, query: Query, now: Date, queryLanguage: String?
+    ) -> Suggestion? {
+        let embedNorm =
+            !candidate.compared
+            ? 0.0
+            : min(
+                1,
+                max(
+                    0,
+                    (candidate.cosine - SuggestionTuning.embeddingFloor)
+                        / SuggestionTuning.embeddingSpan))
+        let age = max(0, now.timeIntervalSince(candidate.clip.createdAt))
+        let recency = pow(0.5, age / SuggestionTuning.recencyHalfLife)
+        let app: Double =
+            (query.bundleID != nil && candidate.clip.sourceAppBundleID == query.bundleID) ? 1 : 0
+        let kind = kindFit(candidate.clip, writing: query.writingContext)
+
+        let parts: [(Double, Factor)] = [
+            (Weight.embedding * embedNorm, .embedding),
+            (Weight.keyword * candidate.keyword, .keyword),
+            (Weight.recency * recency, .recency),
+            (Weight.app * app, .app),
+            (Weight.kind * kind, .kind),
+        ]
+        var total = min(1, max(0, parts.reduce(0) { $0 + $1.0 }))
+        if candidate.demoted { total *= SuggestionTuning.notRelevantWeight }
+        guard total >= SuggestionTuning.minScore else { return nil }
+        let dominant = dominantFactor(
+            embedNorm: embedNorm, candidate: candidate, app: app, kind: kind,
+            writing: query.writingContext)
+        return Suggestion(
+            clip: candidate.clip, score: total,
+            reason: reason(dominant, candidate: candidate, query: query),
+            embeddingLanguage: candidate.compared ? queryLanguage : nil)
+    }
+
+    /// Reason = the most meaningful signal that actually applies, in
+    /// priority order. Recency is a background signal every clip has, so
+    /// it only explains a suggestion when nothing else does (picking the
+    /// largest weighted term would label almost everything "Recently
+    /// copied").
+    private static func dominantFactor(
+        embedNorm: Double, candidate: Candidate, app: Double, kind: Double, writing: Bool
+    ) -> Factor {
+        if embedNorm >= 0.3 { return .embedding }
+        if !candidate.sharedWords.isEmpty { return .keyword }
+        if app == 1 { return .app }
+        if writing, kind == 1 { return .kind }
+        return .recency
     }
 
     private enum Factor { case embedding, keyword, recency, app, kind }

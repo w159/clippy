@@ -20,6 +20,18 @@ enum OnboardingStep: Int, CaseIterable, Identifiable {
         }
     }
 
+    /// Steps that ask for a system permission; they offer a quiet "Continue without granting".
+    var isPermission: Bool { self == .accessibility || self == .notifications }
+
+    /// Short "what you get" checklist shown under a permission ask.
+    var benefits: [String] {
+        switch self {
+        case .accessibility: return ["Paste straight into the app you are using", "Panel opens beside your text caret"]
+        case .notifications: return ["A notice when a sensitive clip is cleared automatically"]
+        default: return []
+        }
+    }
+
     /// Every step can be skipped without changing its associated setting.
     var isSkippable: Bool { true }
 }

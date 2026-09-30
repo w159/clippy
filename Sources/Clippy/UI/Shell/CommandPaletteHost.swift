@@ -19,7 +19,8 @@ struct CommandPaletteHost: View {
     /// Closes the palette.
     let onDismiss: () -> Void
 
-    private var results: [any PaletteCommand] { PaletteRanker.rank(commands, query: query, recents: recents) }
+    private var layout: PaletteLayout { PaletteLayout.build(commands, query: query, recents: recents) }
+    private var results: [any PaletteCommand] { layout.flat }
 
     var body: some View {
         ZStack {
@@ -32,7 +33,7 @@ struct CommandPaletteHost: View {
                     searchField
                     Divider().padding(.vertical, tokens.metrics.space.one)
                     resultList
-                    Divider().padding(.vertical, tokens.metrics.space.one)
+                    Divider().padding(.top, tokens.metrics.space.one)
                     hintBar
                 }
             }
@@ -63,22 +64,35 @@ struct CommandPaletteHost: View {
     }
 
     private var resultList: some View {
-        let items = results
+        let layout = layout
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if items.isEmpty {
+                    if layout.groups.isEmpty {
                         Text("No matching commands. Clear the search to see all.")
                             .foregroundStyle(tokens.textSecondary)
                             .padding(tokens.metrics.space.three)
                     }
-                    ForEach(Array(items.enumerated()), id: \.offset) { index, command in
-                        row(command, selected: index == highlighted, hovered: index == hovered)
-                            .id(index)
-                            .onTapGesture { run(command) }
-                            .onHover { inside in
-                                if inside { hovered = index } else if hovered == index { hovered = nil }
-                            }
+                    ForEach(Array(layout.groups.enumerated()), id: \.offset) { _, group in
+                        if let title = group.title {
+                            Text(title)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(tokens.textSecondary)
+                                .padding(.horizontal, tokens.metrics.space.two)
+                                .padding(.top, tokens.metrics.space.two)
+                                .padding(.bottom, tokens.metrics.space.one)
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                        ForEach(Array(group.commands.enumerated()), id: \.offset) { offset, command in
+                            let index = group.startIndex + offset
+                            row(command, selected: index == highlighted, hovered: index == hovered,
+                                showsContext: group.title != command.section.rawValue)
+                                .id(index)
+                                .onTapGesture { run(command) }
+                                .onHover { inside in
+                                    if inside { hovered = index } else if hovered == index { hovered = nil }
+                                }
+                        }
                     }
                 }
                 .padding(.horizontal, tokens.metrics.space.one)
@@ -89,7 +103,7 @@ struct CommandPaletteHost: View {
         }
     }
 
-    private func row(_ command: any PaletteCommand, selected: Bool, hovered: Bool) -> some View {
+    private func row(_ command: any PaletteCommand, selected: Bool, hovered: Bool, showsContext: Bool) -> some View {
         HStack(spacing: tokens.metrics.space.two) {
             Image(systemName: command.symbol).frame(width: 20).foregroundStyle(tokens.accentText)
             VStack(alignment: .leading, spacing: 0) {
@@ -99,11 +113,23 @@ struct CommandPaletteHost: View {
                 }
             }
             Spacer(minLength: tokens.metrics.space.two)
-            if let shortcut = command.shortcut { KeyCap(shortcut) }
+            if showsContext {
+                Text(command.section.rawValue).font(.caption).foregroundStyle(tokens.textSecondary)
+            }
+            if let shortcut = command.shortcut {
+                HStack(spacing: 2) {
+                    ForEach(Array(PaletteLayout.keyCaps(for: shortcut).enumerated()), id: \.offset) { _, cap in KeyCap(cap) }
+                }
+            }
         }
         .padding(.horizontal, tokens.metrics.space.two)
         .padding(.vertical, tokens.metrics.space.one + 2)
         .background(selected ? tokens.selection : (hovered ? tokens.selection.opacity(0.5) : .clear), in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+        .overlay(alignment: .leading) {
+            if selected {
+                Capsule().fill(tokens.accent).frame(width: 2).padding(.vertical, tokens.metrics.space.one)
+            }
+        }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(command.title)
@@ -113,13 +139,26 @@ struct CommandPaletteHost: View {
     }
 
     private var hintBar: some View {
-        HStack(spacing: tokens.metrics.space.three) {
-            Text("Up/Down move").font(.caption).foregroundStyle(tokens.textSecondary)
-            Text("Return run").font(.caption).foregroundStyle(tokens.textSecondary)
-            Text("Esc close").font(.caption).foregroundStyle(tokens.textSecondary)
+        let hasRows = !results.isEmpty
+        return HStack(spacing: tokens.metrics.space.three) {
+            if hasRows {
+                hint("\u{2191}\u{2193}", "navigate")
+                hint("\u{21A9}", "select")
+            }
+            hint("esc", "close")
+            if layout.sectionStarts.count > 1 { hint("\u{21E5}", "next section") }
             Spacer()
         }
         .padding(.horizontal, tokens.metrics.space.two)
+        .padding(.vertical, tokens.metrics.space.one)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func hint(_ key: String, _ label: String) -> some View {
+        HStack(spacing: tokens.metrics.space.one) {
+            KeyCap(key)
+            Text(label).font(.caption).foregroundStyle(tokens.textSecondary)
+        }
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
@@ -129,6 +168,12 @@ struct CommandPaletteHost: View {
             if count > 0 { highlighted = (highlighted + 1) % count }
         case .upArrow:
             if count > 0 { highlighted = (highlighted - 1 + count) % count }
+        case .tab:
+            let starts = layout.sectionStarts
+            if count > 0, starts.count > 1 {
+                highlighted = PaletteLayout.jump(from: highlighted, sectionStarts: starts,
+                                                 forward: !press.modifiers.contains(.shift))
+            }
         case .return:
             let items = results
             if items.indices.contains(highlighted) { run(items[highlighted]) }

@@ -22,7 +22,7 @@ struct OCRSettingsPane: View {
                         Text("Fast").tag(OCRPreferences.Level.fast)
                         Text("Accurate").tag(OCRPreferences.Level.accurate)
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 180)
+                    .pickerStyle(.segmented).labelsHidden().frame(minWidth: 120, maxWidth: 180)
                     .onChange(of: level) { _, value in OCRPreferences.level = value }
                 }
                 Divider()

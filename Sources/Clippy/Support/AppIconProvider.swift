@@ -67,9 +67,9 @@ final class AppIconProvider {
         NSGraphicsContext.restoreGraphicsState()
 
         var red = 0.0, green = 0.0, blue = 0.0, count = 0.0
-        for y in 0..<side {
-            for x in 0..<side {
-                guard let pixel = rep.colorAt(x: x, y: y), pixel.alphaComponent > 0.3 else { continue }
+        for row in 0..<side {
+            for column in 0..<side {
+                guard let pixel = rep.colorAt(x: column, y: row), pixel.alphaComponent > 0.3 else { continue }
                 red += pixel.redComponent
                 green += pixel.greenComponent
                 blue += pixel.blueComponent

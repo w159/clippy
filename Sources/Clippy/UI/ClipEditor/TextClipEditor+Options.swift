@@ -3,14 +3,28 @@ import SwiftUI
 
 // Options bar: language, wrap, line numbers, zoom, proofing, preview, rich toggle, export.
 extension TextClipEditor {
+    /// Slim toolbar. Falls back from the full icon row to a compact row with a
+    /// "More" menu so no control is ever cut off in a narrow window.
     var optionsBar: some View {
+        ViewThatFits(in: .horizontal) {
+            fullOptionsRow
+            compactOptionsRow
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(dsTokens.surfaceElevated)
+    }
+
+    private var fullOptionsRow: some View {
         HStack(spacing: 4) {
             if richSource != nil {
                 Toggle("Rich text", isOn: Binding(get: { richMode }, set: { setRichMode($0) }))
                     .toggleStyle(.switch).controlSize(.small)
                     .help("Edit with formatting. Off edits as plain text; saving then removes the formatting.")
             }
-            languageMenu.disabled(richMode)
+            languageMenu(compact: false).disabled(richMode)
+            optionsDivider
             IconButton("magnifyingglass", label: "Find", help: "Find (Cmd F)") { showFindBar() }
                 .disabled(richMode)
             toolbarToggle("text.word.spacing", "Word wrap", isOn: prefs.wraps(category), disabled: richMode) {
@@ -26,7 +40,7 @@ extension TextClipEditor {
                           isOn: prefs.usesSmartSubstitutions(category), disabled: richMode) {
                 prefs.setUsesSmartSubstitutions(!prefs.usesSmartSubstitutions(category), for: category)
             }
-            Divider().frame(height: 14)
+            optionsDivider
             IconButton("textformat.size.smaller", label: "Smaller text", help: "Smaller text (Cmd -)",
                        state: richMode ? .disabled : .rest) { prefs.zoomOut(from: effectiveFontSize) }
             IconButton("textformat.size.larger", label: "Larger text", help: "Larger text (Cmd =)",
@@ -36,13 +50,69 @@ extension TextClipEditor {
                     prefs.previewVisible.toggle()
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
             exportMenu
             zoomShortcuts
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(dsTokens.surfaceElevated)
+    }
+
+    private var compactOptionsRow: some View {
+        HStack(spacing: 4) {
+            languageMenu(compact: true).disabled(richMode)
+            IconButton("magnifyingglass", label: "Find", help: "Find (Cmd F)") { showFindBar() }
+                .disabled(richMode)
+            Spacer(minLength: 4)
+            overflowMenu
+            zoomShortcuts
+        }
+    }
+
+    private var optionsDivider: some View {
+        Divider().frame(height: 14).padding(.horizontal, 2)
+    }
+
+    /// Every option that does not fit the compact row, as menu items.
+    private var overflowMenu: some View {
+        Menu {
+            if richSource != nil {
+                Toggle("Rich text", isOn: Binding(get: { richMode }, set: { setRichMode($0) }))
+            }
+            Section("View") {
+                Toggle("Word wrap", isOn: Binding(get: { prefs.wraps(category) },
+                                                  set: { prefs.setWraps($0, for: category) }))
+                    .disabled(richMode)
+                Toggle("Line numbers", isOn: Binding(get: { prefs.showsLineNumbers },
+                                                     set: { prefs.showsLineNumbers = $0 }))
+                    .disabled(richMode)
+                if previewKind != nil {
+                    Toggle("Show preview", isOn: Binding(get: { prefs.previewVisible },
+                                                         set: { prefs.previewVisible = $0 }))
+                }
+                Button("Smaller text") { prefs.zoomOut(from: effectiveFontSize) }.disabled(richMode)
+                Button("Larger text") { prefs.zoomIn(from: effectiveFontSize) }.disabled(richMode)
+            }
+            Section("Proofing") {
+                Toggle("Spell check", isOn: Binding(get: { prefs.checksSpelling(category) },
+                                                    set: { prefs.setChecksSpelling($0, for: category) }))
+                    .disabled(richMode)
+                Toggle("Smart quotes and dashes", isOn: Binding(get: { prefs.usesSmartSubstitutions(category) },
+                                                                set: { prefs.setUsesSmartSubstitutions($0, for: category) }))
+                    .disabled(richMode)
+            }
+            Section("Export") {
+                ForEach(EditorExportFormat.allCases) { format in
+                    Button("Save As \(format.label)…") { export(format) }
+                }
+                ShareLink(item: text) { Label("Share…", systemImage: "square.and.arrow.up") }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle").font(.system(size: 14, weight: .medium))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("More options")
+        .accessibilityLabel("More options")
     }
 
     /// Compact toggle icon with a selected state, tooltip and VoiceOver on/off value.
@@ -59,7 +129,7 @@ extension TextClipEditor {
         NSApp.sendAction(#selector(NSResponder.performTextFinderAction(_:)), to: nil, from: item)
     }
 
-    var languageMenu: some View {
+    func languageMenu(compact: Bool) -> some View {
         Menu {
             Picker("Syntax", selection: Binding(get: { languageOverride }, set: { languageOverride = $0 })) {
                 Text("Auto (\(detectedLanguage.displayName))").tag(CodeLanguage?.none)
@@ -69,10 +139,16 @@ extension TextClipEditor {
             }
             .pickerStyle(.inline)
         } label: {
-            Label(language.displayName, systemImage: "chevron.left.forwardslash.chevron.right")
+            if compact {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+            } else {
+                Label(language.displayName, systemImage: "chevron.left.forwardslash.chevron.right")
+                    .lineLimit(1)
+            }
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .help("Syntax: \(language.displayName)")
         .accessibilityLabel("Syntax: \(language.displayName)")
     }
 

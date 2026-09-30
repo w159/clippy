@@ -17,9 +17,15 @@ struct DataBackupSection: View {
         PaneSection("Backup and restore", footer: "Restoring replaces the current history. Clippy first saves a backup of the current state so you can undo it.") {
             SettingsRow(title: "Create backup", detail: Text("Saved in Clippy's Backups folder.")) {
                 HStack {
-                    Button("Show Folder") { NSWorkspace.shared.activateFileViewerSelecting([ClipDatabase.shared.backupsDirectory]) }
-                    Button(working ? "Working\u{2026}" : "Back Up Now") { create(copyTo: nil) }.disabled(working)
-                    Button("Back Up To\u{2026}") { chooseFolder() }.disabled(working)
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([ClipDatabase.shared.backupsDirectory])
+                    } label: { Image(systemName: "folder") }
+                        .help("Show the Backups folder in Finder")
+                        .accessibilityLabel("Show Folder")
+                    Button("Copy To\u{2026}") { chooseFolder() }.disabled(working)
+                        .help("Create a backup and copy it to a folder you choose")
+                    Button(working ? "Working\u{2026}" : "Back Up Now") { create(copyTo: nil) }
+                        .buttonStyle(.borderedProminent).disabled(working)
                 }
             }
             if rows.isEmpty {
@@ -30,7 +36,9 @@ struct DataBackupSection: View {
                 Divider()
                 SettingsRow(title: LocalizedStringKey(row.title), detail: Text(row.sizeText)) {
                     HStack {
-                        Button("Delete") { delete(row.id) }
+                        Button { delete(row.id) } label: { Image(systemName: "trash") }
+                            .help("Delete this backup")
+                            .accessibilityLabel("Delete")
                         Button("Restore\u{2026}") { restore.request(row.id) }.disabled(restore.isBusy)
                     }
                 }

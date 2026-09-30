@@ -120,6 +120,25 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     /// Every key exportable through preferences export/import.
     static var allExportableKeys: Set<String> { Set(allCases.flatMap(\.keys)) }
 
+    /// Panes added recently; the sidebar marks them with a NEW pill.
+    var isNew: Bool {
+        switch self {
+        case .pasteStack, .snippets, .preview, .semantic, .automation: return true
+        default: return false
+        }
+    }
+
+    /// True for the grouped-Form panes, which the shell constrains to the centered settings column.
+    var usesFormColumn: Bool {
+        switch self {
+        case .general, .appearance, .capture, .ai, .integrations, .about: return true
+        default: return false
+        }
+    }
+
+    /// Width of the centered settings column, shared by Form and scroll panes.
+    static let columnMaxWidth: CGFloat = 600
+
     /// True when the pane offers "Reset this pane".
     var isResettable: Bool { !keys.isEmpty }
 }
@@ -132,11 +151,11 @@ struct SettingsPaneSection: Identifiable {
 
     /// Every pane appears in exactly one section, in sidebar order.
     static let all: [SettingsPaneSection] = [
-        .init(title: "Essentials", panes: [.general, .appearance]),
-        .init(title: "Capture & Paste", panes: [.capture, .pasteStack, .snippets, .preview, .editor, .ocr]),
+        .init(title: "App", panes: [.general, .appearance, .about]),
+        .init(title: "Capture & Data", panes: [.capture, .pasteStack, .snippets, .preview, .editor, .ocr, .data]),
         .init(title: "Intelligence", panes: [.ai, .intelligence, .semantic]),
-        .init(title: "Privacy & Data", panes: [.security, .data]),
-        .init(title: "Extend", panes: [.integrations, .automation, .scripts, .about]),
+        .init(title: "Extend", panes: [.integrations, .automation, .scripts]),
+        .init(title: "Privacy", panes: [.security]),
     ]
 }
 

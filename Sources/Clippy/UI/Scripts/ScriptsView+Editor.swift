@@ -32,58 +32,84 @@ extension ScriptsView {
         }
     }
 
-    /// One row when it fits; otherwise the name gets its own row above the actions.
+    /// Three tiers: labelled controls on one row, icon-only controls on one row, then the name on
+    /// its own row above icon-only controls. Every tier keeps all actions reachable.
     var toolbar: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) { nameField; HStack(spacing: 8) { toolbarControls }.fixedSize() }
-                .padding(10)
+            HStack(spacing: 6) {
+                nameField.frame(minWidth: 120)
+                interpreterPicker
+                toolbarActions(compact: false)
+            }
+            HStack(spacing: 6) {
+                nameField.frame(minWidth: 90)
+                interpreterPicker
+                toolbarActions(compact: true)
+            }
             VStack(spacing: 6) {
                 nameField
-                HStack(spacing: 8) { toolbarControls }.fixedSize()
+                HStack(spacing: 6) {
+                    interpreterPicker
+                    toolbarActions(compact: true)
+                }
             }
-            .padding(10)
-            VStack(spacing: 6) {
-                nameField
-                HStack(spacing: 8) { toolbarControls }.fixedSize().labelStyle(.iconOnly)
-            }
-            .padding(10)
         }
+        .padding(8)
     }
 
     private var nameField: some View {
         TextField("Name", text: Binding(get: { editing?.name ?? "" }, set: { editing?.name = $0 }))
             .textFieldStyle(.roundedBorder)
-            .frame(minWidth: 120)
     }
 
-    @ViewBuilder private var toolbarControls: some View {
-            Picker("Interpreter", selection: Binding(
-                get: { editing?.interpreter ?? .zsh }, set: { editing?.interpreter = $0 })) {
-                ForEach(ScriptInterpreter.allCases) { Text($0.displayName).tag($0) }
+    private var interpreterPicker: some View {
+        Picker("Interpreter", selection: Binding(
+            get: { editing?.interpreter ?? .zsh }, set: { editing?.interpreter = $0 })) {
+            ForEach(ScriptInterpreter.allCases) { Text($0.displayName).tag($0) }
+        }
+        .labelsHidden()
+        .fixedSize()
+    }
+
+    private func toolbarActions(compact: Bool) -> some View {
+        HStack(spacing: 6) {
+            Button { showOptions.toggle() } label: {
+                if compact { Image(systemName: "slider.horizontal.3") }
+                else { Label("Options", systemImage: "slider.horizontal.3") }
             }
-            .labelsHidden()
-            .fixedSize()
-            Button { showOptions.toggle() } label: { Label("Options", systemImage: "slider.horizontal.3") }
-                .popover(isPresented: $showOptions, arrowEdge: .bottom) {
-                    if let script = editing {
-                        ScriptOptionsForm(script: Binding(get: { editing ?? script }, set: { editing = $0 }))
-                            .id(script.id)
-                    }
+            .popover(isPresented: $showOptions, arrowEdge: .bottom) {
+                if let script = editing {
+                    ScriptOptionsForm(script: Binding(get: { editing ?? script }, set: { editing = $0 }))
+                        .id(script.id)
                 }
-                .help("Arguments, working directory, environment, timeout, interpreter path, stdin")
+            }
+            .help("Arguments, working directory, environment, timeout, interpreter path, stdin")
+            .accessibilityLabel("Options")
+            Button { showRunHistory.toggle() } label: {
+                if compact { Image(systemName: "clock.arrow.circlepath") }
+                else { Label("History", systemImage: "clock.arrow.circlepath") }
+            }
+            .disabled(currentHistory.isEmpty)
+            .popover(isPresented: $showRunHistory, arrowEdge: .bottom) { historyPopover }
+            .help("Run history")
+            .accessibilityLabel("History")
             Spacer(minLength: 4)
             Button("Save") { save() }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled((editing?.name.trimmingCharacters(in: .whitespaces).isEmpty ?? true) || (!isDirty && !isDraft))
-            Button { showRunHistory.toggle() } label: { Label("History", systemImage: "clock.arrow.circlepath") }
-                .disabled(currentHistory.isEmpty)
-                .popover(isPresented: $showRunHistory, arrowEdge: .bottom) { historyPopover }
             if currentRun?.isRunning == true {
-                Button { currentRun?.cancel() } label: { Label("Stop", systemImage: "stop.fill") }
+                Button { currentRun?.cancel() } label: {
+                    if compact { Image(systemName: "stop.fill") } else { Label("Stop", systemImage: "stop.fill") }
+                }
+                .help("Stop").accessibilityLabel("Stop")
             } else {
-                Button { activeDialog = .run } label: { Label("Run", systemImage: "play.fill") }
-                    .disabled((editing?.body.isEmpty ?? true) || !(editing?.isEnabled ?? false) || preflight != nil)
-                    .help(preflight ?? "Run the script")
+                Button { activeDialog = .run } label: {
+                    if compact { Image(systemName: "play.fill") } else { Label("Run", systemImage: "play.fill") }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled((editing?.body.isEmpty ?? true) || !(editing?.isEnabled ?? false) || preflight != nil)
+                .help(preflight ?? "Run the script")
+                .accessibilityLabel("Run")
             }
             Menu {
                 Button("Duplicate") { duplicateCurrent() }.disabled(isDraft)
@@ -93,37 +119,46 @@ extension ScriptsView {
                 Button("Delete", role: .destructive) { activeDialog = .delete }
             } label: { Image(systemName: "ellipsis.circle") }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .fixedSize()
+                .accessibilityLabel("More")
+        }
+        .controlSize(.small)
+        // Ideal width = real width, so ViewThatFits only picks a tier whose buttons all fit
+        // untruncated (Save was clipping to "Sa..." in the middle tier).
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var historyPopover: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Recent runs").font(.headline)
-            ForEach(currentHistory) { record in
-                Button {
-                    historyDetail = record
-                    drawerTab = .history
-                    showRunHistory = false
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: Self.icon(for: record.outcome))
-                            .foregroundStyle(Self.color(for: record.outcome, tokens: tokens))
-                        Text(record.startedAt, format: .dateTime.month().day().hour().minute())
-                        Spacer()
-                        Text(record.outcome == .success ? "Success" : (record.outcome == .failed ? "Failed" : record.outcome == .cancelled ? "Cancelled" : "Timed out"))
-                            .foregroundStyle(tokens.textSecondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Recent runs").font(.headline)
+                ForEach(currentHistory) { record in
+                    Button {
+                        historyDetail = record
+                        drawerTab = .history
+                        showRunHistory = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: Self.icon(for: record.outcome))
+                                .foregroundStyle(Self.color(for: record.outcome, tokens: tokens))
+                            Text(record.startedAt, format: .dateTime.month().day().hour().minute()).lineLimit(1)
+                            Spacer(minLength: 4)
+                            Text(record.outcome == .success ? "Success" : (record.outcome == .failed ? "Failed" : record.outcome == .cancelled ? "Cancelled" : "Timed out"))
+                                .foregroundStyle(tokens.textSecondary).lineLimit(1)
+                        }
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
                     }
-                    .font(.caption)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Self.historyAccessibilityLabel(for: record))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Self.historyAccessibilityLabel(for: record))
             }
+            .padding(12)
         }
-        .padding(12)
-        .frame(width: 300, height: min(280, CGFloat(max(1, currentHistory.count)) * 32 + 42))
+        .frame(minWidth: 220, maxWidth: 360, maxHeight: 280)
     }
 
     @ViewBuilder var messageRows: some View {

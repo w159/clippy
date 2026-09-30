@@ -396,23 +396,36 @@ enum ScriptRunner {
                 launchExecutable = SandboxRunner.executablePath
                 env["TMPDIR"] = scratch + "/"
                 cwd = scratch
-                return runChild(launchExecutable, launchArguments, env: env, cwd: cwd, stdinText: stdinText,
-                                timeout: timeout, control: control, start: start, onOutput: onOutput)
+                let launch = ChildLaunch(executable: launchExecutable, arguments: launchArguments, env: env,
+                                         cwd: cwd, stdinText: stdinText, timeout: timeout)
+                return runChild(launch, control: control, start: start, onOutput: onOutput)
             }
         }
-        return runChild(launchExecutable, launchArguments, env: env, cwd: cwd, stdinText: stdinText,
-                        timeout: timeout, control: control, start: start, onOutput: onOutput)
+        let launch = ChildLaunch(executable: launchExecutable, arguments: launchArguments, env: env,
+                                 cwd: cwd, stdinText: stdinText, timeout: timeout)
+        return runChild(launch, control: control, start: start, onOutput: onOutput)
+    }
+
+    /// Everything needed to launch one child process.
+    private struct ChildLaunch {
+        let executable: String
+        let arguments: [String]
+        let env: [String: String]
+        let cwd: String
+        let stdinText: String?
+        let timeout: TimeInterval
     }
 
     /// Spawns and supervises one child: streams, timeout, reaping, result.
-    private static func runChild(_ executable: String, _ arguments: [String], env: [String: String],
-                                 cwd: String, stdinText: String?, timeout: TimeInterval,
-                                 control: RunControl, start: Date,
+    private static func runChild(_ launch: ChildLaunch, control: RunControl, start: Date,
                                  onOutput: (@Sendable (ScriptOutputStream, String) -> Void)?) -> ScriptResult {
+        let executable = launch.executable
+        let timeout = launch.timeout
+        let stdinText = launch.stdinText
         let child: SpawnedChild
         do {
-            child = try spawn(executable: executable, arguments: arguments,
-                              environment: env, directory: cwd)
+            child = try spawn(executable: executable, arguments: launch.arguments,
+                              environment: launch.env, directory: launch.cwd)
         } catch {
             return failedLaunch("Could not start \(executable): \(error.localizedDescription)", start: start)
         }

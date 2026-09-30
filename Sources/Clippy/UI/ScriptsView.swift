@@ -35,7 +35,7 @@ struct ScriptsView: View {
     @State var showBadgeLegend = false
 
     /// Below this width the list collapses into a picker above the editor.
-    static let splitBreakpoint: CGFloat = 560
+    static let splitBreakpoint: CGFloat = 520
 
     enum PendingNav: Equatable { case open(UUID?), newScript }
     enum SaveOutcome: Equatable { case saved, failed }
@@ -76,9 +76,9 @@ struct ScriptsView: View {
             if proxy.size.width >= Self.splitBreakpoint {
                 HSplitView {
                     listPane
-                        .frame(minWidth: 150, idealWidth: 190, maxWidth: 260)
+                        .frame(minWidth: 140, idealWidth: 190, maxWidth: 260)
                     detailPane
-                        .frame(minWidth: 300, maxWidth: .infinity)
+                        .frame(minWidth: 240, maxWidth: .infinity)
                 }
             } else {
                 VStack(spacing: 0) {

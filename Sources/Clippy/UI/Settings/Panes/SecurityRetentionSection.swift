@@ -93,7 +93,7 @@ struct SecurityRetentionSection: View {
             }
             SettingsRow(title: "Add app rule") {
                 HStack {
-                    TextField("com.example.app", text: $newApp).textFieldStyle(.roundedBorder).frame(width: 170)
+                    TextField("com.example.app", text: $newApp).textFieldStyle(.roundedBorder).frame(minWidth: 100, maxWidth: 170)
                     Stepper("\(newAppDays) d", value: $newAppDays, in: RetentionRuleEditorModel.dayRange)
                     Button("Add") {
                         editThrowing({ try $0.addAppRule(bundleID: newApp, days: newAppDays) }, onSuccess: { newApp = "" })

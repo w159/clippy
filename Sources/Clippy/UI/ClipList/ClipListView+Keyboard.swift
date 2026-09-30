@@ -222,7 +222,11 @@ extension ClipListView {
         for clip in clips { store.delete(clip) }
         let undoable = snapshots.count == clips.count
         let noun = clips.count == 1 ? "clip" : "\(clips.count) clips"
-        showStatusBanner(undoable ? "Deleted \(noun). \u{2318}Z to undo" : "Deleted \(noun)")
+        if undoable {
+            showStatusBanner("Deleted \(noun)", actionTitle: "Undo") { _ = undoLastDelete() }
+        } else {
+            showStatusBanner("Deleted \(noun)")
+        }
     }
 
     /// Restores the most recent delete. False when there is nothing to undo.

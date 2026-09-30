@@ -41,7 +41,8 @@ struct PaneScroll<Content: View>: View {
                 content
             }
             .padding(tokens.metrics.space.five)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: SettingsPaneID.columnMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(tokens.surface)
         .accessibilityLabel(Text(title))
@@ -65,14 +66,13 @@ struct PaneSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
             Text(title)
-                .font(.caption.weight(.semibold))
-                .textCase(.uppercase)
-                .foregroundStyle(tokens.textSecondary)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tokens.textPrimary)
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 0) { content }
                 .padding(.horizontal, tokens.metrics.space.four)
-                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(tokens.stroke))
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(tokens.stroke.opacity(0.5), lineWidth: 0.5))
             if let footer {
                 Text(footer).font(.caption).foregroundStyle(tokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
