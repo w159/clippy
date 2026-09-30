@@ -566,19 +566,35 @@ extension ClipboardMonitor {
     /// text clip an AI-suggested title. Opt-in, detached, and best-effort, so it
     /// never blocks or breaks capture; the title is still user-editable.
     fileprivate func maybeAutoSuggestTitle(forText text: String, clipID: Int64?) {
-        // canAutoSuggestTitles, not the raw toggle: this fires on every copy, so
-        // it only runs on a provider that keeps the text on this Mac. See
-        // AppSettings.canAutoSuggestTitles.
-        guard AppSettings.shared.canAutoSuggestTitles, let clipID else { return }
-        guard case .success(let service) = AIService.fromSettings() else { return }
+        let settings = AppSettings.shared
+        guard settings.aiEnabled, settings.aiAutoSuggestTitles, let clipID else { return }
+        // Keep automatic clipboard transmission local, but surface a failed
+        // resolution rather than hiding it behind canAutoSuggestTitles.
+        switch AIProviderStore.shared.resolve() {
+        case .failure(let error):
+            AIHealth.shared.record(error)
+            return
+        case .success(let resolved):
+            guard resolved.keepsDataOnMac else { return }
+        }
+        let service: AIService
+        switch AIService.fromSettings() {
+        case .success(let made): service = made
+        case .failure(let error):
+            AIHealth.shared.record(error)
+            return
+        }
         let database = self.database
         Task.detached {
             // Title the exact row we just inserted. Re-finding by content text
             // could match a different clip when identical text was captured twice.
-            guard let proposal = try? await service.suggestTitle(forText: text),
-                  !proposal.proposed.isEmpty
-            else { return }
-            try? database.updateClipTitle(id: clipID, userTitle: proposal.proposed)
+            do {
+                let proposal = try await service.suggestTitle(forText: text)
+                guard !proposal.proposed.isEmpty else { throw AIError.empty }
+                try database.updateClipTitle(id: clipID, userTitle: proposal.proposed)
+            } catch {
+                await AIHealth.shared.record(error)
+            }
         }
     }
 

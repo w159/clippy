@@ -49,6 +49,7 @@ extension AppSettings {
         mcpPort = 51764
         suggestionsLimit = 8
         resetExternalSettings(Keys.allPersisted)
+        AIProviderStore.shared.reloadFromDefaults()
 
         // Re-seed the logger threshold from the reset value.
         ClippyLog.threshold = logLevel
@@ -71,6 +72,9 @@ extension AppSettings {
         }
         resetExternalSettings(keys)
         reloadFromDefaults()
+        if keys.contains(AIProviderStore.Keys.instances) || keys.contains(AIProviderStore.Keys.activeID) {
+            AIProviderStore.shared.reloadFromDefaults()
+        }
     }
 
     /// Refreshes preferences owned by other observable subsystems after their keys are cleared.

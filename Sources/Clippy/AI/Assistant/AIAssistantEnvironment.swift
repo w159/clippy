@@ -22,20 +22,20 @@ extension AIAssistantEnvironment {
     static func live() -> AIAssistantEnvironment {
         AIAssistantEnvironment(
             makeProvider: {
-                let settings = AppSettings.shared
-                if case .failure(let error) = AIService.fromSettings(settings) { return .failure(error) }
-                let kind = settings.aiProvider
-                let base = settings.aiBaseURL.isEmpty ? kind.defaultBaseURL : settings.aiBaseURL
-                let model = settings.aiModel.isEmpty ? kind.defaultModel : settings.aiModel
-                let key = kind.needsAPIKey ? (KeychainStore.shared.read(account: kind.keychainAccount) ?? "") : ""
-                let config = AIProviderConfig(baseURL: base, apiKey: key, model: model,
-                                              apiVersion: settings.aiAzureAPIVersion)
-                ClippyLog.debug("AI send: provider=\(kind.rawValue) model=\(model) base=\(base)",
-                                category: ClippyLog.ai)
-                return .success(AIAgentProviderFactory.make(kind: kind, config: config))
+                switch AIProviderStore.shared.resolve() {
+                case .failure(let error): return .failure(error)
+                case .success(let resolved):
+                    ClippyLog.debug("AI send: \(resolved.displaySummary)", category: ClippyLog.ai)
+                    return .success(AIProviderRuntime.make(resolved))
+                }
             },
-            supportsTools: { AppSettings.shared.aiProvider.supportsTools },
-            providerName: { AppSettings.shared.aiProvider.displayName },
+            supportsTools: {
+                if case .success(let resolved) = AIProviderStore.shared.resolve() { return resolved.descriptor.supportsTools }
+                return false
+            },
+            providerName: {
+                return AIProviderStore.shared.active?.name ?? "No provider selected"
+            },
             baseTools: {
                 let settings = AppSettings.shared
                 // Confirmation is the policy layer's job now (AIToolPolicy), so the

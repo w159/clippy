@@ -35,16 +35,29 @@ final class AIStreamingLogicTests: XCTestCase {
         XCTAssertEqual(AITextReplace.apply(to: "abc", old: "zzz", new: "new"), "abcnew")
     }
 
-    func testOpenAIAccumulatorReportsUsage() {
-        var acc = OpenAIStreamAccumulator()
-        _ = acc.consume(line: "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5}}")
-        XCTAssertEqual(acc.usage, AIUsage(promptTokens: 12, completionTokens: 5))
+    func testOpenAIStreamReportsUsage() throws {
+        var parser = AIResponseStreamParser(family: .openaiChat)
+        var events = try parser.consume(line: "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}")
+        events += try parser.consume(line: "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5}}")
+        events += try parser.consume(line: "")
+        events += try parser.consume(line: "data: [DONE]")
+        events += try parser.finish()
+        let usage = events.compactMap { event -> AIUsage? in
+            if case .usage(let usage) = event { return usage }
+            return nil
+        }
+        XCTAssertEqual(usage, [AIUsage(promptTokens: 12, completionTokens: 5)])
     }
 
-    func testOllamaAccumulatorReportsUsageOnDoneLine() {
-        var acc = OllamaStreamAccumulator()
-        _ = acc.consume(line: "{\"message\":{\"content\":\"\"},\"done\":true,\"prompt_eval_count\":9,\"eval_count\":3}")
-        XCTAssertEqual(acc.usage, AIUsage(promptTokens: 9, completionTokens: 3))
+    func testOllamaStreamReportsUsageOnDoneLine() throws {
+        var parser = AIResponseStreamParser(family: .ollamaChat)
+        var events = try parser.consume(line: "{\"message\":{\"content\":\"Hello\"},\"done\":true,\"prompt_eval_count\":9,\"eval_count\":3}")
+        events += try parser.finish()
+        let usage = events.compactMap { event -> AIUsage? in
+            if case .usage(let usage) = event { return usage }
+            return nil
+        }
+        XCTAssertEqual(usage, [AIUsage(promptTokens: 9, completionTokens: 3)])
     }
 
     // MARK: Word diff

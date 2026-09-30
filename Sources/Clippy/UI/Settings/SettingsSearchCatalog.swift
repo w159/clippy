@@ -66,7 +66,9 @@ enum SettingsSearchCatalog {
 
     private static let ai: [SettingsSearchEntry] = [
         row("ai.enabled", .ai, "Enable AI and agentic features", ["llm"]),
-        row("ai.provider", .ai, "Provider", ["openai", "anthropic", "ollama", "azure", "apple intelligence"]),
+        row("ai.provider", .ai, "Providers: add, select, duplicate or remove", ["openai", "anthropic", "ollama", "azure", "apple intelligence", "local", "cloud", "aggregator"]),
+        row("ai.advanced", .ai, "Advanced provider settings", ["headers", "temperature", "tokens", "reasoning", "timeouts"]),
+        row("ai.body", .ai, "Extra body JSON"),
         row("ai.model", .ai, "Model"),
         row("ai.endpoint", .ai, "Endpoint URL", ["base url"]),
         row("ai.key", .ai, "API key", ["keychain", "secret"]),

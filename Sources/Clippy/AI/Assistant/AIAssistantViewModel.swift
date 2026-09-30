@@ -170,7 +170,8 @@ final class AIAssistantViewModel: ObservableObject {
         }
         do {
             for try await event in AIAgent.streamWithTools(messages: history, provider: provider, tools: tools) {
-                guard isCurrent(token), !Task.isCancelled else { break }
+                guard isCurrent(token) else { return }
+                try Task.checkCancellation()
                 switch event {
                 case .textDelta(let delta):
                     buffer += delta
@@ -180,6 +181,11 @@ final class AIAssistantViewModel: ObservableObject {
                     flush()
                     segment = AITextReplace.apply(to: segment, old: old, new: new)
                     update(assistantID) { $0.text = AITextReplace.apply(to: $0.text, old: old, new: new) }
+                case .notice(let message):
+                    flush()
+                    update(assistantID) {
+                        $0.toolSteps.append(AssistantToolStep(id: "notice-\(UUID())", name: message, isRunning: false))
+                    }
                 case .toolCall(let call):
                     flush()
                     commitSegment()
@@ -212,19 +218,15 @@ final class AIAssistantViewModel: ObservableObject {
             }
             guard isCurrent(token) else { return }
             flush()
+            try Task.checkCancellation()
             commitSegment()
             failIfEmpty(assistantID, turnStart: turnStart)
         } catch {
             guard isCurrent(token) else { return }
             flush()
-            if error is CancellationError { commitSegment(); return }
-            ClippyLog.error("AI agent error: \(error)", category: ClippyLog.ai)
-            let hasText = messages.first(where: { $0.id == assistantID }).map { !$0.text.isEmpty } ?? false
-            if hasText {
-                commitSegment()
-            } else {
-                showError(error.localizedDescription, on: assistantID, turnStart: turnStart)
-            }
+            if !(error is CancellationError) { AIHealth.shared.record(error) }
+            let message = error is CancellationError ? "The request was cancelled." : error.localizedDescription
+            showError(message, on: assistantID, turnStart: turnStart)
         }
     }
 
@@ -233,7 +235,7 @@ final class AIAssistantViewModel: ObservableObject {
     private func failIfEmpty(_ id: UUID, turnStart: Int) {
         guard let msg = messages.first(where: { $0.id == id }),
               msg.text.isEmpty, msg.toolSteps.isEmpty, !Task.isCancelled else { return }
-        ClippyLog.error("AI stream produced no output", category: ClippyLog.ai)
+        AIHealth.shared.record(AIError.empty)
         showError("The assistant returned an empty response. Check that the model name is correct and that the provider supports streaming, then try again.",
                   on: id, turnStart: turnStart)
     }
@@ -242,7 +244,11 @@ final class AIAssistantViewModel: ObservableObject {
     /// of the transcript unless tools already ran (their side effects happened and
     /// the model should still know about them).
     private func showError(_ message: String, on id: UUID, turnStart: Int) {
-        update(id) { $0.text = message; $0.isError = true }
+        update(id) { msg in
+            msg.text = msg.text.isEmpty ? message : msg.text + "\n\n[Interrupted] \(message)"
+            msg.isError = true
+            for index in msg.toolSteps.indices { msg.toolSteps[index].isRunning = false }
+        }
         if !transcript.hasToolActivity(since: turnStart) { transcript.truncate(to: turnStart) }
     }
 

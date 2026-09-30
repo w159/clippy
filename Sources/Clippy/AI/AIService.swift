@@ -37,26 +37,15 @@ final class AIService: Sendable {
     /// Build a service from the current settings + keychain, or explain why not.
     @MainActor
     static func fromSettings(_ settings: AppSettings = .shared,
-                             keychain: KeychainStore = .shared) -> Result<AIService, AIError> {
+                             store: AIProviderStore = .shared) -> Result<AIService, AIError> {
         guard settings.aiEnabled else {
             return .failure(.notConfigured("AI features are turned off in Settings."))
         }
-        let kind = settings.aiProvider
-        let base = settings.aiBaseURL.isEmpty ? kind.defaultBaseURL : settings.aiBaseURL
-        let model = settings.aiModel.isEmpty ? kind.defaultModel : settings.aiModel
-        if let why = kind.endpointConfigError(base) {
-            return .failure(.notConfigured(why))
+        switch store.resolve() {
+        case .failure(let error): return .failure(error)
+        case .success(let resolved):
+            return .success(AIService(provider: AIProviderRuntime.make(resolved)))
         }
-        var key = ""
-        if kind.needsAPIKey {
-            key = keychain.read(account: kind.keychainAccount) ?? ""
-            if key.isEmpty {
-                return .failure(.notConfigured("\(kind.displayName) needs an API key (set it in Settings)."))
-            }
-        }
-        let config = AIProviderConfig(baseURL: base, apiKey: key, model: model,
-                                      apiVersion: settings.aiAzureAPIVersion)
-        return .success(AIService(provider: AIAgentProviderFactory.make(kind: kind, config: config)))
     }
 
     // MARK: - Actions
@@ -65,9 +54,15 @@ final class AIService: Sendable {
         let out = try await provider.complete([
             AIMessage(role: .system, content: Prompts.title),
             AIMessage(role: .user, content: Self.clamp(text, 4000)),
-        ], options: AICompletionOptions(temperature: 0.2, maxTokens: 32))
+        ], options: AICompletionOptions(temperature: 0.2, maxTokens: 2048, purpose: .quick))
+        let title = Self.sanitizeTitle(out)
+        guard Self.isPlausibleTitle(Self.trim(out)), Self.isPlausibleTitle(title) else {
+            let error = AIError.decoding("The model returned reasoning or a sentence instead of a short title.")
+            await AIHealth.shared.record(error)
+            throw error
+        }
         return AIProposal(kind: .title, label: "Suggested title",
-                          original: nil, proposed: Self.sanitizeTitle(out))
+                          original: nil, proposed: title)
     }
 
     func rewrite(_ text: String, instruction: String) async throws -> AIProposal {
@@ -95,7 +90,7 @@ final class AIService: Sendable {
         let out = try await provider.complete([
             AIMessage(role: .system, content: Prompts.category),
             AIMessage(role: .user, content: "Categories:\n\(list)\n\nItem:\n\(Self.clamp(text, 3000))"),
-        ], options: AICompletionOptions(temperature: 0.0, maxTokens: 24))
+        ], options: AICompletionOptions(temperature: 0.0, maxTokens: 2048, purpose: .quick))
         guard let match = Self.matchCategory(out, to: categories) else { return nil }
         return AIProposal(kind: .category, label: "Suggested category", original: nil, proposed: match)
     }
@@ -178,6 +173,14 @@ final class AIService: Sendable {
         }
         title = stripTrailingPunctuation(title)
         return String(title.prefix(80))
+    }
+
+    /// A title is a short phrase. More than 12 words, or a second sentence, means the model leaked
+    /// its reasoning (or answered the clip) instead of titling it.
+    static func isPlausibleTitle(_ title: String) -> Bool {
+        guard !title.isEmpty, title.split(whereSeparator: \.isWhitespace).count <= 12 else { return false }
+        let sentenceBreak = title.range(of: #"[.!?]\s+\S"#, options: .regularExpression)
+        return sentenceBreak == nil
     }
 
     /// Map a model's reply to one of the offered categories (exact, then

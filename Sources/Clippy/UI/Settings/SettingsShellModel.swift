@@ -102,6 +102,7 @@ final class SettingsShellModel: ObservableObject {
         guard let pending = pendingImport else { return }
         porter.apply(pending.plan, to: settings.defaults, confirmed: confirmedKeys)
         settings.reloadFromDefaults()
+        AIProviderStore.shared.reloadFromDefaults()
         let count = pending.plan.changes.count + pending.plan.requiresConfirmation.filter { confirmedKeys.contains($0.key) }.count
         status = StatusOutcome(succeeded: true, message: "Imported \(count) setting(s) from \(pending.fileName).")
         pendingImport = nil

@@ -60,7 +60,12 @@ extension ClipListView {
                 do {
                     let proposal = try await service.run(action: titleAction, on: clip.contentText)
                     let title = AIService.sanitizeTitle(proposal.proposed)
-                    if !title.isEmpty { store.renameClip(clip, userTitle: title) }
+                    guard AIService.isPlausibleTitle(AIService.trim(proposal.proposed)), AIService.isPlausibleTitle(title) else {
+                        let error = AIError.decoding("The model returned reasoning or a sentence instead of a short title.")
+                        AIHealth.shared.record(error)
+                        throw error
+                    }
+                    store.renameClip(clip, userTitle: title)
                     done += 1
                 } catch {
                     failed.append(clip)

@@ -2,20 +2,23 @@ import Foundation
 
 /// Role in a chat exchange. Anthropic keeps `system` out of the message list, so
 /// providers that need it split it out themselves.
-enum AIRole: String, Codable {
+enum AIRole: String, Codable, Sendable {
     case system
     case user
     case assistant
 }
 
-struct AIMessage: Equatable {
+struct AIMessage: Equatable, Sendable {
     let role: AIRole
     let content: String
 }
 
-struct AICompletionOptions {
-    var temperature: Double = 0.3
+enum AICompletionPurpose: Sendable { case quick, chat }
+
+struct AICompletionOptions: Sendable {
+    var temperature: Double? = nil
     var maxTokens: Int = 1024
+    var purpose: AICompletionPurpose = .chat
 }
 
 enum AIError: LocalizedError, Equatable {
@@ -24,24 +27,20 @@ enum AIError: LocalizedError, Equatable {
     case http(Int, String)
     case decoding(String)
     case empty
-    // Audit [LOW]: distinguish a wedged (idle) stream from a generic HTTP -1 so
-    // the user gets an actionable message instead of "HTTP -1".
-    case idleTimeout
+    case provider(AIRequestFailure)
+    case outputLimitDuringReasoning
 
     var errorDescription: String? {
         switch self {
         case .notConfigured(let why): return "AI is not configured: \(why)"
         case .badURL(let url): return "Invalid endpoint URL: \(url)"
         case .http(let code, let body):
-            // -1 was the old sentinel for an idle-timeout; the dedicated
-            // .idleTimeout case now carries that meaning with a friendlier text.
-            if code == -1 { return "The provider connection failed (HTTP -1)." }
             let snippet = body.prefix(300)
             return "Provider returned HTTP \(code): \(snippet)"
         case .decoding(let why): return "Could not read the provider response: \(why)"
+        case .provider(let failure): return failure.description
+        case .outputLimitDuringReasoning: return "Output limit reached while thinking. Increase the output token budget or disable thinking for quick actions."
         case .empty: return "The provider returned an empty response."
-        case .idleTimeout:
-            return "The assistant stopped responding. The connection was idle for too long. Try sending again."
         }
     }
 }
@@ -71,97 +70,3 @@ extension AIProvider {
     }
 }
 
-/// The backends Clippy can talk to. `appleIntelligence` and `ollama` are local
-/// and need no key.
-enum AIProviderKind: String, CaseIterable, Codable, Identifiable {
-    case appleIntelligence
-    case ollama
-    case openai
-    case anthropic
-    case azureFoundry
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .appleIntelligence: return "Apple Intelligence (on device)"
-        case .ollama: return "Ollama (local)"
-        case .openai: return "OpenAI"
-        case .anthropic: return "Anthropic"
-        case .azureFoundry: return "Microsoft Foundry"
-        }
-    }
-
-    /// True when clipboard content never leaves this Mac: Apple Intelligence runs
-    /// in-process, Ollama on localhost. This is the deciding factor for anyone
-    /// whose clipboard carries client data, and it gates the capture-time
-    /// features - see `AppSettings.canAutoSuggestTitles`.
-    var runsLocally: Bool { self == .appleIntelligence || self == .ollama }
-
-    /// Apple Intelligence runs in-process and Ollama runs on localhost; neither
-    /// takes a credential or an endpoint. The hosted providers need both.
-    var needsAPIKey: Bool { self != .ollama && self != .appleIntelligence }
-
-    /// Apple Intelligence has no endpoint or model to choose, so Settings hides
-    /// those fields for it entirely rather than showing inert controls.
-    var needsEndpointConfiguration: Bool { self != .appleIntelligence }
-
-    /// True when the backend can call Clippy's tools. Apple Intelligence cannot
-    /// yet (Foundation Models needs compile-time `Tool` types, tracked as PLT-04),
-    /// so the assistant hides tool suggestions and says so rather than letting the
-    /// model hallucinate tool results (AI-02).
-    var supportsTools: Bool { self != .appleIntelligence }
-
-    /// Keychain account under which this provider's key is stored.
-    var keychainAccount: String { "ai.\(rawValue).apiKey" }
-
-    var defaultBaseURL: String {
-        switch self {
-        case .appleIntelligence: return ""
-        case .ollama: return "http://localhost:11434"
-        case .openai: return "https://api.openai.com"
-        case .anthropic: return "https://api.anthropic.com"
-        case .azureFoundry: return "https://YOUR-RESOURCE.services.ai.azure.com"
-        }
-    }
-
-    var defaultModel: String {
-        switch self {
-        case .appleIntelligence: return "system"
-        case .ollama: return "llama3.1"
-        case .openai: return "gpt-4o-mini"
-        case .anthropic: return "claude-haiku-4-5"
-        case .azureFoundry: return "gpt-4o-mini"
-        }
-    }
-
-    /// Validate the resolved endpoint before any network call. Returns a precise
-    /// reason string when the endpoint is unusable (e.g. the Azure resource name
-    /// was never filled in), or nil when it is acceptable. Keeping this here means
-    /// every construction site (AIService.fromSettings, the assistant panel) shares
-    /// one authoritative check instead of letting a placeholder host reach DNS.
-    func endpointConfigError(_ baseURL: String) -> String? {
-        if self == .appleIntelligence {
-            // Availability is a runtime property of the Mac, not a typo in a
-            // settings field, so the reason comes from the framework.
-            return AppleIntelligence.availability.reason
-        }
-        guard self == .azureFoundry else { return nil }
-        if baseURL.contains("YOUR-RESOURCE") {
-            return "Azure endpoint not configured. Set your resource Endpoint URL in Settings (e.g. https://my-resource.services.ai.azure.com)."
-        }
-        return nil
-    }
-
-    /// One-line hint shown under the model field in Settings.
-    var modelHint: String {
-        switch self {
-        case .appleIntelligence:
-            return "Runs entirely on this Mac. No key, no endpoint, and nothing you copy leaves the device."
-        case .ollama: return "A model you have pulled, e.g. llama3.1 or qwen2.5."
-        case .openai: return "An OpenAI chat model, e.g. gpt-4o-mini."
-        case .anthropic: return "A Claude model id, e.g. claude-haiku-4-5."
-        case .azureFoundry: return "Your Azure deployment name."
-        }
-    }
-}

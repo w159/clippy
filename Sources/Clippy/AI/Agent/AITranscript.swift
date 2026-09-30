@@ -9,6 +9,7 @@ struct AITranscript: Codable, Equatable {
         let name: String
         /// Arguments as a JSON object string (Codable-friendly).
         let argumentsJSON: String
+        var replayBlocks: Data? = nil
     }
 
     enum Entry: Codable, Equatable {
@@ -26,7 +27,7 @@ struct AITranscript: Codable, Equatable {
 
     mutating func appendToolCall(_ call: AIToolCall) {
         append(.toolCall(Call(id: call.id, name: call.toolName,
-                              argumentsJSON: AIToolCallsSentinel.jsonString(call.arguments))))
+                              argumentsJSON: AIToolCallsSentinel.jsonString(call.arguments), replayBlocks: call.replayBlocks)))
     }
 
     /// Drop everything from `index` on. Used to roll back a failed turn or retry.
@@ -68,7 +69,7 @@ struct AITranscript: Codable, Equatable {
                 let args = (call.argumentsJSON.data(using: .utf8))
                     .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
                 return AIMessage(role: .assistant, content: AIToolCallsSentinel.encode(
-                    [AIToolCall(id: call.id, toolName: call.name, arguments: args)]))
+                    [AIToolCall(id: call.id, toolName: call.name, arguments: args, replayBlocks: call.replayBlocks)]))
             case .toolResult(let id, let name, let result):
                 return AIMessage(role: .user,
                                  content: AIToolResultSentinel.encode(id: id, toolName: name, result: result))

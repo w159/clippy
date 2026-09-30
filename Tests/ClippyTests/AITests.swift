@@ -116,14 +116,33 @@ final class AITests: XCTestCase {
     func testFromSettingsSucceedsForLocalOllamaWithoutKey() {
         let settings = AppSettings.shared
         let prevEnabled = settings.aiEnabled
-        let prevProvider = settings.aiProvider
-        defer { settings.aiEnabled = prevEnabled; settings.aiProvider = prevProvider }
+        defer { settings.aiEnabled = prevEnabled }
         settings.aiEnabled = true
-        settings.aiProvider = .ollama
+        let suiteName = "test.aitests.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        defer { suite.removePersistentDomain(forName: suiteName) }
+        let store = AIProviderStore(defaults: suite,
+                                    secrets: .inMemory(), isForced: { _ in false })
+        suite.set(true, forKey: "aiEnabled")
+        store.setActive(store.add(descriptorID: "ollama-local").id)
 
-        switch AIService.fromSettings(settings) {
+        switch AIService.fromSettings(settings, store: store) {
         case .success: break // Ollama is local and needs no key
         case .failure(let error): XCTFail("local Ollama should configure without a key: \(error)")
         }
     }
+
+    func testLeakedReasoningIsNotSavedAsTitle() async throws {
+        let leaked = "The user has sent me a message that appears to be a pangram. I should title it."
+        let provider = MockAIProvider(response: leaked)
+        do {
+            _ = try await AIService(provider: provider).suggestTitle(forText: "The quick brown fox")
+            XCTFail("Leaked reasoning must not become a title")
+        } catch { XCTAssertTrue(error is AIError) }
+        let good = MockAIProvider(response: "Quick Brown Fox Story")
+        let proposal = try await AIService(provider: good).suggestTitle(forText: "The quick brown fox")
+        XCTAssertEqual(proposal.proposed, "Quick Brown Fox Story")
+        XCTAssertFalse(AIService.isPlausibleTitle("One. Two sentences here"))
+    }
+
 }

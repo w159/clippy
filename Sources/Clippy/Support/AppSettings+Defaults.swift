@@ -53,7 +53,7 @@ extension AppSettings {
                 Keys.customSuccessHex: "",
                 Keys.customDangerHex: "",
                 Keys.aiEnabled: false,
-                Keys.aiProvider: AIProviderKind.appleIntelligence.rawValue,
+                Keys.aiProvider: "appleIntelligence",
                 Keys.aiModel: "",
                 Keys.aiBaseURL: "",
                 Keys.aiAzureAPIVersion: "2024-10-21",

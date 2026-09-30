@@ -13,7 +13,7 @@ struct AboutSettingsPane: View {
         [
             "Clippy \(bundle.shortVersion) (\(bundle.buildNumber))",
             "macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
-            "AI enabled: \(settings.aiEnabled), provider: \(settings.aiProvider.displayName)",
+            "AI enabled: \(settings.aiEnabled), provider: \(AIProviderStore.shared.active?.name ?? "Not configured")",
             "MCP enabled: \(settings.mcpEnabled), iCloud sync: \(settings.iCloudSyncEnabled)",
             "Log level: \(settings.logLevel.label)",
             "Managed keys: \(AppSettings.forcedKeys.count)",

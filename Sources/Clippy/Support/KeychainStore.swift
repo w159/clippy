@@ -49,6 +49,22 @@ struct KeychainStore {
         return value
     }
 
+    /// Like `read`, but distinguishes "no item" from "the keychain refused" so callers
+    /// can tell a missing key from a denied one.
+    func readResult(account: String) -> KeychainReadResult {
+        var query = baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return .missing }
+        guard status == errSecSuccess else { return .denied(status) }
+        guard let data = result as? Data, let value = String(data: data, encoding: .utf8) else {
+            return .missing
+        }
+        return .value(value)
+    }
+
     /// True when a non-empty secret exists for the account, without copying it.
     func has(account: String) -> Bool {
         guard let value = read(account: account) else { return false }
@@ -59,4 +75,11 @@ struct KeychainStore {
     func delete(account: String) -> Bool {
         SecItemDelete(baseQuery(account: account) as CFDictionary) == errSecSuccess
     }
+}
+
+/// Outcome of a keychain read that keeps the OSStatus on failure.
+enum KeychainReadResult: Equatable, Sendable {
+    case value(String)
+    case missing
+    case denied(OSStatus)
 }

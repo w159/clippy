@@ -100,9 +100,7 @@ enum AIAgent {
                     while round < maxRounds {
                         if Task.isCancelled { continuation.finish(); return }
                         round += 1
-                        // Consume one streaming round, retrying transient errors
-                        // (audit [MEDIUM]). Surfaced "Retrying..." as a toolActivity
-                        // so the user sees the retry instead of a silent spinner.
+                        // HTTP owns request retries; never replay a streaming round here.
                         let collectedCalls = try await streamOneRound(
                             messages: messages, provider: provider, tools: tools,
                             options: options, continuation: continuation)
@@ -149,9 +147,7 @@ enum AIAgent {
         }
     }
 
-    /// Drive one streaming round with transient-error retry. Only retries while
-    /// no text has been emitted for this round (a mid-stream retry would double
-    /// the transcript). Returns the tool calls the round produced.
+    /// Consume one provider stream and return its tool calls. HTTP owns retries.
     private static func streamOneRound(
         messages: [AIMessage],
         provider: AIAgentProvider,
@@ -159,43 +155,27 @@ enum AIAgent {
         options: AICompletionOptions,
         continuation: AsyncThrowingStream<AIAgentEvent, Error>.Continuation
     ) async throws -> [AIToolCall] {
-        var attempt = 0
-        while true {
-            var collectedCalls: [AIToolCall] = []
-            var yieldedText = false
-            do {
-                for try await event in provider.streamWithTools(messages, tools: tools, options: options) {
-                    if Task.isCancelled { break }
-                    switch event {
-                    case .textDelta(let text):
-                        yieldedText = true
-                        continuation.yield(.textDelta(text))
-                    case .textReplace(let old, let new):
-                        yieldedText = true
-                        continuation.yield(.textReplace(old: old, new: new))
-                    case .usage(let reported):
-                        continuation.yield(.usage(reported))
-                    case .toolCalls(let calls):
-                        collectedCalls = calls
-                    case .done:
-                        break
-                    }
-                }
-                return collectedCalls
-            } catch {
-                attempt += 1
-                let canRetry = attempt < AIRetry.maxAttempts
-                    && !yieldedText
-                    && AIRetry.isTransient(error)
-                guard canRetry else { throw error }
-                // Surface the retry as a toolActivity so the bubble shows live
-                // progress instead of stalling on a failed attempt.
-                let label = "Retrying (attempt \(attempt + 1)/\(AIRetry.maxAttempts))..."
-                continuation.yield(.toolStarted(label))
-                try? await Task.sleep(for: .milliseconds(AIRetry.backoffMs(attempt)))
-                if Task.isCancelled { throw CancellationError() }
-                continuation.yield(.toolFinished(label))
+        var collectedCalls: [AIToolCall] = []
+        for try await event in provider.streamWithTools(messages, tools: tools, options: options) {
+            try Task.checkCancellation()
+            switch event {
+            case .textDelta(let text):
+                continuation.yield(.textDelta(text))
+            case .textReplace(let old, let new):
+                continuation.yield(.textReplace(old: old, new: new))
+            case .thinkingDelta:
+                continue
+            case .notice(let message):
+                continuation.yield(.notice(message))
+            case .usage(let reported):
+                continuation.yield(.usage(reported))
+            case .toolCalls(let calls):
+                collectedCalls = calls
+            case .done:
+                break
             }
         }
+        try Task.checkCancellation()
+        return collectedCalls
     }
 }

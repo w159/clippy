@@ -50,22 +50,10 @@ struct AIToolCall: Equatable, @unchecked Sendable {
     let toolName: String
     /// JSON-decoded argument dictionary.
     let arguments: [String: Any]
+    var replayBlocks: Data? = nil
 
     static func == (lhs: AIToolCall, rhs: AIToolCall) -> Bool {
         lhs.id == rhs.id && lhs.toolName == rhs.toolName
     }
 }
 
-// MARK: - Agent provider factory
-
-enum AIAgentProviderFactory {
-    static func make(kind: AIProviderKind, config: AIProviderConfig) -> AIAgentProvider {
-        switch kind {
-        case .appleIntelligence: return AppleIntelligenceProvider()
-        case .openai:       return OpenAIAgentProvider(config: config)
-        case .anthropic:    return AnthropicAgentProvider(config: config)
-        case .ollama:       return OllamaAgentProvider(config: config)
-        case .azureFoundry: return AzureFoundryAgentProvider(config: config)
-        }
-    }
-}

@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.2.0 - 2026-09-30 - AI providers rebuilt
+
+### Fixed
+
+AI provider diagnosis (`docs/ai/diagnosis.md`), 17 causes:
+
+1. Model and base URL were shared by all providers; each provider instance now has its own configuration.
+2. Ollama's default model (`llama3.1`) was not installed and nothing listed installed models; models are now discovered from the server.
+3. Thinking models returned empty output; reasoning is parsed, and hitting the token cap while thinking gives a clear error.
+4. OpenAI `max_tokens` and non-default `temperature` were rejected by newer models; `max_completion_tokens` and temperature rules now follow the model, with a self-correcting retry.
+5. `/v1` and other path segments were duplicated in base URLs; URLs are normalized per provider family.
+6. Azure had one hardcoded route; classic deployments and v1 routes are both supported (Entra sign-in is not; use an API key).
+7. Ollama Cloud, API keys and custom headers were unsupported; Ollama Cloud with a key works.
+8. The privacy gate trusted the provider kind; it now checks the resolved host.
+9. App Transport Security: plain-HTTP qualified hostnames (LAN IPs, `.local` names) were blocked in the packaged app. `scripts/make-app.sh` now sets `NSAllowsLocalNetworking` (narrow; internet hosts still need https; `NSAllowsArbitraryLoads` is not set). Checked: the built `Info.plist` contains the key. Not checked: a request to a non-loopback host from the built app.
+10. Timeouts killed slow local models; first-token, idle and overall timeouts are now separate and configurable.
+11. Errors were weak or misleading; failures are structured with remediation, and an interrupted reply is marked in the transcript.
+12. Headers and generation parameters could not be customized; they can now, per provider.
+13. Providers were a hardcoded five-case enum; they now come from a data-driven catalog.
+14. There was no model discovery or picker; there is now a model browser.
+15. The tool/agent path repeated the same problems; it now uses the same resolved provider and transport.
+16. A denied Keychain read looked like a missing key (ad-hoc signed builds); it now has its own state and message.
+17. Two divergent copies of the provider code; the legacy adapter and provider kind were removed.
+
+Also fixed: Settings Reset and Import left the provider list stale until restart; the store now reloads from preferences.
+
+- **Thinking models no longer return reasoning or empty titles.** Verified live on `glm-5.3-flash:cloud` through the local Ollama daemon: it ignores `think:false` and writes its reasoning into the reply, and with no `think` flag and a small budget it returns an empty reply. Quick Ollama actions now check the model's `/api/show` capabilities; thinking-capable models get `think:"low"` and a budget of at least 1024 tokens (retry ladder `low`, `false`, `true` with a larger budget, remembered per model). Only `message.content` is ever used as the answer. A title longer than 12 words or with several sentences is rejected and logged instead of saved, in both the single and bulk title paths. Live result after the fix: title "Pangram sentences about foxes and jugs", streamed reply "pong", connection test OK in about 1.3 s.
+- **Model latency column measures real streaming.** The latency probe uses the normal chat stream; quick Ollama replies are held back while a leaked reasoning reply may still be discarded.
+
+### Added
+
+- Data-driven provider catalog of 25 providers.
+- Multiple configured instances per provider.
+- Per-provider custom headers, extra body JSON, generation parameters and timeouts.
+- Model browser window with a sortable, filterable table and measured latency.
+- Connection test with remediation hints.
+
+### Verification
+
+Covered by unit tests, mock servers and the local Ollama daemon. Authenticated hosted providers (OpenAI, Anthropic, Azure, OpenRouter and
+the others) were NOT exercised with real credentials. Native Gemini supports text and streaming only (no tools). Bedrock and Vertex are deferred
+(`docs/ai/providers-local-complex.md`). GitHub Models is retired upstream and hidden.
+
 ## v2.1.0 - 2026-09-30 - Design pass from Mobbin references
 
 ### Changed

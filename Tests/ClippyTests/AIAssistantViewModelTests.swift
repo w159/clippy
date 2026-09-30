@@ -7,6 +7,7 @@ private final class ScriptedProvider: AIAgentProvider, @unchecked Sendable {
     var rounds: [[AIStreamEvent]]
     var seenMessages: [[AIMessage]] = []
     var hold = false
+    var failures: [AIError?] = []
     private var index = 0
     init(rounds: [[AIStreamEvent]]) { self.rounds = rounds }
 
@@ -17,6 +18,7 @@ private final class ScriptedProvider: AIAgentProvider, @unchecked Sendable {
                          options: AICompletionOptions) -> AsyncThrowingStream<AIStreamEvent, Error> {
         seenMessages.append(messages)
         let events = index < rounds.count ? rounds[index] : []
+        let failure = index < failures.count ? failures[index] : nil
         index += 1
         let hold = self.hold
         return AsyncThrowingStream { continuation in
@@ -25,8 +27,12 @@ private final class ScriptedProvider: AIAgentProvider, @unchecked Sendable {
                     continuation.yield(event)
                     if hold { try? await Task.sleep(for: .milliseconds(400)) }
                 }
-                continuation.yield(.done)
-                continuation.finish()
+                if let failure {
+                    continuation.finish(throwing: failure)
+                } else {
+                    continuation.yield(.done)
+                    continuation.finish()
+                }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -126,6 +132,68 @@ final class AIAssistantViewModelTests: XCTestCase {
         XCTAssertEqual(vm.messages.map(\.text), ["q", "recovered"])
         XCTAssertEqual(vm.transcript.entries, [.user("q"), .assistant("recovered")])
         XCTAssertFalse(provider.seenMessages.last!.contains { $0.content.contains("empty response") })
+    }
+
+    func testProviderFailureBeforeTextSurfacesWithoutAgentRetry() async {
+        let provider = ScriptedProvider(rounds: [[], [.textDelta("Must not silently recover")]])
+        provider.failures = [.http(503, "Unavailable"), nil]
+        let vm = AIAssistantViewModel(env: makeEnv(provider: provider))
+        vm.inputText = "question"
+        vm.send()
+        await vm.waitForTurn()
+
+        XCTAssertTrue(vm.messages[1].isError)
+        XCTAssertTrue(vm.messages[1].text.contains("503"))
+        XCTAssertFalse(vm.messages[1].text.contains("Must not silently recover"))
+        XCTAssertEqual(vm.transcript.entries, [])
+    }
+
+    func testInterruptedReplyPreservesPartialTextAndRetryDoesNotReplayIt() async {
+        let provider = ScriptedProvider(rounds: [[.textDelta("Partial answer")], [.textDelta("Recovered answer")]])
+        provider.failures = [.decoding("Connection lost"), nil]
+        let vm = AIAssistantViewModel(env: makeEnv(provider: provider))
+        vm.inputText = "question"
+        vm.send()
+        await vm.waitForTurn()
+
+        XCTAssertTrue(vm.messages[1].text.hasPrefix("Partial answer\n\n[Interrupted]"))
+        XCTAssertTrue(vm.messages[1].text.contains("Connection lost"))
+        XCTAssertTrue(vm.messages[1].isError)
+        XCTAssertEqual(vm.transcript.entries, [])
+
+        vm.retryTurn(forError: vm.messages[1].id)
+        await vm.waitForTurn()
+        XCTAssertEqual(vm.messages.map(\.text), ["question", "Recovered answer"])
+        XCTAssertEqual(vm.transcript.entries, [.user("question"), .assistant("Recovered answer")])
+        XCTAssertFalse(provider.seenMessages.last!.contains { $0.content.contains("Partial answer") })
+    }
+
+    func testInterruptedReplyKeepsCompletedToolResultButNotPartialFinalAnswer() async {
+        let provider = ScriptedProvider(rounds: [[.toolCalls([call()])], [.textDelta("Incomplete final answer")]])
+        provider.failures = [nil, .decoding("Connection lost")]
+        let vm = AIAssistantViewModel(env: makeEnv(provider: provider, tools: [EchoTool(name: "echo")]))
+        vm.inputText = "go"
+        vm.send()
+        await vm.waitForTurn()
+
+        XCTAssertTrue(vm.messages[1].isError)
+        XCTAssertTrue(vm.messages[1].text.hasPrefix("Incomplete final answer\n\n[Interrupted]"))
+        XCTAssertEqual(vm.transcript.entries.count, 3)
+        XCTAssertEqual(vm.transcript.entries.last, .toolResult(id: "c1", name: "echo", result: "echoed"))
+        XCTAssertFalse(vm.messages[1].toolSteps.contains(where: \.isRunning))
+    }
+
+    func testNoticeIsVisibleWithoutExposingReasoningOrEnteringTranscript() async {
+        let provider = ScriptedProvider(rounds: [[.thinkingDelta("Private reasoning"), .notice("Output limit reached"), .textDelta("Answer")]])
+        let vm = AIAssistantViewModel(env: makeEnv(provider: provider))
+        vm.inputText = "question"
+        vm.send()
+        await vm.waitForTurn()
+
+        XCTAssertEqual(vm.messages[1].text, "Answer")
+        XCTAssertEqual(vm.messages[1].toolSteps.first?.name, "Output limit reached")
+        XCTAssertEqual(vm.messages[1].toolSteps.first?.isRunning, false)
+        XCTAssertEqual(vm.transcript.entries, [.user("question"), .assistant("Answer")])
     }
 
     func testPendingConfirmationIsDeniedOnStop() async {

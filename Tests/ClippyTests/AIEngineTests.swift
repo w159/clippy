@@ -586,33 +586,6 @@ final class AIAgentLoopTests: XCTestCase {
     }
 }
 
-// MARK: - Endpoint configuration tests
-
-@MainActor
-final class AIProviderEndpointConfigTests: XCTestCase {
-
-    func testAzurePlaceholderEndpointIsRejected() {
-        let why = AIProviderKind.azureFoundry.endpointConfigError(
-            "https://YOUR-RESOURCE.services.ai.azure.com")
-        XCTAssertNotNil(why, "The unedited Azure placeholder host must be rejected.")
-        XCTAssertTrue(why?.contains("Azure endpoint not configured") ?? false,
-                      "Message must name the Azure endpoint precisely, not surface a DNS error.")
-    }
-
-    func testAzureRealEndpointIsAccepted() {
-        let why = AIProviderKind.azureFoundry.endpointConfigError(
-            "https://my-resource.services.ai.azure.com")
-        XCTAssertNil(why, "A filled-in Azure endpoint must pass validation.")
-    }
-
-    func testNonAzureProvidersIgnoreEndpointValidation() {
-        for kind in [AIProviderKind.openai, .anthropic, .ollama] {
-            XCTAssertNil(kind.endpointConfigError("https://YOUR-RESOURCE.example.com"),
-                         "Only Azure carries the placeholder check; \(kind) must not reject.")
-        }
-    }
-}
-
 // MARK: - AITool truncation tests
 
 @MainActor

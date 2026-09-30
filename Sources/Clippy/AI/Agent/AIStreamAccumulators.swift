@@ -99,6 +99,13 @@ struct OpenAIStreamAccumulator: SSEStreamParser {
         return nil
     }
 
+    func validateToolArguments() throws {
+        for fragment in toolFragments.values {
+            guard !fragment.name.isEmpty else { throw AIError.decoding("Tool call has no function name") }
+            _ = try AIResponseParser.arguments(fragment.args)
+        }
+    }
+
     func finishToolCalls() -> [AIToolCall] {
         guard sawToolCalls else { return [] }
         return toolFragments.sorted { $0.key < $1.key }.compactMap { _, frag in
@@ -119,7 +126,6 @@ struct OpenAIStreamAccumulator: SSEStreamParser {
 /// still sharing the SSE line-framing loop via SSEStreamParser.
 struct AnthropicStreamAccumulator: SSEStreamParser {
     private var blocks: [Int: (type: String, id: String, name: String, json: String)] = [:]
-    private var stopReason = ""
     private(set) var usage: AIUsage?
 
     // SSEStreamParser: Anthropic-specific event dispatch.
@@ -152,9 +158,6 @@ struct AnthropicStreamAccumulator: SSEStreamParser {
                 }
             }
         case "message_delta":
-            if let messageDelta = root["delta"] as? [String: Any], let reason = messageDelta["stop_reason"] as? String {
-                stopReason = reason
-            }
             if let usageObject = root["usage"] as? [String: Any], let out = usageObject["output_tokens"] as? Int {
                 var current = usage ?? AIUsage()
                 current.completionTokens = out
@@ -167,7 +170,6 @@ struct AnthropicStreamAccumulator: SSEStreamParser {
     }
 
     func finishToolCalls() -> [AIToolCall] {
-        guard stopReason == "tool_use" else { return [] }
         return blocks.sorted { $0.key < $1.key }.compactMap { _, block in
             guard block.type == "tool_use" else { return nil }
             let args = (block.json.data(using: .utf8)
@@ -190,15 +192,19 @@ struct OllamaStreamAccumulator: StreamParser {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty,
               let data = trimmed.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let message = root["message"] as? [String: Any] else { return nil }
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return decodePayload(root: root)
+    }
+
+    mutating func decodePayload(root: [String: Any]) -> String? {
         if root["done"] as? Bool == true {
             usage = AIUsage(promptTokens: root["prompt_eval_count"] as? Int ?? 0,
                             completionTokens: root["eval_count"] as? Int ?? 0)
         }
+        guard let message = root["message"] as? [String: Any] else { return nil }
         if let calls = message["tool_calls"] as? [[String: Any]], !calls.isEmpty {
-            var idx = 0
-            pendingToolCalls = calls.compactMap { toolCall in
+            var idx = pendingToolCalls.count
+            pendingToolCalls += calls.compactMap { toolCall in
                 guard let function = toolCall["function"] as? [String: Any],
                       let name = function["name"] as? String else { return nil }
                 let args: [String: Any]

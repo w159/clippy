@@ -174,6 +174,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             </array>
         </dict>
     </array>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- Lets AI providers on the local network (LM Studio, llama.cpp, Ollama on a LAN
+             IP or .local name) work over plain http. Narrow on purpose: internet hosts
+             still require https; NSAllowsArbitraryLoads is NOT set. -->
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>NSHumanReadableCopyright</key>
     <string>Local-only clipboard manager.</string>
 ${SPARKLE_KEYS}

@@ -37,7 +37,11 @@ enum AIToolCallsSentinel {
     static let prefix = "__tool_calls__:"
 
     static func encode(_ calls: [AIToolCall]) -> String {
-        let payload = calls.map { ["id": $0.id, "tool": $0.toolName, "args": $0.arguments] as [String: Any] }
+        let payload = calls.map { call -> [String: Any] in
+            var value: [String: Any] = ["id": call.id, "tool": call.toolName, "args": call.arguments]
+            if let blocks = call.replayBlocks { value["replayBlocks"] = blocks.base64EncodedString() }
+            return value
+        }
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
               let json = String(data: data, encoding: .utf8) else { return "[tool calls]" }
         return prefix + json
@@ -50,7 +54,8 @@ enum AIToolCallsSentinel {
         else { return nil }
         return array.compactMap { entry in
             guard let id = entry["id"] as? String, let tool = entry["tool"] as? String else { return nil }
-            return AIToolCall(id: id, toolName: tool, arguments: entry["args"] as? [String: Any] ?? [:])
+            return AIToolCall(id: id, toolName: tool, arguments: entry["args"] as? [String: Any] ?? [:],
+                              replayBlocks: (entry["replayBlocks"] as? String).flatMap { Data(base64Encoded: $0) })
         }
     }
 
@@ -115,6 +120,11 @@ enum AIMessageBuilder {
         for msg in messages where msg.role != .system {
             if let calls = AIToolCallsSentinel.decode(msg.content) {
                 flush()
+                if let data = calls.first?.replayBlocks,
+                   let blocks = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    result.append(["role": "assistant", "content": blocks])
+                    continue
+                }
                 let blocks = calls.map { call -> [String: Any] in
                     ["type": "tool_use", "id": call.id, "name": call.toolName, "input": call.arguments]
                 }

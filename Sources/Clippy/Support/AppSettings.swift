@@ -219,19 +219,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// Which backend to talk to. The API key (when needed) lives in the keychain,
-    /// never here.
-    @AppDefault(Keys.aiProvider, default: AIProviderKind.appleIntelligence)
-    private var managedAiProvider: AIProviderKind
-
-    var aiProvider: AIProviderKind {
-        get { managedAiProvider }
-        set {
-            guard !Self.isForced(Keys.aiProvider) else { return }
-            managedAiProvider = newValue
-        }
-    }
-
     /// Model id / Azure deployment name. Empty falls back to the provider default.
     @AppDefault(Keys.aiModel, default: "")
     var aiModel: String

@@ -60,17 +60,4 @@ final class AIMessageBuilderTests: XCTestCase {
         XCTAssertEqual(calls?.first?.arguments["query"] as? String, "x")
         XCTAssertNil(AIToolCallsSentinel.decode("plain"))
     }
-
-    func testOllamaOptionsCarryNumPredict() {
-        let options = OllamaOptions.payload(AICompletionOptions(temperature: 0.2, maxTokens: 77))
-        XCTAssertEqual(options["num_predict"] as? Int, 77)
-        XCTAssertEqual(options["temperature"] as? Double, 0.2)
-    }
-
-    func testOnlyAppleIntelligenceLacksTools() {
-        XCTAssertFalse(AIProviderKind.appleIntelligence.supportsTools)
-        for kind in AIProviderKind.allCases where kind != .appleIntelligence {
-            XCTAssertTrue(kind.supportsTools)
-        }
-    }
 }

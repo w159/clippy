@@ -81,7 +81,8 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
                     Keys.ignoredBundleIDs, Capture.captureOnLaunch, Capture.typeBlocklist, Capture.sensitiveAutoClearSeconds,
                     Capture.autoClearDeletesHistory, Capture.pasteProfiles]
         case .ai:
-            return [Keys.aiEnabled, Keys.aiProvider, Keys.aiModel, Keys.aiBaseURL, Keys.aiAzureAPIVersion,
+            return [Keys.aiEnabled, AIProviderStore.Keys.instances, AIProviderStore.Keys.activeID,
+                    Keys.aiProvider, Keys.aiModel, Keys.aiBaseURL, Keys.aiAzureAPIVersion,
                     Keys.aiAutoSuggestTitles, Keys.aiAgentAllowScripts, Keys.aiAgentAllowCodeExecution, Keys.aiAgentAllowWebSearch]
         case .intelligence:
             return [Keys.suggestionsEnabled, Keys.suggestionsLimit, Keys.suggestionsUseWindowText, Keys.suggestionsAutoOpen]
