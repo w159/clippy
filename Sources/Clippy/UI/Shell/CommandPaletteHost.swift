@@ -24,7 +24,8 @@ struct CommandPaletteHost: View {
 
     var body: some View {
         ZStack {
-            tokens.textPrimary.opacity(0.18)
+            // Elevation shadow color dims in both themes; textPrimary lightened dark panels.
+            tokens.metrics.elevation.color
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
                 .accessibilityHidden(true)

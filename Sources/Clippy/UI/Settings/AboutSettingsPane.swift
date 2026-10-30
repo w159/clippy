@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 // About pane: version/build, update check, links, licenses, content-free diagnostics.
@@ -25,8 +26,9 @@ struct AboutSettingsPane: View {
             Section("Clippy") {
                 LabeledContent("Version", value: Bundle.main.shortVersion)
                 LabeledContent("Build", value: Bundle.main.buildNumber)
-                if let item = Self.updateMenuItem {
-                    Button("Check for Updates\u{2026}") { NSApp.sendAction(item.action!, to: item.target, from: item) }
+                if let updater = Self.updater {
+                    Button("Check for Updates\u{2026}") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheckForUpdates)
                 } else {
                     SettingsNote("Updates are available in the packaged Clippy.app.")
                 }
@@ -55,10 +57,12 @@ struct AboutSettingsPane: View {
         .formStyle(.grouped)
     }
 
-    /// The app menu's Sparkle item, when the updater is wired.
-    private static var updateMenuItem: NSMenuItem? {
-        NSApp.mainMenu?.items.compactMap { $0.submenu?.items }.joined()
-            .first { $0.title.hasPrefix("Check for Updates") && $0.action != nil && $0.isEnabled }
+    /// The app's Sparkle updater, only in a packaged build (one with a feed URL).
+    /// The old lookup searched the main menu, but the update item lives in the
+    /// status-bar menu, so this button never appeared.
+    private static var updater: SPUUpdater? {
+        guard Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil else { return nil }
+        return (NSApp.delegate as? AppDelegate)?.updaterController.updater
     }
 }
 

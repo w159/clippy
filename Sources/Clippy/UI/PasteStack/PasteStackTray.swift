@@ -30,9 +30,9 @@ struct PasteStackTray: View {
         }
         .padding(tokens.metrics.space.three)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Paste stack, \(stack.count) items")
+        .accessibilityLabel("Paste stack, \(CopyFormat.counted(stack.count, "item"))")
         .confirmationDialog("Clear the paste stack?", isPresented: $confirmClear, titleVisibility: .visible) {
-            Button("Clear \(stack.count) items", role: .destructive) { stack.clear(); selection = nil }
+            Button("Clear \(CopyFormat.counted(stack.count, "Item"))", role: .destructive) { stack.clear(); selection = nil }
             Button("Cancel", role: .cancel) {}
         }
     }

@@ -41,7 +41,7 @@ extension ClipListView {
             return
         }
         guard case .success(let service) = AIService.fromSettings() else {
-            showStatusBanner("AI isn't configured. Open Settings to set it up.")
+            showStatusBanner("AI isn't set up yet.", actionTitle: "Open Settings", retry: onOpenSettings)
             return
         }
         guard let titleAction = AIActionStore.shared.actions.first(where: { $0.name == "Suggest Title" })
@@ -50,7 +50,7 @@ extension ClipListView {
             return
         }
         if retryTargets == nil { selectedClipIDs = [] }
-        showStatusBanner("Titling \(targets.count) clip\(targets.count == 1 ? "" : "s")...")
+        showStatusBanner("Generating titles for \(targets.count) clip\(targets.count == 1 ? "" : "s")\u{2026}")
         AIBatchTitleGuard.running = true
         Task { @MainActor in
             defer { AIBatchTitleGuard.running = false }
@@ -73,7 +73,7 @@ extension ClipListView {
                 }
             }
             if failed.isEmpty {
-                showStatusBanner("Titled \(done) of \(targets.count) clip\(targets.count == 1 ? "" : "s").", severity: .success)
+                showStatusBanner("Titled \(done) clip\(done == 1 ? "" : "s").", severity: .success)
             } else {
                 showStatusBanner(
                     "Titled \(done) of \(targets.count). \(failed.count) failed.",

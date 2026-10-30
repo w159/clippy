@@ -46,7 +46,7 @@ extension IntegrationsSettingsTab {
                 if let mcpTestResult { StatusOutcomeLabel(outcome: mcpTestResult, successColor: tokens.success) }
             }
         }
-        Section("Install for...") {
+        Section("Install for\u{2026}") {
             ForEach(McpClient.allCases) { client in installRow(client) }
             if let mcpInstallOutcome { StatusOutcomeLabel(outcome: mcpInstallOutcome, successColor: tokens.success) }
             if !settings.mcpEnabled { SettingsNote("Enable the MCP server above before installing.") }
@@ -136,8 +136,12 @@ extension IntegrationsSettingsTab {
     }
 
     func rotateToken() {
-        McpServerController.shared.rotateToken()
-        tokenNote = "Token rotated. The server is restarting and installed clients are being re-synced."
+        tokenNote = nil
+        McpServerController.shared.rotateToken { rotated in
+            tokenNote = rotated
+                ? "Token rotated. The server is restarting and installed clients are being re-synced."
+                : "Could not rotate the token. Check Keychain access."
+        }
     }
 
     func mcpTest() {

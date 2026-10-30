@@ -26,7 +26,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         window.isMovableByWindowBackground = true
         window.backgroundColor = .clear
         window.delegate = self
-        window.contentView = NSHostingView(rootView: OnboardingView(viewModel: model))
+        // The design system resolves the user's theme; without it the view fell back to the default seed palette.
+        window.contentView = NSHostingView(rootView: OnboardingView(viewModel: model).clippyDesignSystem())
         window.center()
         self.window = window
         viewModel = model

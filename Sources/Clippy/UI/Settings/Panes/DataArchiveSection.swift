@@ -35,7 +35,7 @@ struct DataArchiveSection: View {
             busy = false
             switch result {
             case .success(let done):
-                summary = "Exported \(done.clips) clips in \(done.categories) categories (\(done.mediaFiles) media files)."
+                summary = "Exported \(CopyFormat.counted(done.clips, "clip")) in \(CopyFormat.counted(done.categories, "category", plural: "categories")) (\(CopyFormat.counted(done.mediaFiles, "media file")))."
                 notice = .success(summary ?? "Exported.")
             case .failure: notice = .failure("Export failed.")
             }
@@ -55,7 +55,7 @@ struct DataArchiveSection: View {
             switch result {
             case .success(let done):
                 let skipped = done.skippedImages + done.skippedFiles
-                summary = "Imported \(done.clips) clips in \(done.categories) categories" + (skipped > 0 ? "; \(skipped) skipped." : ".")
+                summary = "Imported \(CopyFormat.counted(done.clips, "clip")) in \(CopyFormat.counted(done.categories, "category", plural: "categories"))" + (skipped > 0 ? "; \(skipped) skipped." : ".")
                 notice = .success(summary ?? "Imported.")
             case .failure(let error): notice = .failure("Import failed: \(error.localizedDescription)")
             }

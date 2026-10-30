@@ -59,6 +59,7 @@ struct DataSmartCollectionsSection: View {
 /// Create/edit sheet for one smart collection.
 struct SmartCollectionEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.clippyTokens) private var tokens
     let collection: SmartCollection?
     let onSaved: () -> Void
     @State private var draft = SmartCollectionDraft()
@@ -86,7 +87,7 @@ struct SmartCollectionEditorSheet: View {
                     Text("Not sensitive").tag(Bool?.some(false))
                 }
             }
-            if let errorText { Text(errorText).font(.caption).foregroundStyle(.red) }
+            if let errorText { Text(errorText).font(.caption).foregroundStyle(tokens.danger) }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)

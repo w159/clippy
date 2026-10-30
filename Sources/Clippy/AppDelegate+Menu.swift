@@ -16,7 +16,7 @@ extension AppDelegate {
         // App submenu (macOS requires the first item to be the app menu).
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
@@ -177,7 +177,7 @@ extension AppDelegate: NSMenuDelegate {
             let empty = NSMenuItem(title: "No scripts yet", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
-            let manage = NSMenuItem(title: "Manage in Settings...", action: #selector(openSettings), keyEquivalent: "")
+            let manage = NSMenuItem(title: "Manage in Settings\u{2026}", action: #selector(openSettings), keyEquivalent: "")
             manage.target = self
             menu.addItem(manage)
             return

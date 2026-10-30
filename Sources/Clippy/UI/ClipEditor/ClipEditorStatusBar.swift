@@ -24,7 +24,7 @@ struct EditorStatusBarView: View {
         .background(tokens.surfaceInset)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status")
-        .accessibilityValue("\(showsCaret ? snapshot.spokenLabel + ", " : "")\(wordCount) words, \(languageName)")
+        .accessibilityValue("\(showsCaret ? snapshot.spokenLabel + ", " : "")\(CopyFormat.counted(wordCount, "word")), \(languageName)")
     }
 
     private func row(showsSource: Bool, showsEncoding: Bool) -> some View {

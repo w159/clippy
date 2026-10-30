@@ -218,6 +218,7 @@ struct ClipRowView: View {
             .menuStyle(.button).buttonStyle(.borderless).menuIndicator(.hidden)
             .foregroundStyle(tokens.textSecondary)
             .help("More actions")
+            .accessibilityLabel("More Actions")
             rowButton("trash", "Delete", actions.delete, destructive: true)
         }
     }
@@ -229,5 +230,6 @@ struct ClipRowView: View {
         .buttonStyle(.borderless)
         .foregroundStyle(destructive ? tokens.danger : tokens.textSecondary)
         .help(help)
+        .accessibilityLabel(help)
     }
 }

@@ -49,7 +49,7 @@ struct OnePasswordStatePanel: View {
             .tint(tokens.accent)
             .disabled(signingIn)
         case .loading:
-            ProgressView("Reading vault...").controlSize(.small)
+            ProgressView("Reading vault\u{2026}").controlSize(.small)
         }
     }
 
@@ -78,8 +78,8 @@ struct OnePasswordStatePanel: View {
         switch state {
         case .notInstalled: return "Check again"
         case .empty: return "Refresh"
-        case .error: return "Retry"
-        default: return "Retry"
+        case .error: return "Try Again"
+        default: return "Try Again"
         }
     }
 

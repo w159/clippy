@@ -51,7 +51,7 @@ struct AssistantToolStepView: View {
                 Text(AssistantPresentation.stepTitle(step))
                     .font(.callout.weight(.medium))
                     .foregroundStyle(tokens.textPrimary)
-                Text("Processing...")
+                Text("Processing\u{2026}")
                     .font(.caption)
                     .foregroundStyle(tokens.accentText)
             } else {

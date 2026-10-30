@@ -51,7 +51,7 @@ struct ClipPreviewView: View {
                 .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if dropped > 0 {
-                Text("\u{2026} \(dropped) more lines").font(.caption).foregroundStyle(tokens.textSecondary)
+                Text("\u{2026} \(dropped) more \(dropped == 1 ? "line" : "lines")").font(.caption).foregroundStyle(tokens.textSecondary)
             }
         }
     }

@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased - UI and UX overhaul (branch `claude/ui-ux-overhaul`)
+
+Not yet built or run on a Mac: every change below was checked by reading the code and by a tree-sitter syntax parse only. `swift build`, `swift test` and the visual result are unverified.
+
+### Design system
+
+- One corner-radius system: `ClippyRadius` roles `panel` 16, `card` 12, `control` 8, `inset` 6 (`UI/DesignSystem/ClippyTokens.swift`). The panel glass was drawn at 24 and clipped at 12; both now use `panel`. No `cornerRadius:` literal is left outside the design gallery.
+- Motion goes through `ClippyMotion` tokens and respects Reduce Motion in the search bar, settings rows, sidebar split, panes and reorder.
+- Hard-coded `Color.orange`, `.red` and `Color.accentColor` replaced with semantic tokens (warning, danger, accent) in the search notice, category editor, audit log, smart collection editor and Scripts list.
+- Onboarding and the paste-stack HUD now get the design-system environment, so they follow the user's theme instead of the default palette.
+- The command palette scrim uses the elevation shadow color, so it dims in dark themes instead of lightening them. The collapsed category rail uses the same panel transparency as the expanded sidebar.
+- New `CopyFormat.counted` helper; counts read "1 clip" and "2 clips" across Scripts, snippets, paste stack, OCR, preview, retention, archive import and export, and the audit log.
+
+### Behavior
+
+- Deleting a clip that fits the undo buffer happens at once with an Undo toast (Cmd+Z); only clips too large to keep for Undo still ask first, and the alert says why.
+- The palette's Delete command acts on the whole multi-selection, as Cmd+Delete does, and is titled "Delete N Clips".
+- Saving an assistant reply, a translation or a new 1Password secret reports failure instead of claiming success. 1Password create failures show a banner with Try Again.
+- Settings: Rotate token in Security now goes through the MCP server controller, so the server restarts and installed clients get the new token (it used to change only the Keychain value). Both rotate buttons report the real outcome.
+- Settings: About's Check for Updates button calls the Sparkle updater directly; the old main-menu lookup never found the item, so the button never appeared.
+- Settings: deleting a backup asks first.
+- Paste warnings about Accessibility access carry an "Open Privacy Settings" button; "AI isn't set up yet" carries "Open Settings", and the AI submenu offers the same instead of a dead-end text row. "Generate Titles" is hidden while AI is off.
+- A search or history error with an empty list shows one error state, not a banner and an error state for the same error.
+
+### Copy and accessibility
+
+- Batch bar: "Paste in Order", "Paste as One", "Generate Titles", "Delete"; the multi-select context menu uses the same words.
+- Editor conflict actions name their outcome: "Use Stored" / "Keep Mine" (was "Reload", which silently discarded edits).
+- Script Run confirmations are no longer styled as destructive.
+- Title Case for buttons, menus and palette commands; "Try Again" everywhere instead of a mix with "Retry"; real ellipsis characters instead of three dots.
+- Row hover buttons, row and card overflow menus, and Scripts icon buttons have accessibility labels. The category section "+" button has a 20 pt hit target, and category counts keep their contrast-adjusted color.
+- README shortcut table and requirements corrected (macOS 26, Swift 6.2; Cmd+2...9 select categories).
+
 ## v2.2.0 - 2026-09-30 - AI providers rebuilt
 
 ### Fixed

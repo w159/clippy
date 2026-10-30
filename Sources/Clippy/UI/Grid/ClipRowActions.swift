@@ -30,12 +30,12 @@ struct ClipAccessibilityModifier: ViewModifier {
             .accessibilityHint("Activate to paste. Use actions for more.")
             .accessibilityActions {
                 Button("Paste", action: actions.paste)
-                Button("Paste as plain text", action: actions.pastePlain)
+                Button("Paste as Plain Text", action: actions.pastePlain)
                 Button(model.isPinned ? "Unpin" : "Pin", action: actions.togglePin)
                 Button("Rename", action: actions.beginRename)
                 if let edit = actions.edit { Button("Edit", action: edit) }
-                if let extract = actions.extractText { Button("Extract text", action: extract) }
-                if let similar = actions.findSimilar { Button("Find similar", action: similar) }
+                if let extract = actions.extractText { Button("Extract Text", action: extract) }
+                if let similar = actions.findSimilar { Button("Find Similar", action: similar) }
                 Button("Delete", action: actions.delete)
             }
     }

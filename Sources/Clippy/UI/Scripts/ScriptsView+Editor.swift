@@ -114,7 +114,7 @@ extension ScriptsView {
             Menu {
                 Button("Duplicate") { duplicateCurrent() }.disabled(isDraft)
                 Button("Open in \(ScriptExternalEditor.shared.editorName)") { openExternally() }
-                Button("Export...") { exportScripts() }
+                Button("Export\u{2026}") { exportScripts() }
                 Divider()
                 Button("Delete", role: .destructive) { activeDialog = .delete }
             } label: { Image(systemName: "ellipsis.circle") }
@@ -184,7 +184,7 @@ extension ScriptsView {
                 } else {
                     Label("Could not save script", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(tokens.danger)
-                    Button("Retry") { save() }.controlSize(.small)
+                    Button("Try Again") { save() }.controlSize(.small)
                 }
             }
             .font(.caption)

@@ -33,16 +33,29 @@ extension ClipListView {
         )
     }
 
-    /// Persistent banners for search and observation failures, each with Retry.
+    /// Persistent banners for search and observation failures, each with Try Again.
+    /// Hidden when the clip list is empty: `emptyState` then shows the same error
+    /// as a full ErrorState, and showing both stacked the message twice.
     @ViewBuilder
     var errorBanners: some View {
-        if let message = store.searchError {
-            ClippyBanner(message, severity: .danger, actionTitle: "Retry", action: { store.retrySearch() })
-                .padding(.horizontal, 12).padding(.vertical, 4)
+        if !(visibleClips.isEmpty && showsClipList) {
+            if let message = store.searchError {
+                ClippyBanner(message, severity: .danger, actionTitle: "Try Again", action: { store.retrySearch() })
+                    .padding(.horizontal, designTokens.metrics.space.three).padding(.vertical, designTokens.metrics.space.one)
+            }
+            if let message = store.observationError {
+                ClippyBanner(message, severity: .danger, actionTitle: "Try Again", action: { store.retryObservation() })
+                    .padding(.horizontal, designTokens.metrics.space.three).padding(.vertical, designTokens.metrics.space.one)
+            }
         }
-        if let message = store.observationError {
-            ClippyBanner(message, severity: .danger, actionTitle: "Retry", action: { store.retryObservation() })
-                .padding(.horizontal, 12).padding(.vertical, 4)
+    }
+
+    /// True when the main pane is the clip grid or list (so `emptyState` can appear),
+    /// not one of the panes that route to their own view in `paneContent`.
+    var showsClipList: Bool {
+        switch selection {
+        case .scripts, .onePassword, .assistant, .aiActions, .suggestions, .snippets, .pasteStack: return false
+        default: return true
         }
     }
 
@@ -93,7 +106,10 @@ extension ClipListView {
             paste: { if let clip { onPaste(clip, settings.pastePlainTextByDefault) } },
             pastePlain: { if let clip { onPaste(clip, true) } },
             togglePin: { if let clip { store.togglePin(clip) } },
-            deleteSelection: { if let clip { requestDelete(clip) } },
+            // Matches Cmd+Delete: a multi-selection deletes every selected clip, not just the anchor.
+            deleteSelection: {
+                if selectedClipIDs.count >= 2 { requestBatchDelete() } else if let clip { requestDelete(clip) }
+            },
             findSimilar: { if let clip { store.findSimilar(to: clip); selection = .suggestions } },
             openSettings: onOpenSettings,
             toggleSidebar: { NotificationCenter.default.post(name: .clippyToggleSidebar, object: nil) },
@@ -104,7 +120,8 @@ extension ClipListView {
             clearSearch: { store.query = "" },
             extractText: { if let clip { runOCR(on: clip) } },
             newCategory: { categoryCreationClip = clip },
-            featureCommands: featurePaletteCommands
+            featureCommands: featurePaletteCommands,
+            selectionCount: max(selectedClipIDs.count, 1)
         )
     }
 }

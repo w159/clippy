@@ -20,7 +20,7 @@ extension ClipListView {
                 systemImage: "magnifyingglass",
                 title: "No clips match",
                 message: "Remove a filter chip, check spelling, or search a shorter phrase.",
-                actionTitle: "Clear search"
+                actionTitle: "Clear Search"
             ) { store.query = "" }
         } else {
             switch selection {
@@ -56,7 +56,9 @@ extension ClipListView {
                         help: "Join the selected clips and paste them as a single clip") {
                 onPasteMany(actionableClips, true, settings.pastePlainTextByDefault)
             }
-            batchButton("Generate Titles", "sparkles", help: "Name each selected clip with AI") { runBatchAITitles() }
+            if settings.aiEnabled {
+                batchButton("Generate Titles", "sparkles", help: "Name each selected clip with AI") { runBatchAITitles() }
+            }
             Divider().frame(height: 14)
             batchButton("Delete", "trash", help: "Delete the selected clips", role: .destructive) { requestBatchDelete() }
             Spacer()

@@ -98,8 +98,10 @@ struct EditorCompareSheet: View {
             Divider()
             HStack {
                 Spacer()
-                Button("Reload", action: onReload)
-                Button("Keep mine", action: onKeepMine)
+                Button("Use Stored Version", action: onReload)
+                    .help("Discard your edits and load the stored text")
+                Button("Keep My Version", action: onKeepMine)
+                    .help("Keep your edits; Save overwrites the stored text")
                 Button("Close", role: .cancel, action: onClose)
                     .keyboardShortcut(.cancelAction)
             }

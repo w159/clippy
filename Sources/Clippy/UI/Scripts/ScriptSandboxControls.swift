@@ -37,7 +37,7 @@ struct ScriptSandboxControls: View {
                     .foregroundStyle(availability.isAvailable ? tokens.textSecondary : tokens.warning)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("Checking sandbox...").font(.caption).foregroundStyle(tokens.textSecondary)
+                Text("Checking sandbox\u{2026}").font(.caption).foregroundStyle(tokens.textSecondary)
             }
         }
         .task {

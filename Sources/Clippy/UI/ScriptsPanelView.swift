@@ -123,7 +123,7 @@ struct ScriptsPanelView: View {
             .accessibilityLabel("Badge legend")
             .popover(isPresented: $showLegend, arrowEdge: .bottom) { ScriptBadgeLegendView() }
             Spacer()
-            Button("Manage...") { onOpenSettings() }
+            Button("Manage\u{2026}") { onOpenSettings() }
                 .controlSize(.small)
                 .buttonStyle(.borderless)
                 .foregroundStyle(tokens.textSecondary)
@@ -213,7 +213,7 @@ private struct ScriptRowView: View {
             isPresented: $pendingRun,
             titleVisibility: .visible
         ) {
-            Button("Run", role: .destructive) { performRun() }
+            Button("Run") { performRun() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(script.confirmBeforeRun

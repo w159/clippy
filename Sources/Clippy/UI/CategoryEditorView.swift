@@ -15,6 +15,7 @@ struct CategoryEditorView: View {
     let onSave: (_ name: String, _ colorHex: String, _ iconKind: CategoryIconKind, _ iconValue: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.clippyTokens) private var designTokens
     @State private var name: String
     @State private var colorHex: String
     @State private var iconKind: CategoryIconKind
@@ -65,7 +66,7 @@ struct CategoryEditorView: View {
             if let message = duplicateNameMessage {
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(designTokens.danger)
                     .accessibilityLabel("Warning: \(message)")
             }
 
@@ -93,7 +94,7 @@ struct CategoryEditorView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(category == nil ? "Create" : "Save") {
                     onSave(
                         name.trimmingCharacters(in: .whitespaces),

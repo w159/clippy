@@ -19,7 +19,7 @@ struct OnePasswordItemDetailPanel: View {
             if loading {
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Loading fields...").font(.caption).foregroundStyle(tokens.textSecondary)
+                    Text("Loading fields\u{2026}").font(.caption).foregroundStyle(tokens.textSecondary)
                 }
                 .padding(.horizontal, 8)
             } else if let error {
@@ -30,7 +30,7 @@ struct OnePasswordItemDetailPanel: View {
                         .symbolEffect(.bounce, value: reduceMotion ? "" : error)
                     Text(error).font(.caption).foregroundStyle(tokens.textSecondary)
                     if let onRetry {
-                        Button("Retry", action: onRetry).controlSize(.small)
+                        Button("Try Again", action: onRetry).controlSize(.small)
                     }
                 }
                 .padding(.horizontal, 8)

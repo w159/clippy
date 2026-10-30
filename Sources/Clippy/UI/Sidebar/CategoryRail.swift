@@ -33,7 +33,8 @@ struct CategoryRail: View {
         .padding(.horizontal, 4)
         .padding(.bottom, 6)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(tokens.surfaceSidebar)
+        // Same transparency as the expanded pane, so collapsing the sidebar doesn't change it.
+        .background(tokens.surfaceSidebar.opacity(settings.panelOpacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Categories")
     }
