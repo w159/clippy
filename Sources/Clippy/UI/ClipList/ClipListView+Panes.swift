@@ -22,7 +22,7 @@ extension ClipListView {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Background behind the scrolling cards; tracks the transparency slider.
             .background(tokens.scrollBackground.opacity(settings.panelOpacity))
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: selection)
+            .animation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false), value: selection)
             .clipped()
 
             PanelStatusOverlay(item: statusItem, action: statusRetry, dismiss: { dismissStatus() })

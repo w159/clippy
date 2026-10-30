@@ -42,38 +42,48 @@ extension ClipListView {
     // MARK: - Batch action bar
 
     /// Shown above the footer when 2+ clips are selected. Operates on
-    /// `actionableClips` so it tracks the live multi-selection.
+    /// `actionableClips` so it tracks the live multi-selection. Labels are
+    /// spelled out in Title Case (no "Seq." abbreviations); Delete sits last,
+    /// after a divider, and reads in the danger color.
     var batchActionBar: some View {
-        HStack(spacing: 10) {
-            batchButton("Paste Seq.", "list.number") {
+        let space = designTokens.metrics.space
+        return HStack(spacing: space.three) {
+            batchButton("Paste in Order", "list.number",
+                        help: "Paste the selected clips one after another") {
                 onPasteMany(actionableClips, false, settings.pastePlainTextByDefault)
             }
-            batchButton("Paste Joined", "rectangle.compress.vertical") {
+            batchButton("Paste as One", "rectangle.compress.vertical",
+                        help: "Join the selected clips and paste them as a single clip") {
                 onPasteMany(actionableClips, true, settings.pastePlainTextByDefault)
             }
-            batchButton("Delete", "trash") { requestBatchDelete() }
-            batchButton("AI Titles", "sparkles") { runBatchAITitles() }
+            batchButton("Generate Titles", "sparkles", help: "Name each selected clip with AI") { runBatchAITitles() }
+            Divider().frame(height: 14)
+            batchButton("Delete", "trash", help: "Delete the selected clips", role: .destructive) { requestBatchDelete() }
             Spacer()
         }
-        .padding(.horizontal, 12).padding(.vertical, 6)
+        .padding(.horizontal, space.three).padding(.vertical, space.two)
         .background(tokens.footerBar.opacity(settings.panelOpacity))
     }
 
-    func batchButton(_ label: String, _ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    func batchButton(_ label: String, _ symbol: String, help: String, role: ButtonRole? = nil,
+                     action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) {
             Label(label, systemImage: symbol).font(PanelTypography.metadata(settings))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.borderless)
+        .foregroundStyle(role == .destructive ? designTokens.danger : designTokens.textPrimary)
+        .help(help)
     }
 
     var footer: some View {
-        HStack(spacing: 14) {
+        let space = designTokens.metrics.space
+        return HStack(spacing: space.three) {
             if selectedClipIDs.count >= 2 {
                 Text("\(selectedClipIDs.count) selected")
                     .font(PanelTypography.micro(settings))
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(tokens.accent.opacity(0.18), in: Capsule())
-                    .foregroundStyle(tokens.accent)
+                    .padding(.horizontal, space.two).padding(.vertical, 2)
+                    .background(designTokens.selection, in: Capsule())
+                    .foregroundStyle(designTokens.accentText)
             }
             ForEach(PanelDisclosure.footerHints(selectedCount: selectedClipIDs.count, hasClips: !visibleClips.isEmpty,
                                                 plainByDefault: settings.pastePlainTextByDefault,
@@ -82,25 +92,19 @@ extension ClipListView {
             }
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, space.three)
+        .padding(.vertical, space.two)
         .background(tokens.footerBar.opacity(settings.panelOpacity))
     }
 
+    /// One footer hint: a key cap (shared `KeyCap` component, so the footer and
+    /// the command palette draw keys the same way) and its action in secondary text.
     func keyHint(_ key: String, _ action: String) -> some View {
-        HStack(spacing: 5) {
-            Text(key)
-                // Use an explicit system font so key glyphs always render at the
-                // correct weight, regardless of any custom font family chosen in
-                // user appearance settings.
-                .font(.system(size: 11, weight: .semibold, design: .default))
-                .foregroundStyle(tokens.textPrimary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(tokens.textPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+        HStack(spacing: designTokens.metrics.space.one) {
+            KeyCap(key)
             Text(action)
                 .font(PanelTypography.metadata(settings))
-                .foregroundStyle(tokens.textPrimary.opacity(0.75))
+                .foregroundStyle(designTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(key), \(action)")

@@ -5,10 +5,17 @@ import AppKit
 // send-keystrokes requests that drive the alert bindings in `body`.
 
 extension ClipListView {
-    /// Stages a clip for deletion behind the confirmation alert. All delete
-    /// entry points call this instead of store.delete directly.
+    /// Single entry point for every single-clip delete path. A clip that can be
+    /// snapshotted for Cmd+Z is deleted at once with an Undo toast (asking first
+    /// and then offering Undo is two gates for one action); a clip too large to
+    /// snapshot cannot come back, so it still goes through the confirmation alert.
     func requestDelete(_ clip: Clip) {
-        clipPendingDeletion = clip
+        if let snapshot = ClipUndoBuffer.snapshot(of: clip, categoryIDs: store.categoryIDs(for: clip),
+                                                  media: store.database.media) {
+            deleteWithUndo([clip], snapshots: [snapshot])
+        } else {
+            clipPendingDeletion = clip
+        }
     }
 
     // MARK: - Batch actions

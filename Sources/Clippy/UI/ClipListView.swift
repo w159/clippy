@@ -9,6 +9,9 @@ struct ClipListView: View {
     @ObservedObject var store: ClipStore
     @ObservedObject var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    /// Contrast-checked semantic tokens (text roles, status colors, metrics).
+    /// `tokens` below is the legacy palette the panel chrome was built on.
+    @Environment(\.clippyTokens) var designTokens
 
     let onPaste: (Clip, Bool) -> Void
     let onPasteMany: ([Clip], Bool, Bool) -> Void
@@ -179,9 +182,9 @@ struct ClipListView: View {
             footer
         }
         .background(ThemedPanelBackground(tokens: tokens, opacity: settings.panelOpacity))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
         .tint(tokens.accent)
@@ -268,7 +271,8 @@ struct ClipListView: View {
         )) {
             instructionSheet
         }
-        // Single confirmation gate for every delete path. The button is marked
+        // Confirmation for a delete that cannot be undone (the clip's media is
+        // too large to keep for Cmd+Z; see `requestDelete`). The button is marked
         // destructive so it reads red and is not the default action.
         .alert(
             "Delete this clip?",
@@ -281,7 +285,7 @@ struct ClipListView: View {
             Button("Delete", role: .destructive) { deleteWithUndo([clip]) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("This permanently removes the clip from your history.")
+            Text("This clip is too large to keep for Undo, so deleting it cannot be undone.")
         }
         // Batch delete confirmation. Mirrors the single-clip gate above so the
         // multi-selection delete path is just as non-destructive.
@@ -296,7 +300,7 @@ struct ClipListView: View {
             Button("Delete", role: .destructive) { performBatchDelete(clips) }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("This permanently removes the selected clips from your history.")
+            Text("You can undo this in the panel with \u{2318}Z, unless a clip is too large to keep for Undo.")
         }
         // Confirmation gate for large keystroke actions so an accidental click
         // does not type thousands of characters into the active app.
