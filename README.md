@@ -7,7 +7,7 @@
   <p>Every clip you copy, searchable in a keystroke. Pins, categories, AI actions, scripts, and 1Password access, all in a panel that pops up right where you are typing. Your data never leaves your Mac.</p>
 
   <p>
-    <img src="https://img.shields.io/badge/macOS-14%2B-0ea5e9?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 14+">
+    <img src="https://img.shields.io/badge/macOS-26%2B-0ea5e9?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 26+">
     <img src="https://img.shields.io/badge/Price-Free-22c55e?style=for-the-badge" alt="Free">
     <img src="https://img.shields.io/badge/Privacy-Local%20only-a855f7?style=for-the-badge" alt="Local only">
     <img src="https://img.shields.io/badge/Updates-Auto-15803d?style=for-the-badge" alt="Auto update">
@@ -69,21 +69,28 @@ Clippy is local-first. Your clipboard data lives in a single database file on yo
 3. **Grant Accessibility access** when prompted (System Settings > Privacy & Security > Accessibility). This lets Clippy read where your cursor is and paste for you. It is required for the panel to appear at your caret and paste in place.
 4. **Press Cmd+Shift+V** in any app to open the panel. Start typing to search, press Return to paste.
 
-Requires macOS 14 (Sonoma) or newer.
+Requires macOS 26 (Tahoe) or newer.
 
 ## Keyboard shortcuts
 
 | Action | Shortcut |
 | --- | --- |
 | Open the panel | Cmd+Shift+V |
+| Command palette (every action) | Cmd+K |
 | Switch to History | Cmd+1 |
-| Switch to Pinned | Cmd+2 |
+| Switch to the Nth category in the sidebar | Cmd+2 to Cmd+9 |
 | Paste the selected clip | Return |
-| Paste in the alternate mode | Shift+Return |
+| Paste in the alternate mode (plain or formatted) | Shift+Return |
+| Quick paste the Nth visible clip | Cmd+Option+1 to Cmd+Option+9 |
+| Extend the selection | Shift+Arrow keys |
+| Select all clips | Cmd+A |
+| Copy without pasting | Cmd+C |
+| Preview the selected clip (Quick Look) | Space (with the list focused) |
 | Edit the selected clip | Cmd+E |
 | Pin the selected clip | Cmd+P |
 | Delete the selected clip | Cmd+Delete |
-| Close the panel | Esc |
+| Undo the last delete | Cmd+Z |
+| Clear the selection, then the search, then close | Esc |
 
 ## Settings at a glance
 
@@ -112,7 +119,7 @@ The original stack rationale lives in [`docs/clipboard-manager-stack-decision.md
 <details>
 <summary><strong>Build and run from source</strong></summary>
 
-Requires macOS 14+ and Swift 6 (Xcode 16+ or current Command Line Tools).
+Requires macOS 26+ and Swift 6.2 (Xcode 26 or current Command Line Tools).
 
 Build the app bundle and open it:
 

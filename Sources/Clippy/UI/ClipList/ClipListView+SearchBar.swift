@@ -18,9 +18,9 @@ extension ClipListView {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.12), value: showsFilterRow)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsFilterRow)
+        .padding(.horizontal, designTokens.metrics.space.three)
+        .padding(.vertical, designTokens.metrics.space.two)
         .background(tokens.headerBar.opacity(settings.panelOpacity))
         .onAppear { focusTarget = .search }
         // PNL-04: an already-visible panel focuses the field instead of rebuilding.
@@ -77,7 +77,7 @@ extension ClipListView {
     var searchNotice: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: BannerSeverity.warning.symbol)
-                .foregroundStyle(Color.orange)
+                .foregroundStyle(designTokens.warning)
                 .accessibilityHidden(true)
             Text(searchWarnings.joined(separator: ". "))
                 .font(.caption)

@@ -67,13 +67,14 @@ struct SettingsStatusLine: View {
 private struct SettingsRowAnchor: ViewModifier {
     @Environment(\.settingsFlashRow) private var flashRow
     @Environment(\.clippyTokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let id: String
 
     func body(content: Content) -> some View {
         content
             .id(id)
             .listRowBackground(flashRow == id ? tokens.selection : nil)
-            .animation(.easeInOut(duration: 0.25), value: flashRow)
+            .animation(ClippyMotion.animation(.standard, reduce: reduceMotion), value: flashRow)
     }
 }
 

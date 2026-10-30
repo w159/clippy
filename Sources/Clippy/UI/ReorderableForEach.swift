@@ -156,7 +156,7 @@ struct ReorderDropDestinationModifier<ID: LosslessStringConvertible & Equatable>
                         .fill(Color.accentColor)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: draggingOver)
+                        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: draggingOver)
                 }
             }
             .dropDestination(for: String.self) { items, _ in
@@ -166,7 +166,7 @@ struct ReorderDropDestinationModifier<ID: LosslessStringConvertible & Equatable>
                       let draggedID = ID(raw),
                       draggedID != id
                 else { return false }
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false)) {
                     onMove(draggedID, id)
                 }
                 return true
@@ -220,7 +220,7 @@ struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Eq
                         .fill(Color.accentColor)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isTargeted)
+                        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: isTargeted)
                 }
             }
             .dropDestination(for: String.self) { items, _ in
@@ -229,7 +229,7 @@ struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Eq
                       let raw = parseReorderToken(token, expectedKind: kind),
                       let draggedID = ID(raw)
                 else { return false }
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false)) {
                     onMove(draggedID)
                 }
                 return true

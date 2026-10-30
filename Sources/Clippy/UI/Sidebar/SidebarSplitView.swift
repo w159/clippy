@@ -45,7 +45,7 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
                 }
                 content.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: isRail)
+            .animation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false), value: isRail)
         }
         .onReceive(NotificationCenter.default.publisher(for: .clippyToggleSidebar)) { _ in
             preferences.toggleCollapsed()

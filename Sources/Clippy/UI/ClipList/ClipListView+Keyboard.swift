@@ -212,10 +212,11 @@ extension ClipListView {
         }
     }
 
-    /// Deletes `clips` after snapshotting them for Cmd+Z.
-    func deleteWithUndo(_ clips: [Clip]) {
+    /// Deletes `clips` after snapshotting them for Cmd+Z. Callers that already
+    /// took the snapshots pass them in so the media is not read twice.
+    func deleteWithUndo(_ clips: [Clip], snapshots prepared: [DeletedClipSnapshot]? = nil) {
         let media = store.database.media
-        let snapshots = clips.compactMap { clip in
+        let snapshots = prepared ?? clips.compactMap { clip in
             ClipUndoBuffer.snapshot(of: clip, categoryIDs: store.categoryIDs(for: clip), media: media)
         }
         ClipUndoBuffer.shared.record(snapshots)
@@ -267,7 +268,9 @@ extension ClipListView {
     func keyboardDecorations(index: Int) -> some View {
         ZStack(alignment: .topTrailing) {
             if selectedClipIDs.count >= 2, index == selectedIndex {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                // Match the cell's own shape: cards use the card radius, rows the control radius.
+                RoundedRectangle(cornerRadius: GridPreferences.shared.density == .cards ? ClippyRadius.card : ClippyRadius.control,
+                                 style: .continuous)
                     .strokeBorder(tokens.accent, lineWidth: 2)
             }
             if quickPasteBadgesVisible, index < 9 {
