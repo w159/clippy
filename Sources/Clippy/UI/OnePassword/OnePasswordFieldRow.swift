@@ -277,6 +277,7 @@ private struct OTPCodeDisplay: View {
                 .font(.system(.body, design: .monospaced).weight(.semibold))
                 .foregroundStyle(designTokens.textPrimary)
                 .accessibilityLabel("One-time code")
+                .accessibilityValue(code.map(String.init).joined(separator: " "))
             TOTPCountdownRing(date: date)
         }
     }

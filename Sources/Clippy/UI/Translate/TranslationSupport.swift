@@ -41,7 +41,8 @@ enum TranslationSupport {
 /// Destination for a finished translation.
 protocol TranslateActionSink {
     func copy(_ text: String)
-    func saveAsNewClip(_ text: String)
+    /// Returns false when the clip could not be saved.
+    func saveAsNewClip(_ text: String) -> Bool
     func replaceClip(_ clipID: Int64, with text: String)
 }
 

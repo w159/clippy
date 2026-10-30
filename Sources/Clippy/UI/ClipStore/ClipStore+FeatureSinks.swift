@@ -25,7 +25,7 @@ struct ClipStoreTranslateSink: @MainActor TranslateActionSink {
 
     func copy(_ text: String) { store.copyOwnText(text) }
 
-    func saveAsNewClip(_ text: String) { store.saveDerivedText(text, source: "Clippy Translate") }
+    func saveAsNewClip(_ text: String) -> Bool { store.saveDerivedText(text, source: "Clippy Translate") }
 
     func replaceClip(_ clipID: Int64, with text: String) {
         do { try store.database.updateClipText(id: clipID, newText: text) } catch {
@@ -36,10 +36,16 @@ struct ClipStoreTranslateSink: @MainActor TranslateActionSink {
 
 extension ClipStore {
     /// Saves derived text (transform, translation, image description) as a new clip. Never logs the text.
-    func saveDerivedText(_ text: String, source: String) {
-        guard !text.isEmpty else { return }
-        do { try database.insertTextClip(text, sourceAppName: source) } catch {
+    /// Returns false when nothing was saved, so callers never confirm a failed write.
+    @discardableResult
+    func saveDerivedText(_ text: String, source: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        do {
+            try database.insertTextClip(text, sourceAppName: source)
+            return true
+        } catch {
             ClippyLog.error("failed to save derived clip: \(error)", category: ClippyLog.storage)
+            return false
         }
     }
 
