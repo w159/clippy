@@ -16,6 +16,8 @@ struct OnePasswordView: View {
     @State private var newTitle = ""
     @State private var newValue = ""
     @State private var status: String?
+    /// A failed "Create secret": persistent, announced, with Try Again (the form keeps its input).
+    @State private var createError: String?
     @State private var searchQuery = ""
     @State private var toastMessage: String?
     @State private var isCreating = false
@@ -118,6 +120,10 @@ struct OnePasswordView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 if creating { newSecretForm }
+                if let createError {
+                    ClippyBanner("Could not create the secret. \(createError)", severity: .danger,
+                                 actionTitle: "Try Again", action: create, dismiss: { self.createError = nil })
+                }
                 if let status { Text(status).font(.caption).foregroundStyle(tokens.textSecondary) }
                 if filteredItems.isEmpty {
                     Text(searchQuery.isEmpty ? "No items in this vault." : "No items match this search.")
@@ -170,7 +176,7 @@ struct OnePasswordView: View {
     // MARK: - Actions
 
     private func showAutoClearToast() {
-        toastMessage = "1Password cleared the clipboard"
+        toastMessage = "Clippy cleared the copied secret from the clipboard"
         toastTask?.cancel()
         toastTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
@@ -194,7 +200,8 @@ struct OnePasswordView: View {
         guard !isCreating, !newTitle.isEmpty, !newValue.isEmpty else { return }
         let title = newTitle, value = newValue
         isCreating = true
-        status = "Creating \(title)..."
+        createError = nil
+        status = "Creating \(title)\u{2026}"
         Task {
             do {
                 try await service.createSecret(title: title, value: value)
@@ -207,7 +214,9 @@ struct OnePasswordView: View {
             } catch {
                 await MainActor.run {
                     isCreating = false
-                    flashStatus(error.localizedDescription)
+                    status = nil
+                    createError = error.localizedDescription
+                    AccessibilityNotification.Announcement("Could not create the secret").post()
                 }
             }
         }

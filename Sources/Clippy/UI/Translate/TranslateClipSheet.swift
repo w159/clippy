@@ -21,6 +21,8 @@ struct TranslateClipSheet: View {
     @State private var confirmed = false
     @State private var isWorking = false
     @State private var status: String?
+    /// A failed "Save as New Clip"; kept apart from `errorMessage`, which turns Translate into Try Again.
+    @State private var saveError: String?
     @State private var requestID = UUID()
     @State private var confirmReplace = false
 
@@ -60,6 +62,7 @@ struct TranslateClipSheet: View {
             result = nil
             errorMessage = nil
             status = nil
+            saveError = nil
         }
         .translationTask(configuration) { session in
             // The framework hands the session to this closure for exactly one use; nothing
@@ -93,7 +96,7 @@ struct TranslateClipSheet: View {
                 }
                 .frame(maxWidth: 240)
                 .disabled(isWorking)
-                Button(errorMessage == nil ? "Translate" : "Try again") { start() }
+                Button(errorMessage == nil ? "Translate" : "Try Again") { start() }
                     .keyboardShortcut(result == nil ? .defaultAction : nil)
                     .disabled(isWorking || isSameLanguage)
             }
@@ -115,6 +118,8 @@ struct TranslateClipSheet: View {
                 Text("Translating…").foregroundStyle(tokens.textSecondary)
             } else if let errorMessage {
                 Text(errorMessage).foregroundStyle(tokens.danger)
+            } else if let saveError {
+                Text(saveError).foregroundStyle(tokens.danger)
             } else if let status {
                 Text(status).foregroundStyle(tokens.success)
             } else if isSameLanguage {
@@ -132,12 +137,18 @@ struct TranslateClipSheet: View {
             HStack {
                 Button("Copy") {
                     sink.copy(translated)
+                    saveError = nil
                     status = "Copied"
                 }
                 .keyboardShortcut(.defaultAction)
-                Button("Save as new clip") {
-                    sink.saveAsNewClip(translated)
-                    status = "Saved"
+                Button("Save as New Clip") {
+                    if sink.saveAsNewClip(translated) {
+                        saveError = nil
+                        status = "Saved as a new clip"
+                    } else {
+                        status = nil
+                        saveError = "Could not save the translation as a clip."
+                    }
                 }
                 Button("Replace…") { confirmReplace = true }
                 Spacer()
@@ -161,6 +172,7 @@ struct TranslateClipSheet: View {
         result = nil
         errorMessage = nil
         status = nil
+        saveError = nil
         confirmReplace = false
         isWorking = false
         requestID = UUID()
@@ -176,6 +188,7 @@ struct TranslateClipSheet: View {
         result = nil
         errorMessage = nil
         status = nil
+        saveError = nil
         isWorking = true
         requestID = UUID()
         if configuration == nil {

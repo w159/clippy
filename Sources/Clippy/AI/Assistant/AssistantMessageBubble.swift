@@ -11,14 +11,16 @@ struct AssistantMessageBubble: View {
     let position: AssistantGroupPosition
     /// Re-send the preceding user message when Retry is activated. nil for non-error bubbles.
     let onRetry: (() -> Void)?
-    /// Save the assistant reply as a new history clip. nil hides the action.
-    let onSaveAsClip: ((String) -> Void)?
+    /// Save the assistant reply as a new history clip; returns false when the
+    /// write failed. nil hides the action.
+    let onSaveAsClip: ((String) -> Bool)?
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("fontSizeBase") private var baseFontSize = 13
     @State private var isHovering = false
     @State private var justCopied = false
     @State private var justSaved = false
+    @State private var saveFailed = false
 
     private var kind: AssistantBubbleKind { AssistantPresentation.kind(of: message) }
     private var isUser: Bool { kind == .user }
@@ -139,15 +141,22 @@ struct AssistantMessageBubble: View {
                 flash($justCopied)
             }
             if let onSaveAsClip {
-                IconButton(justSaved ? "checkmark" : "square.and.arrow.down", label: justSaved ? "Saved" : "Save as clip") {
-                    onSaveAsClip(message.text)
-                    flash($justSaved)
+                // Confirm only a write that happened; a failed save says so instead
+                // of flashing a checkmark.
+                IconButton(saveFailed ? "exclamationmark.triangle" : (justSaved ? "checkmark" : "square.and.arrow.down"),
+                           label: saveFailed ? "Could not save as clip" : (justSaved ? "Saved" : "Save as Clip")) {
+                    if onSaveAsClip(message.text) {
+                        flash($justSaved)
+                    } else {
+                        flash($saveFailed)
+                        AccessibilityNotification.Announcement("Could not save the reply as a clip").post()
+                    }
                 }
             }
             Spacer()
         }
         // Row stays mounted so hover never reflows the transcript; keyboard focus still reaches it.
-        .opacity(isHovering || justCopied || justSaved ? 1 : 0.001)
+        .opacity(isHovering || justCopied || justSaved || saveFailed ? 1 : 0.001)
         .animation(ClippyMotion.animation(.instant, reduce: reduceMotion), value: isHovering)
     }
 
