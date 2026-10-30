@@ -48,7 +48,7 @@ extension ClipCardView {
 
     /// Selection draws the only colored stroke; otherwise a neutral hairline.
     var cardStroke: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+        RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous)
             .strokeBorder(
                 model.isSelected ? tokens.accent : (settings.cardStyle == .plain ? Color.clear : tokens.stroke),
                 lineWidth: model.isSelected ? 2 : 1

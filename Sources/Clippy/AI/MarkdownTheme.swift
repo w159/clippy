@@ -38,8 +38,8 @@ extension MarkdownUI.Theme {
                     CodeBlockCopyButton(text: configuration.content, tokens: tokens)
                         .padding(6)
                 }
-                .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(tokens.cardBorder, lineWidth: 1))
+                .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
+                .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset).strokeBorder(tokens.cardBorder, lineWidth: 1))
                 .markdownMargin(top: 6, bottom: 6)
             }
             .link {

@@ -126,7 +126,7 @@ struct ClipCardView: View {
             .padding(.vertical, 10)
         }
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous))
         .overlay(cardStroke)
         .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: isHovering)
         .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: model.isSelected)

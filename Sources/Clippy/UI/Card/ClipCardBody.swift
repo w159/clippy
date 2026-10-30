@@ -54,10 +54,10 @@ extension ClipCardView {
 
     func colorPreview(_ swatch: Color) -> some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous)
                 .fill(swatch)
                 .frame(width: 44, height: 28)
-                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(tokens.stroke, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous).strokeBorder(tokens.stroke, lineWidth: 1))
                 .accessibilityHidden(true)
             Text(HighlightedPreview.attributed(clip.previewText, query: query, color: tokens.accent))
                 .font(.system(size: CGFloat(settings.fontSizeBase), design: .monospaced))

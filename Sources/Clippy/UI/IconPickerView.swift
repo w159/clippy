@@ -183,7 +183,7 @@ struct IconPickerView: View {
                 .frame(width: 30, height: 28)
                 .background(
                     selectedBackground(isSelected: isSelected),
-                    in: RoundedRectangle(cornerRadius: 6)
+                    in: RoundedRectangle(cornerRadius: ClippyRadius.inset)
                 )
         }
         .buttonStyle(.plain)

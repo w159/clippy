@@ -107,7 +107,7 @@ extension ClipCardView {
             }
             .frame(maxWidth: 220)
             .frame(height: 84)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
             .task(id: clip.thumbFilename) {
                 guard let filename = clip.thumbFilename,
                       Self.cachedThumbnail(for: filename) == nil else { return }
@@ -123,7 +123,7 @@ extension ClipCardView {
         }
         .overlay {
             if isProcessingOCR {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous)
                     .fill(tokens.surfaceElevated.opacity(0.85))
                     .overlay {
                         VStack(spacing: 6) {

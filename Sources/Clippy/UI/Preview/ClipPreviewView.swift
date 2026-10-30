@@ -78,8 +78,8 @@ struct ClipPreviewView: View {
 
     private func colorView(_ value: ColorValue) -> some View {
         HStack(spacing: tokens.metrics.space.three) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(value.color).frame(width: 72, height: 72)
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(tokens.stroke))
+            RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous).fill(value.color).frame(width: 72, height: 72)
+                .overlay(RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous).stroke(tokens.stroke))
             VStack(alignment: .leading) {
                 Text(value.literal).font(.system(.body, design: .monospaced)).foregroundStyle(tokens.textPrimary)
                 Text(value.hex).font(.caption).foregroundStyle(tokens.textSecondary)

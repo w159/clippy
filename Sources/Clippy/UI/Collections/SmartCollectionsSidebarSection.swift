@@ -53,7 +53,7 @@ struct SmartCollectionsSidebarSection: View {
                     .foregroundStyle(tokens.textSecondary)
             }
             .padding(.vertical, 4).padding(.horizontal, tokens.metrics.space.one)
-            .background(isSelected ? tokens.selection : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(isSelected ? tokens.selection : Color.clear, in: RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain).foregroundStyle(tokens.textPrimary)

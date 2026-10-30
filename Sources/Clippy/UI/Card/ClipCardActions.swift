@@ -51,6 +51,7 @@ extension ClipCardView {
         .menuIndicator(.hidden)
         .foregroundStyle(tokens.textSecondary)
         .help("More actions")
+        .accessibilityLabel("More actions")
     }
 
     var hoverActions: some View {
@@ -77,6 +78,7 @@ extension ClipCardView {
                     .menuIndicator(.hidden)
                     .foregroundStyle(tokens.textSecondary)
                     .help("AI actions")
+                    .accessibilityLabel("AI actions")
                 }
                 cardActionButton("keyboard", help: "Send as keystrokes", action: onSendKeystrokes)
                 cardActionButton("pencil", help: "Edit", action: onEdit)

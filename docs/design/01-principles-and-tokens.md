@@ -72,12 +72,21 @@ Borderless `NSPanel` shell: glass is the content view's background; the window m
 
 | Token | pt | Use |
 |---|---:|---|
-| `radius.xs` | 4 | Inline code chips, keycaps, color swatches |
-| `radius.sm` | 8 | Compact row selection inset, small buttons |
-| `radius.md` | 12 | Cards, previews, text fields, popovers |
-| `radius.lg` | 16 | Sidebar, sheets/inspector, command palette |
-| `radius.xl` | 24 | Panel shell |
+| `radius.xs` | 4 | Color swatches, crop handles, tiny thumbnails in compact rows |
+| `radius.sm` | 8 | Small buttons, icon-button hover fills |
+| `radius.md` | 12 | Grouped settings sections |
+| `radius.lg` | 16 | Command palette, assistant composer |
+| `radius.xl` | 24 | Reserved; no current surface |
 | `radius.full` | capsule | Filter/reason chips, toasts, default glass controls |
+
+Semantic roles (`ClippyRadius` in `UI/DesignSystem/ClippyTokens.swift`, also `tokens.metrics.radius.panel` etc.). Views use a role, not a raw number, so nested shapes stay concentric. Added 2026-10-30 after an audit found nine different literal radii (2, 4, 5, 6, 8, 10, 12, 20, 24) and the panel's glass drawn at 24 while the panel clipped at 12.
+
+| Role | pt | Use |
+|---|---:|---|
+| `panel` | 16 (`lg`) | Popup panel shell, its glass and its Increase Contrast border |
+| `card` | 12 (`md`) | Clip cards and their selection stroke and multi-select cursor ring |
+| `control` | 8 (`sm`) | Compact and comfortable rows, text fields, selection highlights |
+| `inset` | 6 | Content nested inside a card: thumbnails, code blocks, key caps, inline rename field |
 
 Rule: inner radius follows outer radius - inset; use `ConcentricRectangle` when possible. Exact values are design proposals, not Apple's published metrics. [INFERENCE]
 
