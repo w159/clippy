@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 /// Audit log summary: entry count, tamper verification, export and reveal.
 struct SecurityAuditSection: View {
+    @Environment(\.clippyTokens) private var tokens
     @Binding var notice: PaneNotice?
     @State private var entryCount: Int?
     @State private var verification: AuditLog.VerificationReport?
@@ -35,8 +36,8 @@ struct SecurityAuditSection: View {
     private var verificationText: Text {
         guard let report = verification else { return Text("Checks every entry's hash chain for tampering.") }
         if report.isValid { return Text("No tampering found in \(report.entriesChecked) entries across \(report.filesChecked) files.") }
-        return Text("Tampering detected: \(report.failures.count) problem\(report.failures.count == 1 ? "" : "s") in \(Set(report.failures.map(\.file)).count) file(s).")
-            .foregroundColor(.red)
+        return Text("Tampering detected: \(report.failures.count) problem\(report.failures.count == 1 ? "" : "s") in \(CopyFormat.counted(Set(report.failures.map(\.file)).count, "file")).")
+            .foregroundColor(tokens.danger)
     }
 
     private func verify() {

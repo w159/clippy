@@ -25,6 +25,8 @@ struct PanelCommandContext {
     var newCategory: () -> Void
     /// Commands contributed by feature modules (preview, paste stack, snippets/transforms, semantic); already gated for sensitive clips.
     var featureCommands: [any PaletteCommand] = []
+    /// Clips the delete command acts on; 2+ means the whole multi-selection, as Cmd+Delete does.
+    var selectionCount: Int = 1
 }
 
 /// The palette's built-in command set.
@@ -47,34 +49,34 @@ enum BuiltInCommands {
         return [
             ClosurePaletteCommand(id: "paste", title: "Paste", symbol: "doc.on.clipboard", keywords: ["insert"],
                                   shortcut: "\u{21A9}", isEnabled: clip, perform: context.paste),
-            ClosurePaletteCommand(id: "paste-plain", title: "Paste as plain text", symbol: "text.alignleft",
+            ClosurePaletteCommand(id: "paste-plain", title: "Paste as Plain Text", symbol: "text.alignleft",
                                   keywords: ["unformatted", "strip"], shortcut: "\u{21E7}\u{21A9}", isEnabled: clip,
                                   perform: context.pastePlain),
             ClosurePaletteCommand(id: "pin", title: context.isPinned ? "Unpin" : "Pin", symbol: "pin",
                                   keywords: ["favorite", "keep"], shortcut: "\u{2318}P", isEnabled: clip,
                                   perform: context.togglePin),
-            ClosurePaletteCommand(id: "delete", title: "Delete", symbol: "trash", keywords: ["remove"],
+            ClosurePaletteCommand(id: "delete", title: context.selectionCount >= 2 ? "Delete \(context.selectionCount) Clips" : "Delete", symbol: "trash", keywords: ["remove"],
                                   shortcut: "\u{2318}\u{232B}", isEnabled: clip, perform: context.deleteSelection),
-            ClosurePaletteCommand(id: "similar", title: "Find similar", symbol: "sparkle.magnifyingglass",
+            ClosurePaletteCommand(id: "similar", title: "Find Similar", symbol: "sparkle.magnifyingglass",
                                   keywords: ["related", "suggest"], isEnabled: clip && context.canFindSimilar, perform: context.findSimilar),
-            ClosurePaletteCommand(id: "extract-text", title: "Extract text", subtitle: "Recognise text in the image",
+            ClosurePaletteCommand(id: "extract-text", title: "Extract Text", subtitle: "Recognize text in the image",
                                   symbol: "text.viewfinder", keywords: ["ocr", "recognize"],
                                   isEnabled: context.canExtractText, perform: context.extractText),
-            ClosurePaletteCommand(id: "clear-search", title: "Clear search", symbol: "xmark.circle",
+            ClosurePaletteCommand(id: "clear-search", title: "Clear Search", symbol: "xmark.circle",
                                   keywords: ["reset", "filter"], section: .navigate, isEnabled: context.hasQuery,
                                   perform: context.clearSearch),
-            ClosurePaletteCommand(id: "sidebar", title: "Toggle sidebar", symbol: "sidebar.left",
+            ClosurePaletteCommand(id: "sidebar", title: "Toggle Sidebar", symbol: "sidebar.left",
                                   keywords: ["collapse", "rail", "categories"], section: .navigate,
                                   perform: context.toggleSidebar),
             densityCommand(.compact, id: "density-compact", context: context),
             densityCommand(.comfortable, id: "density-comfortable", context: context),
             densityCommand(.cards, id: "density-cards", context: context),
             ClosurePaletteCommand(id: "suggestions",
-                                  title: context.suggestionsEnabled ? "Turn off Suggestions" : "Turn on Suggestions",
+                                  title: context.suggestionsEnabled ? "Turn Off Suggestions" : "Turn On Suggestions",
                                   subtitle: "Toggle Suggestions", symbol: "sparkles",
                                   keywords: ["smart", "toggle", "suggestions"], section: .settings,
                                   perform: context.toggleSuggestions),
-            ClosurePaletteCommand(id: "new-category", title: "New category", symbol: "folder.badge.plus",
+            ClosurePaletteCommand(id: "new-category", title: "New Category", symbol: "folder.badge.plus",
                                   keywords: ["create", "folder", "board"], section: .navigate,
                                   isEnabled: clip, perform: context.newCategory),
             ClosurePaletteCommand(id: "settings", title: "Open Settings", symbol: "gearshape",
@@ -85,7 +87,7 @@ enum BuiltInCommands {
 
     private static func densityCommand(_ density: ClipDensity, id: String,
                                        context: PanelCommandContext) -> ClosurePaletteCommand {
-        ClosurePaletteCommand(id: id, title: "Change density: \(density.title)", symbol: density.symbolName,
+        ClosurePaletteCommand(id: id, title: "Change Density: \(density.title)", symbol: density.symbolName,
                               keywords: ["view", "layout", "grid", "density", density.rawValue],
                               section: .navigate, isEnabled: context.currentDensity != density,
                               perform: { context.setDensity(density) })

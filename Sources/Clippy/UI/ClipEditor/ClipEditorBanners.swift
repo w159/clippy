@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Banners
 
-/// Shown when the stored clip changed under unsaved edits (EDT-02): Reload, Keep mine, Compare.
+/// Shown when the stored clip changed under unsaved edits (EDT-02): Use Stored, Keep Mine, Compare.
 struct EditorConflictBanner: View {
     @Environment(\.clippyTokens) private var tokens
     let onReload: () -> Void
@@ -22,9 +22,10 @@ struct EditorConflictBanner: View {
                 .font(.callout).foregroundStyle(tokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: tokens.metrics.space.two)
-            Button("Reload", action: onReload).help("Discard your edits and load the stored text").fixedSize()
-            Button("Keep mine", action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
-            Button("Compare...", action: onCompare).help("Show both versions side by side").fixedSize()
+            // Labels name the outcome: "Reload" read as harmless but discarded the edits.
+            Button("Use Stored", action: onReload).help("Discard your edits and load the stored text").fixedSize()
+            Button("Keep Mine", action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
+            Button("Compare\u{2026}", action: onCompare).help("Show both versions side by side").fixedSize()
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -43,7 +44,7 @@ struct EditorDeletedBanner: View {
 
     var body: some View {
         ClippyBanner("This clip was deleted. Your edits can no longer be saved.", severity: .danger,
-                     actionTitle: onCopy == nil ? nil : "Copy text", action: onCopy)
+                     actionTitle: onCopy == nil ? nil : "Copy Text", action: onCopy)
             .padding(.horizontal, 8)
             .padding(.top, 6)
     }

@@ -77,7 +77,7 @@ struct OCRResultView: View {
 
     private var statsRow: some View {
         HStack(spacing: tokens.metrics.space.two) {
-            Text("\(result.wordCount) words · \(result.characterCount) characters")
+            Text("\(CopyFormat.counted(result.wordCount, "word")) · \(CopyFormat.counted(result.characterCount, "character"))")
                 .foregroundStyle(tokens.textSecondary)
             if let status {
                 Text(status).foregroundStyle(statusFailed ? tokens.danger : tokens.success)

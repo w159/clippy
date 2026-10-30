@@ -8,7 +8,7 @@ extension ScriptsView {
     var listPane: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Text("\(store.scripts.count) scripts")
+                Text(CopyFormat.counted(store.scripts.count, "script"))
                     .font(.caption)
                     .foregroundStyle(tokens.textSecondary)
                 Spacer()
@@ -19,9 +19,10 @@ extension ScriptsView {
                     .popover(isPresented: $showBadgeLegend, arrowEdge: .bottom) { ScriptBadgeLegendView().padding() }
                 Button { requestNew() } label: { Image(systemName: "plus") }
                     .help("New script")
+                    .accessibilityLabel("New Script")
                 Menu {
-                    Button("Import Scripts...") { importScripts() }
-                    Button("Export Selected...") { exportScripts() }
+                    Button("Import Scripts\u{2026}") { importScripts() }
+                    Button("Export Selected\u{2026}") { exportScripts() }
                         .disabled(editing == nil && selection.isEmpty)
                     Divider()
                     Toggle("Keep run history on disk (no output)", isOn: Binding(
@@ -30,6 +31,7 @@ extension ScriptsView {
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                     .help("Import, export and history options")
+                    .accessibilityLabel("More Options")
             }
             .padding(10)
             Divider()
@@ -48,6 +50,7 @@ extension ScriptsView {
                     }
                     .buttonStyle(.plain)
                     .help("Clear search")
+                    .accessibilityLabel("Clear Search")
                 }
             }
             .padding(.horizontal, 10)
@@ -83,9 +86,10 @@ extension ScriptsView {
             .frame(maxWidth: .infinity, alignment: .leading)
             Button { requestNew() } label: { Image(systemName: "plus") }
                 .help("New script")
+                .accessibilityLabel("New Script")
             Menu {
-                Button("Import Scripts...") { importScripts() }
-                Button("Export Selected...") { exportScripts() }
+                Button("Import Scripts\u{2026}") { importScripts() }
+                Button("Export Selected\u{2026}") { exportScripts() }
                     .disabled(editing == nil && selection.isEmpty)
                 Divider()
                 Toggle("Keep run history on disk (no output)", isOn: Binding(
@@ -93,6 +97,7 @@ extension ScriptsView {
             } label: { Image(systemName: "ellipsis.circle") }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .accessibilityLabel("More Options")
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(tokens.sidebar)
@@ -152,7 +157,7 @@ extension ScriptsView {
                 if center.isRunning(script.id) { ProgressView().controlSize(.mini) }
                 Text(displayName(script.name))
                     .font(.body)
-                    .foregroundStyle(open ? Color.accentColor : tokens.textPrimary)
+                    .foregroundStyle(open ? tokens.accent : tokens.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if bodyOnly { Text("in body").font(.caption2).foregroundStyle(tokens.textSecondary) }
@@ -183,7 +188,7 @@ extension ScriptsView {
         HStack {
             Text(draft.name.isEmpty ? "New script" : draft.name)
                 .font(.body.italic())
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(tokens.accent)
                 .lineLimit(1)
             Spacer()
             Text("unsaved").font(.caption2).foregroundStyle(tokens.textSecondary)

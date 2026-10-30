@@ -7,6 +7,8 @@ struct DataBackupSection: View {
     @State private var snapshots: [BackupSnapshot] = []
     @State private var restore = RestoreConfirmationState()
     @State private var working = false
+    /// A backup awaiting delete confirmation; deleting one is permanent.
+    @State private var pendingDeleteID: String?
 
     /// Creates the section.
     init(notice: Binding<PaneNotice?>) { self._notice = notice }
@@ -36,7 +38,7 @@ struct DataBackupSection: View {
                 Divider()
                 SettingsRow(title: LocalizedStringKey(row.title), detail: Text(row.sizeText)) {
                     HStack {
-                        Button { delete(row.id) } label: { Image(systemName: "trash") }
+                        Button { pendingDeleteID = row.id } label: { Image(systemName: "trash") }
                             .help("Delete this backup")
                             .accessibilityLabel("Delete")
                         Button("Restore\u{2026}") { restore.request(row.id) }.disabled(restore.isBusy)
@@ -51,6 +53,16 @@ struct DataBackupSection: View {
             Button("Cancel", role: .cancel) { restore.cancel() }
         } message: {
             Text("The current history is replaced by the backup. A safety backup is taken first.")
+        }
+        .confirmationDialog("Delete this backup?", isPresented: Binding(get: { pendingDeleteID != nil }, set: { if !$0 { pendingDeleteID = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let id = pendingDeleteID { delete(id) }
+                pendingDeleteID = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeleteID = nil }
+        } message: {
+            Text("The backup file is removed from disk. This cannot be undone.")
         }
     }
 

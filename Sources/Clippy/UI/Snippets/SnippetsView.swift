@@ -175,7 +175,7 @@ struct SnippetEditor: View {
             Text("Test expansion").font(.headline)
             Text(preview).font(.system(.body, design: .monospaced)).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Used \(snippet.useCount) times. Snippets stay on this Mac.").font(.caption).foregroundStyle(tokens.textSecondary)
+            Text("Used \(snippet.useCount == 1 ? "once" : "\(snippet.useCount) times"). Snippets stay on this Mac.").font(.caption).foregroundStyle(tokens.textSecondary)
         }
         .formStyle(.grouped)
     }

@@ -92,8 +92,8 @@ struct AIActionsManagerView: View {
             Text("AI Actions").font(.headline).foregroundStyle(tokens.textPrimary)
             Spacer()
             Menu {
-                Button("Import actions...", action: importActions)
-                Button("Export actions...", action: exportActions)
+                Button("Import actions\u{2026}", action: importActions)
+                Button("Export actions\u{2026}", action: exportActions)
             } label: {
                 Label("Import / Export", systemImage: "square.and.arrow.up.on.square")
             }

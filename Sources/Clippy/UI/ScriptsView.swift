@@ -109,7 +109,7 @@ struct ScriptsView: View {
         case .run: return "Run \"\(displayName(editing?.name))\"?"
         case .discard: return "Discard unsaved changes?"
         case .delete: return "Delete \"\(displayName(editing?.name))\"?"
-        case .batch: return "Run \(selectedScripts.count) scripts in order?"
+        case .batch: return "Run \(CopyFormat.counted(selectedScripts.count, "script")) in order?"
         case nil: return ""
         }
     }
@@ -126,9 +126,9 @@ struct ScriptsView: View {
     @ViewBuilder var dialogButtons: some View {
         switch activeDialog {
         case .run:
-            Button("Run", role: .destructive) { performRun(); activeDialog = nil }
+            Button("Run") { performRun(); activeDialog = nil }
         case .batch:
-            Button("Run All", role: .destructive) {
+            Button("Run All") {
                 center.startBatch(selectedScripts)
                 activeDialog = nil
             }
@@ -181,13 +181,13 @@ struct ScriptOptionsForm: View {
             labeled("Working directory") {
                 HStack {
                     TextField("Home folder", text: $script.workingDirectory).textFieldStyle(.roundedBorder)
-                    Button("Choose...") { chooseFile(directories: true) { script.workingDirectory = $0 } }
+                    Button("Choose\u{2026}") { chooseFile(directories: true) { script.workingDirectory = $0 } }
                 }
             }
             labeled("Interpreter path (optional)") {
                 HStack {
                     TextField("Resolved from PATH", text: $script.customInterpreterPath).textFieldStyle(.roundedBorder)
-                    Button("Choose...") { chooseFile(directories: false) { script.customInterpreterPath = $0 } }
+                    Button("Choose\u{2026}") { chooseFile(directories: false) { script.customInterpreterPath = $0 } }
                 }
             }
             ScriptEnvironmentEditor(environment: $script.environment)

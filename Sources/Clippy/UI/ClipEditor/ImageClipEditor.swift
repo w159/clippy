@@ -145,7 +145,7 @@ struct ImageClipEditor: View {
                     .layoutPriority(-1)
                     .help(saveError)
             }
-            Button("Save a copy...") { saveCopy() }
+            Button("Save a copy\u{2026}") { saveCopy() }
                 .fixedSize()
                 .disabled(model.working == nil)
             Spacer(minLength: 0)

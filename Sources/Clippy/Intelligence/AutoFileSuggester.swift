@@ -113,7 +113,7 @@ final class AutoFileSuggester {
             let members = centroids.first { $0.categoryID == hit.categoryID }?.memberCount ?? 0
             return AutoFileSuggestion(
                 clipID: clip.id, categoryID: hit.categoryID, score: hit.score,
-                reason: "Similar to \(members) clips in \(name)")
+                reason: "Similar to \(CopyFormat.counted(members, "clip")) in \(name)")
         }
     }
 }

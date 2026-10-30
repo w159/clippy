@@ -47,7 +47,7 @@ extension IntegrationsSettingsTab {
         let result = runOpenPanel(types: [UTType(filenameExtension: "toml") ?? .plainText, .plainText, .text]) { url in
             let text = try String(contentsOf: url, encoding: .utf8)
             let summary = try ClippyArchive.importTOML(text, into: ClipDatabase.shared)
-            var message = "Imported \(summary.categories) categories and \(summary.clips) clips."
+            var message = "Imported \(CopyFormat.counted(summary.categories, "category", plural: "categories")) and \(CopyFormat.counted(summary.clips, "clip"))."
             if summary.skippedImages > 0 {
                 message += " Skipped \(summary.skippedImages) image(s) whose files were missing."
             }
@@ -101,7 +101,7 @@ extension IntegrationsSettingsTab {
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(document).write(to: url)
-            return "Exported \(clips.count) clips to \(url.lastPathComponent)."
+            return "Exported \(CopyFormat.counted(clips.count, "clip")) to \(url.lastPathComponent)."
         }
         if let result { exportResult = result }
     }

@@ -125,7 +125,7 @@ struct AIProviderDetailSection: View {
     @ViewBuilder private var keyLine: some View {
         if case .denied = keyStatus {
             SettingsStatusLine(kind: .failure, text: "Keychain access denied")
-            Button("Retry") { keyError = false; refreshKey() }
+            Button("Try Again") { keyError = false; refreshKey() }
         } else if keyError {
             SettingsStatusLine(kind: .failure, text: "Could not save to Keychain. Your entry was kept; try again.")
         } else {

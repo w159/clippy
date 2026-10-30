@@ -10,8 +10,9 @@ extension ClipListView {
     @ViewBuilder
     func aiActionsMenu(for clip: Clip) -> some View {
         if !settings.aiEnabled {
+            // A dead-end text row gave no way forward; offer the fix instead.
             Menu {
-                Text("Enable AI in Settings to use AI actions.")
+                Button("Set Up AI in Settings\u{2026}", action: onOpenSettings)
             } label: {
                 Label("AI", systemImage: "sparkles")
             }
@@ -71,7 +72,7 @@ extension ClipListView {
                 }
             }
             Divider()
-            Button("New Category...") { categoryCreationClip = clip }
+            Button("New Category\u{2026}") { categoryCreationClip = clip }
         } label: {
             Label("Categories", systemImage: "folder.badge.plus")
         }
@@ -91,8 +92,8 @@ extension ClipListView {
     /// Batch variants act on the whole multi-selection.
     @ViewBuilder
     func batchContextMenu() -> some View {
-        Button("Paste \(selectedClipIDs.count) Sequentially") { onPasteMany(actionableClips, false, settings.pastePlainTextByDefault) }
-        Button("Paste \(selectedClipIDs.count) Combined") { onPasteMany(actionableClips, true, settings.pastePlainTextByDefault) }
+        Button("Paste \(selectedClipIDs.count) in Order") { onPasteMany(actionableClips, false, settings.pastePlainTextByDefault) }
+        Button("Paste \(selectedClipIDs.count) as One") { onPasteMany(actionableClips, true, settings.pastePlainTextByDefault) }
         Menu("Move \(selectedClipIDs.count) to Category") {
             ForEach(store.categories) { cat in
                 Button(cat.name) {
@@ -108,9 +109,11 @@ extension ClipListView {
                 selectedClipIDs = []
             }
         }
-        Button("Set \(selectedClipIDs.count) Titles with AI") { runBatchAITitles() }
+        if settings.aiEnabled {
+            Button("Generate \(selectedClipIDs.count) Titles") { runBatchAITitles() }
+        }
         Divider()
-        Button("Delete \(selectedClipIDs.count)", role: .destructive) { requestBatchDelete() }
+        Button("Delete \(selectedClipIDs.count) Clips", role: .destructive) { requestBatchDelete() }
     }
 
     /// Menu for a single clip, grouped: paste, edit, organize, AI/analysis, delete.
@@ -122,7 +125,7 @@ extension ClipListView {
             Button { onPaste(clip, true) } label: { Label("Paste as Plain Text", systemImage: "textformat") }
         }
         if clip.contentKind == .file {
-            Button { onPasteFile(clip, true) } label: { Label("Move Here (removes original)", systemImage: "folder") }
+            Button { onPasteFile(clip, true) } label: { Label("Move Here and Remove Original", systemImage: "folder") }
         }
         Divider()
         // Edit group

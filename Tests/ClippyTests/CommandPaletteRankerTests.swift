@@ -52,6 +52,10 @@ final class CommandPaletteRankerTests: XCTestCase {
         XCTAssertTrue(some.contains { $0.id == "pin" && $0.title == "Unpin" })
         XCTAssertTrue(some.contains { $0.id == "clear-search" })
         XCTAssertFalse(some.contains { $0.id == "extract-text" })
+        var multi = context(clip: true, query: false)
+        multi.selectionCount = 3
+        XCTAssertTrue(BuiltInCommands.make(multi).contains { $0.id == "delete" && $0.title == "Delete 3 Clips" })
+        XCTAssertTrue(some.contains { $0.id == "delete" && $0.title == "Delete" })
     }
 
     func testEmptyQueryPromotesRecentsInRecencyOrderAndIgnoresUnknownOrDisabled() {

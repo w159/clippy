@@ -154,8 +154,8 @@ struct SecurityRetentionSection: View {
             let outcome = await Task.detached { () -> PaneNotice in
                 do {
                     let result = try RetentionService(database: ClipDatabase.shared).apply(rules: rules, actor: "settings")
-                    return result.failed.isEmpty ? .success("Deleted \(result.deleted.count) clips.")
-                        : .failure("Deleted \(result.deleted.count) clips; \(result.failed.count) could not be deleted.")
+                    return result.failed.isEmpty ? .success("Deleted \(CopyFormat.counted(result.deleted.count, "clip")).")
+                        : .failure("Deleted \(CopyFormat.counted(result.deleted.count, "clip")); \(result.failed.count) could not be deleted.")
                 } catch { return .failure("Retention run failed.") }
             }.value
             notice = outcome

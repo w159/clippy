@@ -84,7 +84,7 @@ extension AppDelegate {
         menu.addItem(pauseItem)
         menu.addItem(.separator())
 
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
@@ -100,7 +100,7 @@ extension AppDelegate {
         menu.addItem(.separator())
 
         let updateItem = NSMenuItem(
-            title: "Check for Updates...",
+            title: "Check for Updates\u{2026}",
             action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
             keyEquivalent: ""
         )

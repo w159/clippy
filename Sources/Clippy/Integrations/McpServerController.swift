@@ -361,15 +361,19 @@ final class McpServerController: ObservableObject {
 
     /// Replace the bearer token, restart the server with it, and re-write every
     /// installed client config. The old token stops working immediately.
-    func rotateToken() {
+    /// `completion` reports whether the new token was stored, so callers never
+    /// confirm a rotation that failed.
+    func rotateToken(completion: (@MainActor (Bool) -> Void)? = nil) {
         enqueue { [weak self] in
-            guard let self else { return }
+            guard let self else { completion?(false); return }
             do {
                 try self.tokenProvider.rotate()
             } catch {
                 self.fail("Could not rotate the MCP access token.")
+                completion?(false)
                 return
             }
+            completion?(true)
             await self.stopNow()
             if self.settings.mcpEnabled { await self.startNow() }
             await McpInstallService.resyncInstalledClients(port: self.settings.mcpPort,

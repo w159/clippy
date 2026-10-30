@@ -115,7 +115,7 @@ struct AIActionSheet: View {
             box(runner.partialText, minHeight: 180)
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
-                Text("Asking the model...")
+                Text("Asking the model\u{2026}")
                 Spacer()
                 // Audit [MEDIUM]: let the user abandon a long run instead of
                 // waiting on a stuck request.

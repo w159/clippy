@@ -63,7 +63,7 @@ struct PanelHeaderView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(tokens.textSecondary)
                     .allowsHitTesting(false)
-                    .accessibilityLabel("\(clipCount) clips")
+                    .accessibilityLabel(CopyFormat.counted(clipCount, "clip"))
             }
         }
     }
@@ -79,9 +79,9 @@ struct PanelHeaderView: View {
             }
             if grid.density == .cards {
                 Divider()
-                columnButton("Auto columns", mode: .auto)
+                columnButton("Auto Columns", mode: .auto)
                 ForEach(1...4, id: \.self) { count in
-                    columnButton("\(count) \(count == 1 ? "column" : "columns")", mode: .fixed(count))
+                    columnButton("\(count) \(count == 1 ? "Column" : "Columns")", mode: .fixed(count))
                 }
             }
             Divider()

@@ -20,7 +20,7 @@ extension CategorySidePane {
                         Text("\(count)")
                             .font(.caption2)
                             .monospacedDigit()
-                            .foregroundStyle(tokens.textSecondary.opacity(0.8))
+                            .foregroundStyle(tokens.textSecondary)
                     }
                     Spacer(minLength: 0)
                 }
@@ -34,6 +34,9 @@ extension CategorySidePane {
             if let onAdd {
                 Button(action: onAdd) {
                     Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                        // The bare 10pt glyph was a ~12pt hit target.
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help(addLabel ?? "Add")
@@ -74,7 +77,7 @@ extension CategorySidePane {
         return SidebarRow(
             rowID: .history, focus: $focus, title: "History", tint: settings.accentColor, count: count,
             isSelected: selection == .history, help: "All history (\u{2318}1)",
-            accessibilityText: "History, \(count) clips", indicator: indicator(for: .history)
+            accessibilityText: "History, \(CopyFormat.counted(count, "clip"))", indicator: indicator(for: .history)
         ) {
             Image(systemName: "clock").font(.system(size: 12, weight: .semibold))
         }
@@ -89,7 +92,7 @@ extension CategorySidePane {
         return SidebarRow(
             rowID: .category(categoryID), focus: $focus, title: category.name, tint: Color(hexString: category.colorHex),
             count: count, isSelected: selection == .category(categoryID), help: category.name,
-            accessibilityText: "\(category.name), \(count) clips", indicator: indicator(for: .category(categoryID)),
+            accessibilityText: "\(category.name), \(CopyFormat.counted(count, "clip"))", indicator: indicator(for: .category(categoryID)),
             renameText: Binding(get: { renaming ? renameDraft : nil }, set: { renameDraft = $0 ?? ""; renameDuplicate = false }),
             renameError: renaming && renameDuplicate,
             onCommitRename: { commitRename(category) }, onCancelRename: { cancelRename() }
@@ -110,7 +113,7 @@ extension CategorySidePane {
         .accessibilityAction(named: "Rename") { beginRename(category) }
         .accessibilityAction(named: "Delete") { categoryToDelete = category }
         .contextMenu {
-            Button("Edit...") { editingCategory = category }
+            Button("Edit\u{2026}") { editingCategory = category }
             Button("Rename") { beginRename(category) }
             Divider()
             Button("Delete", role: .destructive) { categoryToDelete = category }

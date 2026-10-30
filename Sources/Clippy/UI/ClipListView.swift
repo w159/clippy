@@ -312,7 +312,7 @@ struct ClipListView: View {
             ),
             presenting: clipPendingKeystrokes
         ) { clip in
-            Button("Type \(clip.contentText.count.formatted()) characters", role: .destructive) {
+            Button("Type \(clip.contentText.count.formatted()) Characters") {
                 onSendKeystrokes(clip)
             }
             Button("Cancel", role: .cancel) {}

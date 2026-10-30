@@ -63,7 +63,7 @@ struct IntegrationsSettingsTab: View {
 
             Section("Data") {
                 LabeledContent("Export history") {
-                    Button("Export as JSON...") { exportJSON() }
+                    Button("Export as JSON\u{2026}") { exportJSON() }
                 }
                 .settingsRow("integrations.history")
                 if let exportResult {

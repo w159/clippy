@@ -28,7 +28,7 @@ extension ImageClipEditor {
     var ocrScrim: some View {
         VStack(spacing: 10) {
             ProgressView().controlSize(.large)
-            Text("Extracting text...").font(.callout).foregroundStyle(dsTokens.textPrimary)
+            Text("Extracting text\u{2026}").font(.callout).foregroundStyle(dsTokens.textPrimary)
             Button("Cancel") { cancelExtractText() }
         }
         .padding(20)
@@ -41,7 +41,7 @@ extension ImageClipEditor {
     @ViewBuilder
     func ocrBanner(_ outcome: OCRExtractOutcome) -> some View {
         if case .failure(let message) = outcome {
-            ClippyBanner(message, severity: .danger, actionTitle: "Retry", action: { extractText() }, dismiss: { ocrNotice = nil })
+            ClippyBanner(message, severity: .danger, actionTitle: "Try Again", action: { extractText() }, dismiss: { ocrNotice = nil })
                 .padding(6)
         } else {
             ClippyBanner(outcome.message, severity: .neutral, dismiss: { ocrNotice = nil }).padding(6)

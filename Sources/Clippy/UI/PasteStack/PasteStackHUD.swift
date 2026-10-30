@@ -10,7 +10,7 @@ final class PasteStackHUD {
 
     /// Shows `message` near the top of the main screen for `duration` seconds.
     func show(_ message: String, severity: BannerSeverity = .neutral, duration: TimeInterval = 1.4) {
-        let host = NSHostingView(rootView: ClippyToast(message, severity: severity))
+        let host = NSHostingView(rootView: ClippyToast(message, severity: severity).clippyDesignSystem())
         host.frame.size = host.fittingSize
         let panel = window ?? NSPanel(contentRect: host.frame, styleMask: [.borderless, .nonactivatingPanel],
                                       backing: .buffered, defer: false)

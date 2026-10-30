@@ -13,7 +13,7 @@ extension ClipListView {
     /// `PanelStatusPolicy`: failures and messages with a Retry stay until
     /// dismissed, others dismiss themselves. VoiceOver is notified by
     /// `PanelStatusOverlay`.
-    func showStatusBanner(_ message: String, severity: StatusSeverity = .info, actionTitle: String = "Retry",
+    func showStatusBanner(_ message: String, severity: StatusSeverity = .info, actionTitle: String = "Try Again",
                           retry: (() -> Void)? = nil) {
         let hasAction = retry != nil
         let item = PanelStatusItem(
@@ -47,7 +47,17 @@ extension ClipListView {
     func handlePasteResult(_ object: Any?) {
         guard let result = object as? PasteResult,
               let status = PanelStatusMessages.status(for: result) else { return }
-        showStatusBanner(status.message, severity: status.severity == .danger ? .failure : .warning)
+        let severity: StatusSeverity = status.severity == .danger ? .failure : .warning
+        if case .copiedOnly(.accessibilityNotGranted) = result {
+            // The warning names a fix; give it a button that goes straight there.
+            showStatusBanner(status.message, severity: severity, actionTitle: "Open Privacy Settings") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        } else {
+            showStatusBanner(status.message, severity: severity)
+        }
     }
 
     /// Reports the storage-ceiling warning once per change.

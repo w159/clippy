@@ -95,12 +95,16 @@ struct SecurityAccessSection: View {
         newType = ""
     }
 
+    /// Goes through the server controller (like Integrations) so the running
+    /// server restarts and installed clients get the new token; rotating only the
+    /// Keychain value left every connected client on a dead token.
     private func rotate() {
-        Task {
-            let rotated = await Task.detached { (try? McpTokenProvider.shared.rotate()) != nil }.value
+        McpServerController.shared.rotateToken { rotated in
             tokenPresent = rotated ? true : tokenPresent
             if rotated { AuditLog.shared.record(actor: "settings", action: "rotate-mcp-token", detail: "token rotated", clipIDs: []) }
-            notice = rotated ? .success("MCP token rotated.") : .failure("Could not rotate the token. Check Keychain access.")
+            notice = rotated
+                ? .success("Token rotated. The server is restarting and installed clients are being re-synced.")
+                : .failure("Could not rotate the token. Check Keychain access.")
         }
     }
 }
