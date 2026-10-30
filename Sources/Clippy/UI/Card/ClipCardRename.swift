@@ -22,9 +22,9 @@ extension ClipCardView {
         .padding(.vertical, 1)
         // Opposite-luminance fill so the field never blends into the card:
         // a dark tint on light themes, a light tint on dark themes.
-        .background(renameFieldFill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .background(renameFieldFill, in: RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous)
                 .strokeBorder(tokens.accent, lineWidth: 1.5)
         )
     }

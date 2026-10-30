@@ -57,9 +57,9 @@ struct ClipRowView: View {
         .padding(.trailing, 8)
         .frame(minHeight: comfortable ? 48 : GridMetrics.compactRowHeight)
         .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
                 .strokeBorder(tokens.accent, lineWidth: model.isSelected ? 2 : 0)
         )
         .contentShape(Rectangle())
@@ -92,7 +92,7 @@ struct ClipRowView: View {
                 }
             }
             .frame(width: 24, height: 24)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
             .task(id: clip.thumbFilename) {
                 guard let name = clip.thumbFilename else { return }
                 thumbnail = ClipCardView.cachedThumbnail(for: name)

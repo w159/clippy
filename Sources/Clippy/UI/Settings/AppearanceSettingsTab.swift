@@ -341,9 +341,9 @@ struct ThemeSwatchStrip: View {
             }
         }
         .frame(height: 20)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
         // Decorative swatches carry no per-rectangle meaning, so collapse them

@@ -43,7 +43,7 @@ struct ThemedPanelBackground: View {
             solidFallback
         case .glass:
             ZStack {
-                Rectangle().fill(.clear).glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
+                Rectangle().fill(.clear).glassEffect(.regular, in: RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous))
                 tokens.panel.opacity(opacity)
             }
         case .vibrancy where reduceTransparency || colorSchemeContrast == .increased:
@@ -58,9 +58,13 @@ struct ThemedPanelBackground: View {
 
     /// High-contrast, opaque fallback when material transparency is unavailable.
     private var solidFallback: some View {
+        // The panel root already draws its 1pt border and clips to
+        // `ClippyRadius.panel`; this fallback only thickens that edge under
+        // Increase Contrast, on the same shape so the corners line up.
         tokens.panel.overlay {
             if colorSchemeContrast == .increased {
-                RoundedRectangle(cornerRadius: 24).strokeBorder(tokens.cardBorder, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
+                    .strokeBorder(tokens.cardBorder, lineWidth: 1.5)
             }
         }
     }

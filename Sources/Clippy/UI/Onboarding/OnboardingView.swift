@@ -7,7 +7,7 @@ struct OnboardingView: View {
     @Environment(\.clippyTokens) private var tokens
 
     var body: some View {
-        GlassSurface(in: RoundedRectangle(cornerRadius: 20)) {
+        GlassSurface(in: RoundedRectangle(cornerRadius: ClippyRadius.lg)) {
             VStack(spacing: 0) {
                 header
                 Divider()
@@ -51,7 +51,7 @@ struct OnboardingView: View {
                 }
                 .opacity(step.rawValue > viewModel.model.current.rawValue ? 0.55 : 1)
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 8).fill(step == viewModel.model.current ? tokens.selection : .clear))
+                .background(RoundedRectangle(cornerRadius: ClippyRadius.control).fill(step == viewModel.model.current ? tokens.selection : .clear))
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(step == viewModel.model.current ? .isSelected : [])
             }

@@ -160,9 +160,9 @@ struct OnePasswordView: View {
         }
         .disabled(isCreating)
         .padding(8)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
+        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: ClippyRadius.inset)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
     }

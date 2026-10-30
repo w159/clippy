@@ -131,9 +131,9 @@ extension ScriptsView {
     }
 
     func rowBackground(selected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 5)
+        RoundedRectangle(cornerRadius: ClippyRadius.inset)
             .fill(selected ? tokens.cardSurface : Color.clear)
-            .overlay(RoundedRectangle(cornerRadius: 5)
+            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset)
                 .strokeBorder(selected ? tokens.cardBorder : Color.clear, lineWidth: 1))
     }
 

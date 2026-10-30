@@ -58,7 +58,7 @@ struct ScriptRunResultView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: layout == .fill ? .infinity : nil, alignment: .topLeading)
-        .background(tokens.scrollBackground.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(tokens.scrollBackground.opacity(0.6), in: RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
     }
 
     // MARK: Status
@@ -129,7 +129,7 @@ struct ScriptRunResultView: View {
             followsTail: run.isRunning,
             accessibilityLabel: activeStream == .stdout ? "Script output" : "Script errors")
             .frame(minHeight: layout == .fill ? 60 : 120, maxHeight: layout == .fill ? .infinity : 220)
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
     }
 
     // MARK: Actions

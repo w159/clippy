@@ -33,7 +33,7 @@ extension ClipCardView {
         .overlay(alignment: .trailing) {
             fittingHoverActions
                 .padding(.horizontal, 4)
-                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
                 .opacity(showsActions ? 1 : 0)
                 .allowsHitTesting(showsActions)
         }

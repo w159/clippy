@@ -203,9 +203,9 @@ private struct ScriptRowView: View {
             }
         }
         .padding(10)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
                 .strokeBorder(tokens.cardBorder, lineWidth: 1)
         )
         .confirmationDialog(
@@ -236,7 +236,7 @@ private struct ScriptRowView: View {
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(tokens.accent.opacity(0.12),
-                                    in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
                     ForEach(ScriptBadge.allCases.filter { $0.applies(to: script) }, id: \.title) { badge in
                         Image(systemName: badge.icon)
                             .font(.system(size: 9, weight: .semibold))

@@ -154,12 +154,39 @@ struct ClippyMetrics {
 }
 
 /// Corner-radius scale in points; `full` means capsule, not an arbitrary radius.
+/// Views pick a semantic role (`panel`, `card`, `control`, `inset`) rather than a
+/// raw size so nested shapes stay concentric: a shape inside another uses the
+/// next role down.
 struct RadiusScale {
-    let xs: CGFloat = 4
-    let sm: CGFloat = 8
-    let md: CGFloat = 12
-    let lg: CGFloat = 16
-    let xl: CGFloat = 24
+    let xs: CGFloat = ClippyRadius.xs
+    let sm: CGFloat = ClippyRadius.sm
+    let md: CGFloat = ClippyRadius.md
+    let lg: CGFloat = ClippyRadius.lg
+    let xl: CGFloat = ClippyRadius.xl
+
+    var panel: CGFloat { ClippyRadius.panel }
+    var card: CGFloat { ClippyRadius.card }
+    var control: CGFloat { ClippyRadius.control }
+    var inset: CGFloat { ClippyRadius.inset }
+}
+
+/// Static radius roles, usable from views that still read the legacy
+/// `ThemeTokens` and have no `clippyTokens` environment value.
+enum ClippyRadius {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 24
+
+    /// Floating windows and their glass: the popup panel, the command palette.
+    static let panel: CGFloat = lg
+    /// Clip cards, grouped settings sections, result boxes.
+    static let card: CGFloat = md
+    /// Rows, buttons, text fields, selection highlights.
+    static let control: CGFloat = sm
+    /// Content nested inside a card: thumbnails, code blocks, key caps, inline fields.
+    static let inset: CGFloat = 6
 }
 
 /// The shared 4-point spacing grid.

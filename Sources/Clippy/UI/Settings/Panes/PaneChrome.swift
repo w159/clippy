@@ -71,8 +71,8 @@ struct PaneSection<Content: View>: View {
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 0) { content }
                 .padding(.horizontal, tokens.metrics.space.four)
-                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(tokens.stroke.opacity(0.5), lineWidth: 0.5))
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous).stroke(tokens.stroke.opacity(0.5), lineWidth: 0.5))
             if let footer {
                 Text(footer).font(.caption).foregroundStyle(tokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

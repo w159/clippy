@@ -170,8 +170,8 @@ struct AIActionSheet: View {
             }
             .frame(minHeight: minHeight, maxHeight: 220)
             .padding(8)
-            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(tokens.cardBorder))
+            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
+            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset).stroke(tokens.cardBorder))
             // Audit [POLISH]: copy-button overlay on each diff/proposal box.
             if !text.isEmpty {
                 ClipboardCopyButton(text: text, tokens: tokens)
@@ -194,8 +194,8 @@ struct AIActionSheet: View {
             }
             .frame(maxHeight: 180)
             .padding(8)
-            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(tokens.cardBorder))
+            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
+            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset).stroke(tokens.cardBorder))
             Text("Result").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
             box(proposed)
         }

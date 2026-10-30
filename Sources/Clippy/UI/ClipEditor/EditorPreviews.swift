@@ -76,10 +76,10 @@ struct ColorSwatchStrip: View {
             HStack(spacing: 10) {
                 ForEach(colors, id: \.hex) { value in
                     HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: ClippyRadius.xs)
                             .fill(value.color)
                             .frame(width: 22, height: 22)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(tokens.textSecondary.opacity(0.4), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.xs).stroke(tokens.textSecondary.opacity(0.4), lineWidth: 1))
                         Text(value.hex)
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(tokens.textSecondary)

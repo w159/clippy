@@ -35,7 +35,7 @@ struct OnePasswordItemRow: View {
             .padding(.horizontal, 6)
             .background(
                 isExpanded ? tokens.accent.opacity(0.10) : tokens.cardBorder.opacity(hovered ? 0.28 : 0.15),
-                in: RoundedRectangle(cornerRadius: 6)
+                in: RoundedRectangle(cornerRadius: ClippyRadius.inset)
             )
         }
         .buttonStyle(.plain)

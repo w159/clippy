@@ -18,9 +18,9 @@ struct ImageCropOverlay: View {
                 if showsThirds { thirds }
                 ForEach(CropHandle.allCases) { handle in
                     let point = CropGeometry.point(of: handle, in: rect)
-                    RoundedRectangle(cornerRadius: 2)
+                    RoundedRectangle(cornerRadius: ClippyRadius.xs)
                         .fill(tokens.accent)
-                        .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(tokens.onAccent, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: ClippyRadius.xs).strokeBorder(tokens.onAccent, lineWidth: 1))
                         .frame(width: gripSize, height: gripSize)
                         .position(point)
                 }

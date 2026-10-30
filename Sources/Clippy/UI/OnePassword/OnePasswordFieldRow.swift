@@ -38,7 +38,7 @@ struct OnePasswordFieldRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: 5))
+        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
         .onDisappear { revealed = false }
     }
 
