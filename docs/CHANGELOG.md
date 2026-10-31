@@ -2,7 +2,25 @@
 
 ## Unreleased - UI and UX overhaul (branch `claude/ui-ux-overhaul`)
 
-Not yet built or run on a Mac: every change below was checked by reading the code and by a tree-sitter syntax parse only. `swift build`, `swift test` and the visual result are unverified.
+Built and tested on macOS in CI ([run 41159198613](https://github.com/w159/clippy/actions/runs/41159198613), commit `ac28368`): `swift build`, 1324 XCTests (4 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of the panel, Settings, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).
+
+### Search
+
+Search was broken in six ways. The first CI run on the old code with the new tests ([run 41150351429](https://github.com/w159/clippy/actions/runs/41150351429)) failed 11 tests, and the harness reproduced the symptoms in the real panel.
+
+- History hid every clip filed in a category, also while searching, so a filed clip could not be found from History. While a query is active History now lists every match, filed or not.
+- Full-text search matched word prefixes only: "hub" missed github and "UserName" missed getUserName, while the category pane and the highlight used substring matching, so results differed by pane. Fragments inside words now match everywhere (text, title and OCR text). Results are word-start matches first, then fragments, newest first within each tier, grouped by day so the keyboard order equals the visual order.
+- A query of only punctuation ("@", "$", "!!!") built no full-text pattern and returned every clip; "c++" became every word starting with c. Words with punctuation are now matched as literal text.
+- When new results arrived the cursor stayed on the previously selected clip while the list scrolled to the top, so Return pasted a clip off screen. New results select the top match until the user moves the cursor.
+- Return pressed within the 180 ms search debounce pasted the previous query's top clip. Return now runs the search at once and pastes the top match of what was typed.
+- Typing while the list had focus moved focus to the search field, which selected its text, so the next key replaced the first ("deck" became "eck"). Characters typed from the list now go through the search field's own editor and every character is kept.
+- Also: clearing the query left semantic match badges from the old search; a failed search empties the list instead of keeping stale results; the History and category badges count what their panes show while searching (a category no longer reads "1" beside an empty result).
+
+### Found on the macOS screenshots
+
+- The default theme follows macOS: Clean Light in light mode, GitHub Dark in dark mode (new `Automatic` preset). Before, dark mode kept the light palette and the filter chip labels and the search prompt were unreadable. Explicit theme choices are kept.
+- Filter chips, toast text and the search prompt use explicit token colors.
+- On the real first launch the onboarding glass card sat below an empty titlebar strip with the window buttons floating over the desktop. The card now fills the window, as the panel does; Skip for now (also Escape) closes it. Continue is tinted with the theme accent (macOS draws it gray while the window is inactive).
 
 ### Design system
 
@@ -23,6 +41,12 @@ Not yet built or run on a Mac: every change below was checked by reading the cod
 - Settings: deleting a backup asks first.
 - Paste warnings about Accessibility access carry an "Open Privacy Settings" button; "AI isn't set up yet" carries "Open Settings", and the AI submenu offers the same instead of a dead-end text row. "Generate Titles" is hidden while AI is off.
 - A search or history error with an empty list shows one error state, not a banner and an error state for the same error.
+- The copy-only setting is renamed "Double-click and Return copy without pasting", which is what it governs; a single click only selects. Typing in Suggestions searches History. The VoiceOver default action on a row pastes it. A history update that leaves the visible window unchanged no longer re-runs the search.
+- A clip whose image text recognition failed keeps that marker until the user clears it, instead of being retried on every launch.
+
+### Known gaps
+
+- Every history update still reloads the full rows of categorized clips. With very large categories that is extra work on each change; it needs a row-diffing change in the store and is left for later.
 
 ### Copy and accessibility
 
