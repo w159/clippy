@@ -293,6 +293,7 @@ final class PanelHarnessTests: XCTestCase {
         click(at: card)
         pump(seconds: 0.7)  // the double-click gesture delays the single tap
         pump(until: "list focused after a card click") { !(self.window.firstResponder is NSTextView) }
+        XCTAssertFalse(window.firstResponder is NSTextView, "the click moved focus off the search field to the list")
         typeText("deck")
         pump(seconds: 0.3)
         XCTAssertEqual(store.query, "deck", "first character must not be replaced by the second")
