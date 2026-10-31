@@ -37,6 +37,11 @@ final class ClipCardModelTests: XCTestCase {
         var edited = plain
         edited.contentText = "4111 1111 1111 1111"
         XCTAssertFalse(CardSensitivity.maskedLine(edited).contains("4111 1111 1111 1111"))
+        // The stale cached value would also lack the card number, so pin the exact masked form
+        // and require it to differ from the unedited clip's line (same id, different text).
+        XCTAssertEqual(CardSensitivity.maskedLine(edited),
+                       SensitiveContent.maskedPreview(edited.previewText).replacingOccurrences(of: "\n", with: " "))
+        XCTAssertNotEqual(CardSensitivity.maskedLine(edited), CardSensitivity.maskedLine(plain))
     }
 
     func testValueReportsOCRStates() {
