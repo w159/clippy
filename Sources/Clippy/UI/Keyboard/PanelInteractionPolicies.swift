@@ -33,9 +33,12 @@ enum CommandDeletePolicy {
 /// mode. The menu used to hard-code formatted paste for the main entry.
 enum PasteMenuPolicy {
     static func items(defaultPlain: Bool) -> (primaryPlain: Bool, alternate: (title: String, plain: Bool)) {
-        defaultPlain
-            ? (true, ("Paste with Formatting", false))
-            : (false, ("Paste as Plain Text", true))
+        // Spelled out with labels: the unlabeled nested-tuple ternary crashed
+        // the type checker ("failed to produce diagnostic for expression").
+        if defaultPlain {
+            return (primaryPlain: true, alternate: (title: "Paste with Formatting", plain: false))
+        }
+        return (primaryPlain: false, alternate: (title: "Paste as Plain Text", plain: true))
     }
 }
 
@@ -82,7 +85,8 @@ enum PanelFocusPolicy {
 /// visibility toggle left nothing focused).
 enum PaletteTogglePolicy {
     static func next(isVisible: Bool) -> (visible: Bool, focus: PanelFocusTarget?) {
-        isVisible ? (false, .search) : (true, nil)
+        if isVisible { return (visible: false, focus: .search) }
+        return (visible: true, focus: nil)
     }
 }
 
