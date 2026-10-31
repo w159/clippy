@@ -36,7 +36,7 @@ struct PaneScroll<Content: View>: View {
                 // The settings shell already renders the pane title above the pane; repeating it
                 // here duplicated the heading, so the title is exposed to accessibility only.
                 if let notice {
-                    ClippyToast(notice.message, severity: notice.severity) { self.notice = nil }
+                    ClippyToast(notice.message, severity: notice.severity, dismiss: { self.notice = nil })
                 }
                 content
             }
