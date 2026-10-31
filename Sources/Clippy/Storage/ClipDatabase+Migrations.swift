@@ -273,6 +273,14 @@ extension ClipDatabase {
                 CREATE INDEX IF NOT EXISTS clips_thumb_filename ON clips (thumbFilename)
                 WHERE thumbFilename IS NOT NULL
                 """)
+            // Eviction orders by this expression; without a matching expression index
+            // every capture past the cap sorts the whole table. SQLite only uses it when
+            // the ORDER BY text equals the indexed expression, hence the shared constant.
+            // Serves both directions (DESC for the keep set, ASC for the ceiling pass).
+            try connection.execute(sql: """
+                CREATE INDEX IF NOT EXISTS clips_history_entry
+                ON clips (\(ClipDatabase.historyEntrySQL), id)
+                """)
         }
     }
 }
