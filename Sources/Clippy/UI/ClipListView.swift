@@ -177,7 +177,11 @@ struct ClipListView: View {
         return nil
     }
 
-    var body: some View {
+    // `body` is split into chained pieces: one long modifier chain exceeds the
+    // type-checker budget ("unable to type-check this expression in reasonable time").
+    var body: some View { keystrokeAlertLayer }
+
+    private var panelLayout: some View {
         VStack(spacing: 0) {
             panelHeader
             Divider()
@@ -200,6 +204,11 @@ struct ClipListView: View {
         .ocrResultSheet(store: store, onPaste: onPaste)
         .modifier(ClipListFeatureModifier(store: store, smartCollections: smartCollections, features: $features,
                                           selectedClip: selectedClip))
+    }
+
+    /// Store observers and the selection bookkeeping that follows them.
+    private var observedLayout: some View {
+        panelLayout
         .onReceive(NotificationCenter.default.publisher(for: .clippyPasteResult)) { handlePasteResult($0.object) }
         .onChange(of: store.storageWarning) { _, usage in handleStorageWarning(usage) }
         .onChange(of: store.categoryError) { _, message in handleCategoryError(message) }
@@ -231,6 +240,10 @@ struct ClipListView: View {
             selectedIndex = 0
         }
         .onChange(of: store.completedQuery) { _, _ in finishPendingReturn() }
+    }
+
+    private var trackedLayout: some View {
+        observedLayout
         .onChange(of: store.suggestionsState) { _, newState in
             // Auto-open: show the Suggestions pane once results land, unless
             // the user already navigated somewhere this presentation.
@@ -265,6 +278,10 @@ struct ClipListView: View {
             selectedClipIDs = []
             attemptPendingReveal()
         }
+    }
+
+    private var sheetsLayer: some View {
+        trackedLayout
         // AI action sheet, shown when a context-menu AI action produces a proposal.
         .sheet(isPresented: Binding(
             get: { aiRunner.isPresenting },
@@ -285,6 +302,10 @@ struct ClipListView: View {
         )) {
             instructionSheet
         }
+    }
+
+    private var alertsLayer: some View {
+        sheetsLayer
         // Confirmation for a delete that cannot be undone (the clip's media is
         // too large to keep for Cmd+Z; see `requestDelete`). The button is marked
         // destructive so it reads red and is not the default action.
@@ -316,6 +337,10 @@ struct ClipListView: View {
         } message: { _ in
             Text("You can undo this in the panel with \u{2318}Z, unless a clip is too large to keep for Undo.")
         }
+    }
+
+    private var keystrokeAlertLayer: some View {
+        alertsLayer
         // Confirmation gate for large keystroke actions so an accidental click
         // does not type thousands of characters into the active app.
         .alert(
