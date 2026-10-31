@@ -36,8 +36,57 @@ jobs:
             - name: Build
               run: swift build
 
+            # Tee the output so the XCTest totals are printed as their own line:
+            # the swift-testing summary at the end only counts swift-testing tests.
             - name: Test
-              run: swift test
+              run: |
+                  set -o pipefail
+                  swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log"
+                  echo "::notice title=XCTest totals::$(grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/swift-test.log" | tail -1)"
+
+    app:
+        name: App bundle, UI harness and screenshots
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v6.0.3
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
+            # Drives the real panel in a real window with real key and mouse
+            # events (PanelHarnessTests): search, Return mid-typing, typing from
+            # the list, no results; and saves light and dark screenshots of the
+            # panel, Settings and onboarding.
+            - name: UI harness
+              env:
+                  CLIPPY_UI_HARNESS: "1"
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+              run: |
+                  set -o pipefail
+                  swift test --filter PanelHarnessTests 2>&1 | tee "$RUNNER_TEMP/harness.log"
+                  grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/harness.log" | tail -1
+
+            - name: Build Clippy.app
+              run: scripts/make-app.sh 0.0.0-ci
+
+            # The bundle must launch and stay up; a crash on start fails here.
+            - name: Launch smoke test
+              run: |
+                  mkdir -p "$RUNNER_TEMP/screenshots"
+                  open build/Clippy.app
+                  sleep 8
+                  pgrep -x Clippy
+                  /usr/sbin/screencapture -x "$RUNNER_TEMP/screenshots/09-first-launch.png" || true
+                  pkill -x Clippy || true
+
+            - name: Upload screenshots
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: clippy-screenshots
+                  path: ${{ runner.temp }}/screenshots
+                  if-no-files-found: warn
 
     mcp:
         name: MCP server
