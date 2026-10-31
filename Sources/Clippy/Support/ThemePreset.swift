@@ -34,6 +34,7 @@ struct ThemeTokens {
 /// user's per-surface colors from AppSettings; the rest are fixed palettes
 /// matching their well-known namesakes.
 enum ThemePreset: String, CaseIterable, Identifiable {
+    case automatic
     case system
     case cleanLight
     case githubDark
@@ -49,6 +50,7 @@ enum ThemePreset: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .automatic: return "Clean (match system)"
         case .system: return "Match system"
         case .cleanLight: return "Clean Light"
         case .githubDark: return "GitHub Dark"
@@ -65,7 +67,7 @@ enum ThemePreset: String, CaseIterable, Identifiable {
     /// Presets shown in the picker, in display order. `.system` and `.custom`
     /// bracket the fixed palettes.
     static var selectable: [ThemePreset] {
-        [.system, .cleanLight, .githubDark, .dracula, .materialDarkPlus, .nord, .oneDark, .tokyoNight, .solarizedDark, .custom]
+        [.automatic, .system, .cleanLight, .githubDark, .dracula, .materialDarkPlus, .nord, .oneDark, .tokyoNight, .solarizedDark, .custom]
     }
 
     /// Fixed token table for the palette presets. nil for `.system` and
@@ -170,9 +172,18 @@ enum ThemePreset: String, CaseIterable, Identifiable {
                 success: hex("#859900"), danger: hex("#DC322F"),
                 isDark: true
             )
-        case .system, .custom:
+        case .automatic, .system, .custom:
             return nil
         }
+    }
+
+    /// The concrete preset to draw with for the given effective appearance.
+    /// `.automatic` is Clean Light in light mode and its GitHub Dark counterpart
+    /// in dark mode (Clean Light is GitHub's light palette); every other preset
+    /// is already concrete and is returned unchanged, so a user's explicit
+    /// choice never flips with the OS.
+    func concrete(isDark: Bool) -> ThemePreset {
+        self == .automatic ? (isDark ? .githubDark : .cleanLight) : self
     }
 
     private func hex(_ value: String) -> Color { Color(themeHex: value) }
@@ -199,6 +210,8 @@ enum Theme {
     static func tokens(_ settings: AppSettings) -> ThemeTokens {
         var base: ThemeTokens
         switch settings.themePreset {
+        case .automatic:
+            base = settings.themePreset.concrete(isDark: effectiveIsDark(settings)).fixedTokens ?? customSeed
         case .system:
             base = systemTokens(settings)
         case .custom:
@@ -257,7 +270,7 @@ enum Theme {
     /// token table so a dark theme never shows light scrollbars.
     static func nsAppearance(_ settings: AppSettings) -> NSAppearance? {
         switch settings.themePreset {
-        case .system:
+        case .automatic, .system:
             return settings.appearanceMode.nsAppearance
         default:
             return NSAppearance(named: tokens(settings).isDark ? .darkAqua : .aqua)
@@ -299,7 +312,10 @@ enum Theme {
         case .light: return false
         case .dark: return true
         case .system:
-            return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            // The hosting window's color scheme (pushed by the design-system
+            // environment) beats a one-off read of the app appearance.
+            return settings.hostColorSchemeIsDark
+                ?? (NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
         }
     }
 }

@@ -38,6 +38,7 @@ extension AppSettings {
         hasher.combine(customAccentHex)
         hasher.combine(customSuccessHex)
         hasher.combine(customDangerHex)
+        hasher.combine(hostColorSchemeIsDark)
         hasher.combine(Theme.appearanceEpoch)
         return hasher.finalize()
     }

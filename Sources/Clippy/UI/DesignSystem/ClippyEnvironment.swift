@@ -53,11 +53,17 @@ extension View {
 private struct ClippyDesignSystemEnvironment: ViewModifier {
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        content
+        // Resolve against this host's own scheme so a dark window gets dark
+        // tokens at once; views that read `settings.theme` directly follow via
+        // the shared value and the re-render below.
+        settings.hostColorSchemeChanged(isDark: colorScheme == .dark)
+        return content
+            .onChange(of: colorScheme) { _, _ in settings.objectWillChange.send() }
             .environment(\.clippyTokens, ClippyTokens.resolve(from: settings.theme, contrast: contrast))
             .environment(\.clippyTextScale, ClippyTextScale.multiplier)
             .environment(\.clippyFontFamily, settings.fontFamily)
