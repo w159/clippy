@@ -124,12 +124,17 @@ final class SurfaceFixTests: XCTestCase {
         }
         var declared = Set<String>()
         let single = try NSRegularExpression(pattern: "settingsRow\\(\"([^\"]+)\"\\)")
+        // sizePicker(...) forwards its id to .settingsRow(id), so the literal sits at the call site.
+        let picker = try NSRegularExpression(pattern: "sizePicker\\([^\\n]*id:\\s*\"([^\"]+)\"")
         let list = try NSRegularExpression(pattern: "anchors:\\s*\\[([^\\]]*)\\]")
         let quoted = try NSRegularExpression(pattern: "\"([^\"]+)\"")
         for case let url as URL in walker where url.pathExtension == "swift" {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
             let whole = NSRange(text.startIndex..., in: text)
             for match in single.matches(in: text, range: whole) {
+                declared.insert(String(text[Range(match.range(at: 1), in: text)!]))
+            }
+            for match in picker.matches(in: text, range: whole) {
                 declared.insert(String(text[Range(match.range(at: 1), in: text)!]))
             }
             for match in list.matches(in: text, range: whole) {
