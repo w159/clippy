@@ -15,7 +15,7 @@ extension ClipListView {
             ErrorState(title: "Search failed", message: message) { store.retrySearch() }
         } else if let message = store.observationError {
             ErrorState(title: "History unavailable", message: message) { store.retryObservation() }
-        } else if !store.query.isEmpty {
+        } else if HistoryPanePolicy.isSearching(store.query) {
             EmptyState(
                 systemImage: "magnifyingglass",
                 title: "No clips match",

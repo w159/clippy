@@ -130,7 +130,7 @@ extension ClipListView {
     /// Applies the selected smart collection to the History list.
     func smartFiltered(_ base: [Clip]) -> [Clip] {
         guard let smart = features.smartClips else { return base }
-        if store.query.isEmpty { return smart.filter { !store.isPinned($0) } }
+        if !HistoryPanePolicy.isSearching(store.query) { return smart.filter { !store.isPinned($0) } }
         let ids = Set(smart.compactMap(\.id))
         return base.filter { $0.id.map(ids.contains) ?? false }
     }

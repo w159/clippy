@@ -48,6 +48,7 @@ extension ClipListView {
         if let index = visibleClips.firstIndex(where: { $0.id == target }) {
             pendingRevealClipID = nil
             selectedClipIDs = []
+            selectionFollowsTop = false
             anchoredClipID = target
             selectedIndex = index
         } else if store.query.isEmpty {
@@ -73,6 +74,7 @@ extension ClipListView {
     /// Focus moves to the list container, not back to search (KEY-06).
     func handleRowClick(_ clip: Clip, at index: Int, modifiers: EventModifiers) {
         guard let id = clip.id else { return }
+        selectionFollowsTop = false
         syncRangeModel()
         if modifiers.contains(.command) {
             rangeModel.toggle(id)

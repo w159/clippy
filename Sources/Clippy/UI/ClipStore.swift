@@ -35,6 +35,11 @@ final class ClipStore: ObservableObject {
     /// Last search failure. Non-nil triggers an error banner with Retry in the
     /// panel. Cleared on the next successful search or when the query empties.
     @Published var searchError: String?
+    /// Trimmed query whose results are in `clips`. Lags `query` while a search
+    /// is debounced or running; `hasPendingSearch` compares the two so Return
+    /// pressed mid-typing can wait for the results it means instead of pasting
+    /// the previous query's top clip.
+    @Published private(set) var completedQuery = ""
     /// Last DB observation failure. Non-nil triggers an error banner with a
     /// Retry that re-starts the ValueObservation pipelines.
     @Published var observationError: String?
@@ -327,7 +332,9 @@ final class ClipStore: ObservableObject {
         if trimmed.isEmpty {
             // Immediate: clearing search should never feel laggy.
             searchError = nil
+            semanticMatches = [:]
             clips = residentClips()
+            completedQuery = ""
             return
         }
         searchDebounce = Task { [weak self] in
@@ -337,6 +344,19 @@ final class ClipStore: ObservableObject {
             // thread so SwiftUI observes the change on the right queue.
             await MainActor.run { self.refilter() }
         }
+    }
+
+    /// True while `clips` still holds results for an older query.
+    var hasPendingSearch: Bool {
+        completedQuery != query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Skips the debounce: runs the search for the current query now. Used when
+    /// the user commits (Return) before the debounce fired.
+    func searchNow() {
+        guard hasPendingSearch else { return }
+        searchDebounce?.cancel()
+        refilter()
     }
 
     /// Bump the generation and cancel the running search. Called on EVERY path
@@ -354,6 +374,7 @@ final class ClipStore: ObservableObject {
             searchError = nil
             semanticMatches = [:]
             clips = residentClips()
+            completedQuery = ""
             return
         }
         let token = refilterToken
@@ -376,12 +397,14 @@ final class ClipStore: ObservableObject {
                 case .success(let found):
                     self.clips = found
                     self.searchError = nil
+                    self.completedQuery = trimmed
                     self.scheduleSemanticMerge(query: trimmed, token: token, keyword: found)
                 case .failure(let error):
                     ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
                     // Keep the last results on screen rather than wiping to empty; the
                     // banner carries the failure and a Retry action.
                     self.searchError = error.localizedDescription
+                    self.completedQuery = trimmed
                 }
             }
         }
@@ -390,11 +413,12 @@ final class ClipStore: ObservableObject {
 
 extension Clip {
     /// In-memory match used to scope the search field to the active category
-    /// pane (FTS5 only runs against the global history window). Understands the
-    /// same grammar as ClipDatabase.search except `in:` (the pane already scopes
-    /// the category): kinds, apps, dates, sizes, negations, phrases and free
-    /// text, matched case- and diacritic-insensitively against text, title,
-    /// source app name and OCR text.
+    /// pane (the database search runs against the whole history). Understands
+    /// the same grammar as ClipDatabase.search except `in:` (the pane already
+    /// scopes the category), and matches free text the same way: anywhere in
+    /// the text, title or OCR text, case- and diacritic-insensitive. The source
+    /// app name is not free text in either place (`app:` filters it), so a
+    /// result never appears without a visible match.
     func matchesLocally(query: String) -> Bool {
         let parsed = ClipQueryParser.parse(query)
 
@@ -415,7 +439,7 @@ extension Clip {
             if !parsed.sizeConstraints.allSatisfy({ $0.matches(size) }) { return false }
         }
 
-        let haystacks = [contentText, userTitle ?? "", sourceAppName ?? "", ocrText ?? ""]
+        let haystacks = [contentText, userTitle ?? "", ocrText ?? ""]
         func has(_ needle: String) -> Bool { haystacks.contains { SearchHighlight.contains($0, needle) } }
         if parsed.excludedTerms.contains(where: has) || parsed.excludedPhrases.contains(where: has) { return false }
         return parsed.highlightTerms.allSatisfy(has)
