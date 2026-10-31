@@ -32,6 +32,10 @@ final class OnboardingViewModel: ObservableObject {
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
+    /// UserNotifications throws outside an app bundle (unit tests, `swift run`),
+    /// where it has no identity to ask for; the status then stays not determined.
+    private static var canUseNotifications: Bool { Bundle.main.bundleURL.pathExtension == "app" }
+
     /// Starts 1s polling of permission state (it changes in System Settings).
     func startPolling() {
         refresh()
@@ -57,6 +61,7 @@ final class OnboardingViewModel: ObservableObject {
         let login = LaunchAtLogin.status
         if launchStatus != login { launchStatus = login }
         notificationRefreshTask?.cancel()
+        guard Self.canUseNotifications else { return }
         notificationRefreshTask = Task { [weak self] in
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             guard let self, !Task.isCancelled else { return }
@@ -71,7 +76,7 @@ final class OnboardingViewModel: ObservableObject {
 
     /// Asks for notification permission (auto-clear alerts).
     func requestNotifications() {
-        guard !requestingNotifications else { return }
+        guard !requestingNotifications, Self.canUseNotifications else { return }
         requestingNotifications = true
         notificationRequestTask = Task { [weak self] in
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
