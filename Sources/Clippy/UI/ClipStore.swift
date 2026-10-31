@@ -102,7 +102,12 @@ final class ClipStore: ObservableObject {
     /// mid-search cannot overwrite the current results with stale ones.
     var refilterToken = 0
     /// Where each semantic-merged hit came from (search pass 2); empty unless the semantic opt-in produced results.
-    var semanticMatches: [Int64: SearchMatchSource] = [:]
+    /// Deliberately not @Published: views read it together with `clips`, which is republished on any change.
+    var semanticMatches: [Int64: SearchMatchSource] = [:] {
+        didSet { semanticMatchesAssignCount += 1 }
+    }
+    /// Test seam: how many times `semanticMatches` was assigned, so a pulse that clears and restores badges is visible.
+    private(set) var semanticMatchesAssignCount = 0
     /// Runs the keyword search off the main actor. A seam so tests can make it fail.
     typealias SearchRunner = @Sendable (ClipDatabase, String, Int) throws -> [Clip]
     var searchRunner: SearchRunner = { database, query, limit in
