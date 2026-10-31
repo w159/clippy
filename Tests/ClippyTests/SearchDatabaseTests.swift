@@ -101,12 +101,64 @@ final class SearchDatabaseTests: XCTestCase {
         XCTAssertEqual(try texts(db, "-#link plain", limit: 5).count, 5)
     }
 
-    func testUnusableTextProducesWarningAndRecentFallback() throws {
+    // MARK: - Free-text matching (search used to miss fragments and match everything on punctuation)
+
+    func testPunctuationOnlyQueryIsALiteralNotEverything() throws {
         let db = try makeTestDatabase(self)
         try add(db, clip("hello"))
-        let outcome = try db.search(matching: "!!!", limit: 5)
-        XCTAssertEqual(outcome.warnings.map(\.kind), [.unsearchableText])
-        XCTAssertEqual(outcome.hits.count, 1)
+        try add(db, clip("mail me at jo@example.com"))
+        try add(db, clip("wow!!! really"))
+        let bang = try db.search(matching: "!!!", limit: 5)
+        XCTAssertTrue(bang.warnings.isEmpty)
+        XCTAssertEqual(bang.clips.map(\.contentText), ["wow!!! really"])
+        XCTAssertEqual(try texts(db, "@"), ["mail me at jo@example.com"])
+        XCTAssertEqual(try texts(db, "-@"), ["wow!!! really", "hello"])
+    }
+
+    func testFragmentsMatchInsideWords() throws {
+        let db = try makeTestDatabase(self)
+        try add(db, clip("https://github.com/w159/clippy"))
+        try add(db, clip("let value = getUserName(id)"))
+        try add(db, clip("C++ templates"))
+        try add(db, clip("c sharp notes"))
+        XCTAssertEqual(try texts(db, "hub"), ["https://github.com/w159/clippy"])
+        XCTAssertEqual(try texts(db, "UserName"), ["let value = getUserName(id)"])
+        XCTAssertEqual(try texts(db, "c++"), ["C++ templates"])
+        XCTAssertEqual(try texts(db, "w159/clip"), ["https://github.com/w159/clippy"])
+        XCTAssertEqual(Set(try texts(db, "-hub")).count, 3)
+    }
+
+    func testWordStartsStillMatchWithCaseAndDiacriticsIgnored() throws {
+        let db = try makeTestDatabase(self)
+        try add(db, clip("Invoice for the Caf\u{e9} order"))
+        try add(db, clip("unrelated"))
+        XCTAssertEqual(try texts(db, "inv"), ["Invoice for the Caf\u{e9} order"])
+        XCTAssertEqual(try texts(db, "cafe"), ["Invoice for the Caf\u{e9} order"])
+        XCTAssertEqual(try texts(db, "INVOICE cafe"), ["Invoice for the Caf\u{e9} order"])
+    }
+
+    func testWordMatchesRankAboveFragmentsAndNewestComesFirst() throws {
+        let db = try makeTestDatabase(self)
+        let base = Date().addingTimeInterval(-10_000)
+        try add(db, clip("invoice paid", at: base))
+        try add(db, clip(String(repeating: "invoice ", count: 30), at: base.addingTimeInterval(10)))
+        try add(db, clip("invoice due friday", at: base.addingTimeInterval(20)))
+        try add(db, clip("reinvoiced the client", at: base.addingTimeInterval(30)))
+        XCTAssertEqual(try texts(db, "invoice"), [
+            "invoice due friday", String(repeating: "invoice ", count: 30), "invoice paid", "reinvoiced the client",
+        ])
+    }
+
+    func testFragmentsMatchTitleAndRecognisedText() throws {
+        let db = try makeTestDatabase(self)
+        let titled = try add(db, clip("body text"))
+        try db.dbQueue.write { try $0.execute(sql: "UPDATE clips SET userTitle = 'Deployment checklist' WHERE id = ?", arguments: [titled]) }
+        let image = try add(db, clip("", kind: .image, media: "shot.png"))
+        try db.setOCRText(id: image, text: "Total: 1,234.56 USD")
+        XCTAssertEqual(try db.search(matching: "ploym", limit: 5).clips.map(\.id), [titled])
+        let ocr = try db.search(matching: "234.5", limit: 5).hits
+        XCTAssertEqual(ocr.map(\.clip.id), [image])
+        XCTAssertEqual(ocr.map(\.matchedIn), [.ocr])
     }
 
     // MARK: - OCR text + FTS triggers

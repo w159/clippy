@@ -76,11 +76,11 @@ final class SearchGrammarTests: XCTestCase {
         XCTAssertEqual(parse("after:2025-01-01..2025-02-01").warnings.map(\.kind), [.invalidDate])
     }
 
-    func testUnsearchableWordWarnsInsteadOfVanishing() {
+    func testPunctuationWordIsKeptAsLiteralTextWithoutWarning() {
         let p = parse("!!! foo")
-        XCTAssertEqual(p.warnings.map(\.kind), [.unsearchableText])
-        XCTAssertEqual(p.warnings.first?.token, "!!!")
-        XCTAssertFalse(p.warnings.first!.message.isEmpty)
+        XCTAssertTrue(p.warnings.isEmpty)
+        XCTAssertEqual(p.text, "!!! foo")
+        XCTAssertEqual(p.highlightTerms, ["!!!", "foo"])
     }
 
     func testDateOperators() {

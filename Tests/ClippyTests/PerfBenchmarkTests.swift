@@ -51,6 +51,10 @@ final class PerfBenchmarkTests: XCTestCase {
         }
         let search = try ms("FTS search 'invoice'") { _ = try db.search(matching: "invoice", limit: 300) }
         let search2 = try ms("FTS search 'quarterly review'") { _ = try db.search(matching: "quarterly review", limit: 300) }
+        // Fragment-only and no-match queries fall through the index to the LIKE
+        // scan: the worst case for every keystroke.
+        let fragment = try ms("fragment search 'nvoic'") { _ = try db.search(matching: "nvoic", limit: 300) }
+        let miss = try ms("no-match search 'zqxjv'") { _ = try db.search(matching: "zqxjv", limit: 300) }
         let kind = try ms("filter kind #image") { _ = try db.search(matching: "#image", limit: 300) }
         let app = try ms("filter app:xcode") { _ = try db.search(matching: "app:xcode", limit: 300) }
         let pin = try ms("pin toggle") { try db.toggleStarterMembership(clipID: 1234) }
@@ -68,6 +72,8 @@ final class PerfBenchmarkTests: XCTestCase {
         XCTAssertLessThan(list, 30 * slack, "10k-clip initial list fetch budget")
         XCTAssertLessThan(search, 50 * slack, "10k-clip FTS search budget")
         XCTAssertLessThan(search2, 50 * slack, "10k-clip multi-term search budget")
+        XCTAssertLessThan(fragment, 100 * slack, "10k-clip fragment search budget")
+        XCTAssertLessThan(miss, 100 * slack, "10k-clip no-match search budget")
         XCTAssertLessThan(kind, 50 * slack, "10k-clip kind filter budget")
         XCTAssertLessThan(app, 50 * slack, "10k-clip app filter budget")
         XCTAssertLessThan(pin, 20 * slack, "10k-clip pin toggle budget")
