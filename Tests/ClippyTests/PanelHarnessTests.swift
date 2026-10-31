@@ -81,7 +81,7 @@ final class PanelHarnessTests: XCTestCase {
     private func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name) {
         NSApp.appearance = NSAppearance(named: appearance)
         let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
-                                 styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                                 styleMask: PastePanel.chromeStyleMask,
                                  backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: appearance)
         window.titlebarAppearsTransparent = true
@@ -91,6 +91,7 @@ final class PanelHarnessTests: XCTestCase {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         pump(seconds: 0.5)
+        if !window.isKeyWindow { print("HARNESS warning: window is not key") }
     }
 
     // MARK: - Run loop and events
