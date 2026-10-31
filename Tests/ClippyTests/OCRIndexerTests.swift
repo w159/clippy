@@ -122,7 +122,7 @@ final class OCRIndexerTests: XCTestCase {
         XCTAssertEqual(try db.clipsNeedingOCR(limit: 10).count, 4 - result.indexed)
     }
 
-    func testRecognitionFailureLeavesClipUnscannedAndContinues() async throws {
+    func testRecognitionFailureIsMarkedScannedAndNotRetried() async throws {
         let db = try makeTestDatabase(self)
         _ = try addImage(db, "bad.png")
         _ = try addImage(db, "good.png")
@@ -137,7 +137,12 @@ final class OCRIndexerTests: XCTestCase {
         let result = await indexer.runPass()
         XCTAssertEqual(result.indexed, 1)
         XCTAssertEqual(result.failed, 1)
-        XCTAssertEqual(try db.clipsNeedingOCR(limit: 10).count, 1)
+        // A failed clip is marked scanned (empty text), so the next kick skips it
+        // instead of retrying it at 2 s each forever.
+        XCTAssertTrue(try db.clipsNeedingOCR(limit: 10).isEmpty)
+        XCTAssertEqual(try db.allClips().first { $0.mediaFilename == "bad.png" }?.ocrText, "")
+        let second = await indexer.runPass()
+        XCTAssertEqual(second, OCRIndexer.PassResult(indexed: 0, skippedSensitive: 0, failed: 0, stop: .finished))
     }
 
     func testCapturedNotificationTriggersPass() async throws {

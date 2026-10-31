@@ -188,6 +188,12 @@ final class OCRIndexer: @unchecked Sendable {
                     }
                 case .failure:
                     result.failed += 1
+                    // Mark the clip scanned ("" = no text) so the next kick does not
+                    // retry it (2 s each) forever. Clearing OCR text or editing the
+                    // image resets it to NULL, and Extract Text still works by hand.
+                    do { try database.setOCRText(id: id, text: "") } catch {
+                        ClippyLog.error("OCR failure marker write failed: \(error)", category: ClippyLog.storage)
+                    }
                 }
                 await pause(minimumInterval)
             }

@@ -109,6 +109,14 @@ extension ClipDatabase {
             }
         }
         _ = try dbQueue.write { db in
+            // The members become plain history clips. Stamp them in this same
+            // transaction (the FK cascade below would otherwise be the only
+            // thing touching them) so they enter history as new, not as their
+            // old capture date, and the next capture cannot evict them.
+            try db.execute(
+                sql: "UPDATE clips SET unfiledAt = ? WHERE id IN (SELECT clipID FROM clip_category WHERE categoryID = ?)",
+                arguments: [Date(), id]
+            )
             try Category.deleteOne(db, key: id)
         }
         // Drop the cache if the starter itself was deleted so Cmd+P recreates it.
@@ -175,6 +183,24 @@ extension ClipDatabase {
                     arguments: [clipID, categoryID]
                 )
             }
+        }
+    }
+
+    /// Files a clip into `categoryID`, first leaving `others`, as ONE transaction.
+    /// Two separate writes left a window where the clip was in no category and a
+    /// concurrent capture's eviction pass could delete it.
+    func fileClip(_ clipID: Int64, into categoryID: Int64, leaving others: Set<Int64>) throws {
+        try dbQueue.write { db in
+            for existing in others where existing != categoryID {
+                try db.execute(
+                    sql: "DELETE FROM clip_category WHERE clipID = ? AND categoryID = ?",
+                    arguments: [clipID, existing]
+                )
+            }
+            try db.execute(
+                sql: "INSERT OR IGNORE INTO clip_category (clipID, categoryID, addedAt) VALUES (?, ?, ?)",
+                arguments: [clipID, categoryID, Date()]
+            )
         }
     }
 

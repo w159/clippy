@@ -464,25 +464,34 @@ extension ClipboardMonitor {
             // Detection and hashing run here, off the main thread: both are
             // linear in the text and a huge paste must not stall the UI.
             let findings = SensitiveContent.detect(text)
-            let sensitive = findings.contains { $0.confidence >= SensitiveContent.sensitiveThreshold }
             let key = Clip.contentKey(kind: .text, text: text, mediaFilename: nil, filePath: nil)
+            // The user's explicit "sensitive" / "not sensitive" choice for this exact
+            // content beats detection (a re-copy of text they cleared must not be
+            // auto-cleared again).
+            let detectedSensitive = findings.contains { $0.confidence >= SensitiveContent.sensitiveThreshold }
+            let sensitive = flagStore.entry(for: key)?.userOverride ?? detectedSensitive
             // Opt-in "copy twice to append" (FEAT-13): a quick second copy from the
             // same app extends the previous clip instead of adding one. Never for sensitive text.
             let appendDecision = appendTracker.evaluate(text: text, bundleID: bundleID, sensitive: sensitive, now: createdAt)
             if case .append(let targetID, let merged) = appendDecision {
                 do {
-                    try database.updateClipText(id: targetID, newText: merged)
+                    // Refuses a clip that was filed or pinned since it was captured:
+                    // appending drops its RTF/HTML and must never rewrite a clip the
+                    // user organized. In that case the copy is stored as its own clip.
+                    if try database.appendClipText(id: targetID, newText: merged) {
+                        DispatchQueue.main.async { [weak self] in
+                            self?.recordSuccess()
+                            self?.playCaptureSound(appended: true)
+                        }
+                        return
+                    }
+                    appendTracker.forget()
                 } catch {
                     ClippyLog.error("Failed to append to clip: \(error)", category: ClippyLog.capture)
                     appendTracker.forget()
                     self?.recordFailure("Could not append to the previous clip")
                     return
                 }
-                DispatchQueue.main.async { [weak self] in
-                    self?.recordSuccess()
-                    self?.playCaptureSound(appended: true)
-                }
-                return
             }
             var clip = Clip(
                 id: nil,
@@ -501,13 +510,16 @@ extension ClipboardMonitor {
                     }
                 }
                 flagStore.record(key: key, findings: findings)
-                try database.saveCapturedClip(&clip, cap: cap)
-                appendTracker.recordSaved(clipID: clip.id, text: text, bundleID: bundleID, date: createdAt, sensitive: sensitive)
-                var savedID = clip.id
-                if sensitive, savedID == nil {
-                    savedID = try? database.dbQueue.read { try Clip.duplicateText(of: text).fetchOne($0)?.id }
+                let inserted = try database.saveCapturedClip(&clip, cap: cap)
+                // A re-copy of an existing clip only bumps it. That older clip is not
+                // this capture's to append to, retitle or auto-clear: only a row this
+                // capture created is handed on.
+                let clipID = inserted ? clip.id : nil
+                if inserted {
+                    appendTracker.recordSaved(clipID: clip.id, text: text, bundleID: bundleID, date: createdAt, sensitive: sensitive)
+                } else {
+                    appendTracker.forget()
                 }
-                let clipID = savedID
                 // Sound/title fire only after a confirmed save; duplicates or DB
                 // errors get no feedback. Hop back to main for AppKit + the
                 // .clippyDidCapture notification the status item observes.
@@ -540,6 +552,8 @@ extension ClipboardMonitor {
     func scheduleAutoClear(changeCount: Int, clipID: Int64?, key: String, after delay: TimeInterval) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
+            // The user marked this content "not sensitive" while the timer ran.
+            if self.flagStore.entry(for: key)?.userOverride == false { return }
             var clearedClipboard = false
             var deletedHistory = false
             if self.pasteboard.changeCount == changeCount {
@@ -548,9 +562,11 @@ extension ClipboardMonitor {
             }
             if CapturePreferences.autoClearDeletesHistory, let clipID {
                 do {
-                    try self.database.deleteClip(id: clipID)
-                    self.flavorStore.delete(key: key)
-                    deletedHistory = true
+                    // Never removes a clip the user has since pinned or filed.
+                    if try self.database.deleteClipUnlessFiled(id: clipID) {
+                        self.flavorStore.delete(key: key)
+                        deletedHistory = true
+                    }
                 } catch {
                     ClippyLog.error("Auto-clear could not delete a sensitive clip: \(error)", category: ClippyLog.capture)
                 }

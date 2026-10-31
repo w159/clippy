@@ -433,9 +433,20 @@ enum ClippyArchive {
     private static func stage(_ clip: ArchivedClip, mediaURL: URL?, database: ClipDatabase) -> Staged {
         switch clip.kind {
         case "image":
-            guard let url = mediaURL, let raw = FileManager.default.contents(atPath: url.path),
-                  let image = NSImage(data: raw), let png = MediaStore.pngData(from: image),
-                  let stored = try? database.media.store(pngData: png) else { return .skippedImage }
+            guard let url = mediaURL, let raw = FileManager.default.contents(atPath: url.path) else {
+                return .skippedImage
+            }
+            // A PNG keeps its exact bytes: re-encoding through NSImage/TIFF changes the
+            // content hash, so every sync would miss the dedupe and add the image again.
+            let png: Data
+            if let passthrough = MediaStore.pngData(fromEncoded: raw) {
+                png = passthrough
+            } else if let image = NSImage(data: raw), let converted = MediaStore.pngData(from: image) {
+                png = converted
+            } else {
+                return .skippedImage
+            }
+            guard let stored = try? database.media.store(pngData: png) else { return .skippedImage }
             return .image(stored)
         case "file":
             let path = clip.filePath
