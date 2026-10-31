@@ -58,6 +58,15 @@ final class SidebarBehaviorTests: XCTestCase {
     func testHistoryCountMatchesUnfiledClips() {
         XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: [1, 2, 3, nil], membership: [1: [9], 2: [], 3: [10, 11]]), 2)
     }
+    /// Seeded fault: counting only unfiled clips while searching shows "History 1"
+    /// beside a list header of "History 2" (clip 2 is filed but matches the query).
+    func testHistoryCountIncludesFiledMatchesWhileSearching() {
+        let ids: [Int64?] = [1, 2]
+        let membership: [Int64: Set<Int64>] = [2: [9]]
+        XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: ids, membership: membership, query: ""), 1)
+        XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: ids, membership: membership, query: "invoice"), 2)
+        XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: ids, membership: membership, query: "   "), 1)
+    }
     private func makeCategory(id: Int64, name: String, sortOrder: Int) -> Clippy.Category {
         Clippy.Category(id: id, name: name, colorHex: "#112233", iconKind: .symbol, iconValue: "folder", sortOrder: sortOrder, isStarter: false, createdAt: .distantPast)
     }
