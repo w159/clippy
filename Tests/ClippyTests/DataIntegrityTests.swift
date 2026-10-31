@@ -1,4 +1,5 @@
 import AppKit
+import GRDB
 import XCTest
 
 @testable import Clippy
@@ -9,6 +10,24 @@ import XCTest
 @MainActor
 final class DataIntegrityTests: XCTestCase {
     private let base = Date(timeIntervalSince1970: 1_700_000_000)
+
+    /// Seeded fault: no expression index, so every eviction pass sorted the whole table.
+    /// Both eviction orderings must be answered from `clips_history_entry`.
+    func testEvictionOrderingUsesTheHistoryEntryIndex() throws {
+        let db = try makeTestDatabase(self)
+        let order = ClipDatabase.historyEntrySQL
+        for direction in ["ASC", "DESC"] {
+            let plan = try db.dbQueue.read { connection in
+                try Row.fetchAll(connection, sql: """
+                    EXPLAIN QUERY PLAN SELECT id FROM clips
+                    WHERE id NOT IN (SELECT clipID FROM clip_category)
+                    ORDER BY \(order) \(direction), id \(direction) LIMIT 5
+                    """).map { ($0["detail"] as String?) ?? "" }.joined(separator: " | ")
+            }
+            XCTAssertTrue(plan.contains("clips_history_entry"), "\(direction): \(plan)")
+            XCTAssertFalse(plan.contains("USE TEMP B-TREE FOR ORDER BY"), "\(direction): \(plan)")
+        }
+    }
 
     private func insertTexts(_ db: ClipDatabase, prefix: String, count: Int, start: Date,
                              step: TimeInterval) throws -> [Int64] {
@@ -357,6 +376,26 @@ final class SensitiveRecopyTests: CaptureTestCase {
         monitor.tick()
         XCTAssertTrue(waitFor(4) { notices > 0 })
         XCTAssertNotNil(try db.allClips().first { $0.id == saved.id }, "the re-copy deleted the filed clip")
+    }
+
+    /// Seeded fault: a re-copy that only bumped an existing unfiled clip passed no id to
+    /// auto-clear, so a secret captured while auto-clear was off stayed in history.
+    func testRecopyOfAnUnfiledSensitiveClipIsAutoClearedFromHistory() throws {
+        let db = try makeTestDatabase(self)
+        let pb = makePasteboard()
+        let monitor = makeMonitor(db, pb)
+        var notices = 0
+        monitor.autoClearNotifier = { _, _ in notices += 1 }
+        CapturePreferences.sensitiveAutoClearSeconds = 0  // first capture schedules nothing
+        write(pb, card)
+        monitor.tick()
+        let saved = try XCTUnwrap(try clip(db, text: card))
+
+        CapturePreferences.sensitiveAutoClearSeconds = 1
+        write(pb, card)
+        monitor.tick()
+        XCTAssertTrue(waitFor(4) { notices > 0 })
+        XCTAssertNil(try db.allClips().first { $0.id == saved.id }, "the secret stayed in history after the re-copy")
     }
 
     func testNotSensitiveOverrideStopsAutoClearOfARecopy() throws {
