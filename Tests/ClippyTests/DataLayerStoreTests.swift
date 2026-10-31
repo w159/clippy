@@ -33,7 +33,8 @@ final class DataLayerStoreTests: XCTestCase {
         let store = ClipStore(database: db)
         waitFor("initial load") { store.clips.count == 20 }
 
-        store.query = "needle 7"
+        // Fragment search: "needle 7" would also match "needle 17", "13" matches only one.
+        store.query = "needle 13"
         waitFor("search applied") { store.clips.count == 1 }
         // Clear immediately, then give any late FTS completion time to land.
         store.query = ""
