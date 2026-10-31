@@ -25,8 +25,13 @@ enum HistoryPanePolicy {
 /// Background pulses (a new capture, a pin) with an unchanged query keep the
 /// cursor on the same clip.
 enum ResultSelectionPolicy {
-    static func index(in clips: [Clip], anchor: Int64?, followsTop: Bool) -> Int {
-        guard !followsTop, let anchor, let index = clips.firstIndex(where: { $0.id == anchor }) else { return 0 }
-        return index
+    ///
+    /// `previousIndex` is where the cursor was. When the anchored clip is gone
+    /// (deleted, filed away) the cursor lands on its neighbour, the same row
+    /// clamped to the list, instead of jumping to row 0.
+    static func index(in clips: [Clip], anchor: Int64?, followsTop: Bool, previousIndex: Int = 0) -> Int {
+        guard !followsTop else { return 0 }
+        if let anchor, let index = clips.firstIndex(where: { $0.id == anchor }) { return index }
+        return max(0, min(previousIndex, clips.count - 1))
     }
 }

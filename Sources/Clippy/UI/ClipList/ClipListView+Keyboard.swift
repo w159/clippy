@@ -82,7 +82,10 @@ extension ClipListView {
             return .handled
         }
         if command, press.key == .delete {
-            if selectedClipIDs.count >= 2 { requestBatchDelete() } else if let clip = selectedClip { requestDelete(clip) } else { return .ignored }
+            // In the search field with text this is a text edit, not a clip delete.
+            guard CommandDeletePolicy.deletesClips(source: source, query: store.query) else { return .ignored }
+            let targets = actionableClips
+            if targets.count >= 2 { requestBatchDelete() } else if let clip = targets.first { requestDelete(clip) } else { return .ignored }
             return .handled
         }
         if let digit = press.key.character.wholeNumberValue, (1...9).contains(digit), press.key.character.isNumber {
@@ -150,8 +153,9 @@ extension ClipListView {
             onPaste(clips[index], settings.pastePlainTextByDefault)
             return .handled
         }
-        // Suggestions: bare digit pastes the Nth suggestion while the query is empty.
-        if selection == .suggestions, store.query.isEmpty, mods.isEmpty {
+        // Suggestions: bare digit pastes the Nth suggestion from the list; in the
+        // search field it is text.
+        if mods.isEmpty, SuggestionDigitPolicy.pastesSuggestion(selection: selection, source: source, query: store.query) {
             if let index = QuickPasteMap.index(forDigit: digitChar, visibleCount: clips.count) {
                 onPaste(clips[index], settings.pastePlainTextByDefault)
             }
@@ -188,11 +192,11 @@ extension ClipListView {
             if source == .search, !store.query.isEmpty { return .ignored }
             return undoLastDelete() ? .handled : .ignored
         case "e":
-            guard let clip = selectedClip, clip.contentKind == .text else { return .ignored }
+            guard let clip = singleActionClip, clip.contentKind == .text else { return .ignored }
             onEdit(clip)
             return .handled
         case "p":
-            guard let clip = selectedClip else { return .ignored }
+            guard let clip = singleActionClip else { return .ignored }
             store.togglePin(clip)
             return .handled
         default:
@@ -219,7 +223,8 @@ extension ClipListView {
 
     /// Two-stage Escape: multi-selection, then query, then the panel (PNL-11).
     func performEscape() {
-        switch EscapeAction.next(hasMultiSelection: !selectedClipIDs.isEmpty, query: store.query) {
+        switch EscapeAction.next(hasMultiSelection: !selectedClipIDs.isEmpty, query: store.query,
+                                 hideOnEscape: settings.hideOnEscape, panelPinned: settings.panelPinned) {
         case .clearSelection:
             syncRangeModel()
             rangeModel.collapseToCursor()
@@ -228,6 +233,8 @@ extension ClipListView {
             store.query = ""
         case .hidePanel:
             onClose()
+        case .stay:
+            break
         }
     }
 

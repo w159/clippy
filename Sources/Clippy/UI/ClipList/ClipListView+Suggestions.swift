@@ -4,6 +4,9 @@ import AppKit
 // Suggestions pane wiring for `ClipListView` (selection == .suggestions).
 
 extension ClipListView {
+    /// Ids of the current suggestions, observed so dismissing or replacing them re-clamps the cursor.
+    var suggestionClipIDs: [Int64?] { store.suggestions.map { $0.clip.id } }
+
     /// Smart Suggestions pane: hero header, then either a state view or the
     /// ranked clips as cards wrapped in reason chips, keycaps 1-9 and a row menu.
     var suggestionsPane: some View {
@@ -24,7 +27,7 @@ extension ClipListView {
                             card: card(for: suggestion.clip, at: index, metadata: metadata),
                             onPaste: { plain in onPaste(suggestion.clip, plain) },
                             onFeedback: { feedback.dismiss($0, clip: suggestion.clip, store: store) },
-                            onFindSimilar: { store.findSimilar(to: suggestion.clip) })
+                            onFindSimilar: { showSimilarClips(to: suggestion.clip) })
                     }
                 }
                 .padding(10)
@@ -35,6 +38,9 @@ extension ClipListView {
             .onKeyPress(phases: [.down, .repeat]) { press in handleKey(press, from: .list) }
             .onChange(of: selectedIndex) { _, newIndex in
                 guard suggestions.indices.contains(newIndex) else { return }
+                // The anchor feeds handleClipsChanged; without it the History
+                // pane's stale anchor snapped the cursor to row 0 on every pulse.
+                anchoredClipID = suggestions[newIndex].clip.id
                 proxy.scrollTo(suggestions[newIndex].clip.id, anchor: nil)
             }
         }

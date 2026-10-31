@@ -34,11 +34,11 @@ extension AppDelegate {
     private func wireURLSchemeActions() {
         var actions = URLSchemeHandler.Actions()
         actions.showPanel = { [weak self] in self?.openPanel() }
-        actions.showPanelSearching = { [weak self] _ in self?.openPanel() }
-        actions.revealClip = { [weak self] _ in self?.openPanel() }
+        actions.showPanelSearching = { [weak self] query in self?.openPanelPerforming(.search(query)) }
+        actions.revealClip = { [weak self] id in self?.openPanelPerforming(.reveal(id)) }
         actions.pasteLatest = { [weak self] in self?.pasteRecent(offset: 0, asPlainText: AppSettings.shared.pastePlainTextByDefault) }
         actions.showSettings = { [weak self] in self?.openSettings() }
-        actions.showPalette = { [weak self] in self?.openPanel() }
+        actions.showPalette = { [weak self] in self?.openPanelPerforming(.palette) }
         URLSchemeHandler.actions = actions
         let service = pasteService
         // Intents run off the main actor; PasteService is main-actor bound.

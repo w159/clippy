@@ -120,9 +120,10 @@ extension ClipListView {
     @ViewBuilder
     func singleClipContextMenu(for clip: Clip) -> some View {
         // Paste group
-        Button { onPaste(clip, false) } label: { Label("Paste", systemImage: "arrow.down.doc") }
+        let pasteMenu = PasteMenuPolicy.items(defaultPlain: settings.pastePlainTextByDefault)
+        Button { onPaste(clip, pasteMenu.primaryPlain) } label: { Label("Paste", systemImage: "arrow.down.doc") }
         if clip.contentKind == .text {
-            Button { onPaste(clip, true) } label: { Label("Paste as Plain Text", systemImage: "textformat") }
+            Button { onPaste(clip, pasteMenu.alternate.plain) } label: { Label(pasteMenu.alternate.title, systemImage: "textformat") }
         }
         if clip.contentKind == .file {
             Button { onPasteFile(clip, true) } label: { Label("Move Here and Remove Original", systemImage: "folder") }
@@ -154,8 +155,7 @@ extension ClipListView {
             aiActionsMenu(for: clip)
             if settings.suggestionsEnabled {
                 Button {
-                    store.findSimilar(to: clip)
-                    selection = .suggestions
+                    showSimilarClips(to: clip)
                 } label: { Label("Find Similar Clips", systemImage: "sparkle.magnifyingglass") }
             }
         }

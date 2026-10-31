@@ -20,6 +20,8 @@ struct SidebarRow<Icon: View>: View {
     let renameError: Bool
     let onCommitRename: () -> Void
     let onCancelRename: () -> Void
+    /// Rename field lost focus; falls back to `onCommitRename` when nil.
+    let onRenameFocusLost: (() -> Void)?
     let icon: Icon
 
     /// Creates a row; `renameText` non-nil switches the title to an editable field.
@@ -28,6 +30,7 @@ struct SidebarRow<Icon: View>: View {
         isSelected: Bool, help: String, accessibilityText: String, indicator: SidebarDropIndicator = .none,
         renameText: Binding<String?> = .constant(nil), renameError: Bool = false,
         onCommitRename: @escaping () -> Void = {}, onCancelRename: @escaping () -> Void = {},
+        onRenameFocusLost: (() -> Void)? = nil,
         @ViewBuilder icon: () -> Icon
     ) {
         self.rowID = rowID
@@ -43,6 +46,7 @@ struct SidebarRow<Icon: View>: View {
         self.renameError = renameError
         self.onCommitRename = onCommitRename
         self.onCancelRename = onCancelRename
+        self.onRenameFocusLost = onRenameFocusLost
         self.icon = icon()
     }
 
@@ -101,7 +105,7 @@ struct SidebarRow<Icon: View>: View {
                 .foregroundStyle(renameError ? tokens.danger : tokens.textPrimary)
                 .focused($fieldFocused)
                 .onAppear { fieldFocused = true }
-                .onChange(of: fieldFocused) { _, isFocused in if !isFocused { onCommitRename() } }
+                .onChange(of: fieldFocused) { _, isFocused in if !isFocused { (onRenameFocusLost ?? onCommitRename)() } }
                 .onSubmit(onCommitRename)
                 .onExitCommand(perform: onCancelRename)
                 .accessibilityLabel("Rename category")

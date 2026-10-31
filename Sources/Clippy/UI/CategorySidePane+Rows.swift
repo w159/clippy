@@ -95,7 +95,8 @@ extension CategorySidePane {
             accessibilityText: "\(category.name), \(CopyFormat.counted(count, "clip"))", indicator: indicator(for: .category(categoryID)),
             renameText: Binding(get: { renaming ? renameDraft : nil }, set: { renameDraft = $0 ?? ""; renameDuplicate = false }),
             renameError: renaming && renameDuplicate,
-            onCommitRename: { commitRename(category) }, onCancelRename: { cancelRename() }
+            onCommitRename: { commitRename(category) }, onCancelRename: { cancelRename() },
+            onRenameFocusLost: { commitRename(category, focusLost: true) }
         ) {
             categoryIcon(category)
         }
