@@ -27,6 +27,28 @@ final class PerfBenchmarkTests: XCTestCase {
         }
     }
 
+    /// Rows shaped like real rich-text history: RTF and HTML blobs sit between the text
+    /// and the title/OCR columns, so a scan that reads those columns walks overflow pages.
+    private func seedRich(_ db: ClipDatabase, count: Int = 10_000) throws {
+        let now = Date()
+        let rtf = Data(repeating: 0x7B, count: 6_000)
+        let html = Data(repeating: 0x3C, count: 6_000)
+        try db.dbQueue.write { conn in
+            for index in 0..<count {
+                let body = (0..<40).map { Self.words[(index &* 31 &+ $0 &* 7) % Self.words.count] + "\(index % 97)" }
+                    .joined(separator: " ")
+                // One rare fragment, deep in the history, to force a full scan.
+                let rare = index == count - 50 ? " xqzjvk" : ""
+                var clip = Clip(
+                    id: nil, contentText: body + " #\(index)" + rare, contentRTF: rtf, contentHTML: html,
+                    typeIdentifier: "public.rtf", sourceAppBundleID: "com.test.app\(index % 8)",
+                    sourceAppName: "Notes", createdAt: now.addingTimeInterval(-Double(index)))
+                if index % 5 == 0 { clip.userTitle = "Title \(index)" }
+                try clip.insert(conn)
+            }
+        }
+    }
+
     private func ms(_ label: String, _ body: () throws -> Void) rethrows -> Double {
         let clock = ContinuousClock()
         var best = Double.infinity
@@ -36,6 +58,26 @@ final class PerfBenchmarkTests: XCTestCase {
         }
         print("PERF \(label): \(String(format: "%.2f", best)) ms (best of 5)")
         return best
+    }
+
+    /// Search over rich-text rows: a plain word with plenty of whole-word matches must not pay for the
+    /// fragment scan, and a rare fragment (full LIKE scan) must stay interactive.
+    func testSearchBenchmarksOn10kRichTextClips() throws {
+        let db = try makeTestDatabase(self)
+        try seedRich(db)
+
+        let word = try ms("rich: plain word 'invoice'") { XCTAssertEqual(try db.search(matching: "invoice", limit: 300).hits.count, 300) }
+        let words = try ms("rich: two words 'quarterly review'") { _ = try db.search(matching: "quarterly review", limit: 300) }
+        let commonFragment = try ms("rich: common fragment 'nvoic'") { XCTAssertEqual(try db.search(matching: "nvoic", limit: 300).hits.count, 300) }
+        let rareFragment = try ms("rich: rare fragment 'qzjv'") { XCTAssertEqual(try db.search(matching: "qzjv", limit: 300).hits.count, 1) }
+        let miss = try ms("rich: no match 'zqxjv'") { XCTAssertEqual(try db.search(matching: "zqxjv", limit: 300).hits.count, 0) }
+
+        let slack = ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == nil ? 1.0 : 3.0
+        XCTAssertLessThan(word, 100 * slack, "10k rich-text plain word budget")
+        XCTAssertLessThan(words, 100 * slack, "10k rich-text two-word budget")
+        XCTAssertLessThan(commonFragment, 100 * slack, "10k rich-text common fragment budget")
+        XCTAssertLessThan(rareFragment, 250 * slack, "10k rich-text rare fragment (full scan) budget")
+        XCTAssertLessThan(miss, 250 * slack, "10k rich-text no-match (full scan) budget")
     }
 
     func testBenchmarksOn10kClips() throws {
