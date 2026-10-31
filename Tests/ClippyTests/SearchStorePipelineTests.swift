@@ -93,17 +93,15 @@ final class SearchStorePipelineTests: XCTestCase {
         XCTAssertFalse(matches.isEmpty)
 
         var emissions: [[Clip]] = []
-        var matchEmissions = 0
         let clipsSink = store.$clips.dropFirst().sink { emissions.append($0) }
-        let matchesSink = store.$semanticMatches.dropFirst().sink { _ in matchEmissions += 1 }
+        let assignsBefore = store.semanticMatchesAssignCount
         let before = store.semanticCompletedRunID
         store.retrySearch()
         waitFor("refreshed merge finished") { store.semanticCompletedRunID > before }
         clipsSink.cancel()
-        matchesSink.cancel()
 
         XCTAssertTrue(emissions.isEmpty, "the list must not be republished for an unchanged result")
-        XCTAssertEqual(matchEmissions, 0, "badges must not be cleared and restored")
+        XCTAssertEqual(store.semanticMatchesAssignCount, assignsBefore, "badges must not be cleared and restored")
         XCTAssertEqual(store.clips, fused)
         XCTAssertEqual(store.semanticMatches, matches)
     }
