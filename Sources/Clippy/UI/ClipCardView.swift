@@ -39,8 +39,9 @@ struct ClipCardView: View {
     @Environment(\.clippyTokens) var tokens
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var isHovering = false
-    /// Thumbnail decoded off-main on a cache miss.
-    @State var decodedThumbnail: NSImage?
+    /// Thumbnail decoded off-main on a cache miss. Tagged with its filename so a reused
+    /// card never shows the previous clip's image while the task re-runs.
+    @State var decodedThumbnail: DecodedThumbnail?
     @Binding var isRenaming: Bool
     @ScaledMetric(relativeTo: .body) var placeholderIconSize: CGFloat = 24
 
@@ -156,4 +157,10 @@ struct ClipCardView: View {
         isHovering = false
         if NSCursor.current === NSCursor.pointingHand { NSCursor.pop() }
     }
+}
+
+/// A decoded thumbnail plus the file it came from.
+struct DecodedThumbnail {
+    let filename: String
+    let image: NSImage
 }

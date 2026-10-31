@@ -66,11 +66,21 @@ extension ClipCardView {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         proc.arguments = ["-x", "-k", archiveURL.path, destDir.path]
-        let errorPipe = Pipe()
-        proc.standardError = errorPipe
+        // stderr goes to a temp file, not a Pipe: a Pipe read only at termination would
+        // block ditto forever once it wrote more than the 64 KB pipe buffer.
+        let logURL = FileManager.default.temporaryDirectory.appendingPathComponent("clippy-ditto-\(UUID().uuidString).log")
+        guard FileManager.default.createFile(atPath: logURL.path, contents: nil),
+              let logHandle = try? FileHandle(forWritingTo: logURL) else {
+            try? FileManager.default.removeItem(at: destDir)
+            FileActionAlert.present(title: "Extraction failed", detail: ZipExtractNaming.failureDetail(reason: "Couldn't create a temporary log file."))
+            return
+        }
+        proc.standardError = logHandle
         proc.terminationHandler = { process in
             let status = process.terminationStatus
-            let stderr = (process.standardError as? Pipe)?.fileHandleForReading.readDataToEndOfFile() ?? Data()
+            try? (process.standardError as? FileHandle)?.close()
+            let stderr = (try? Data(contentsOf: logURL)) ?? Data()
+            try? FileManager.default.removeItem(at: logURL)
             let reason = String(decoding: stderr, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             Task { @MainActor in
                 if status == 0 {
@@ -84,6 +94,8 @@ extension ClipCardView {
         do {
             try proc.run()
         } catch {
+            try? logHandle.close()
+            try? FileManager.default.removeItem(at: logURL)
             try? FileManager.default.removeItem(at: destDir)
             FileActionAlert.present(title: "Extraction failed", detail: ZipExtractNaming.failureDetail(reason: error.localizedDescription))
         }
