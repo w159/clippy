@@ -10,7 +10,7 @@ import XCTest
 /// to `CLIPPY_SCREENSHOT_DIR` (default: a temporary folder, printed).
 @MainActor
 final class PanelHarnessTests: XCTestCase {
-    private var window: HarnessWindow!
+    private var window: PastePanel!
     private var store: ClipStore!
     private var pasted: [String] = []
     private var shotDirectory: URL!
@@ -80,9 +80,9 @@ final class PanelHarnessTests: XCTestCase {
 
     private func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name) {
         NSApp.appearance = NSAppearance(named: appearance)
-        let window = HarnessWindow(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
-                                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
-                                   backing: .buffered, defer: false)
+        let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
+                                 styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                                 backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: appearance)
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
@@ -329,10 +329,4 @@ final class PanelHarnessTests: XCTestCase {
             window.orderOut(nil)
         }
     }
-}
-
-/// A titled window that can become key while the test process is the app.
-final class HarnessWindow: NSWindow {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
 }

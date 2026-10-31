@@ -105,12 +105,11 @@ extension ClipListView {
     /// replaced everything typed so far ("abc" typed from the list became "c").
     func typeIntoSearch(_ characters: String) {
         store.query += characters
+        // Armed before the focus change: the panel puts the caret at the end in
+        // the same turn the field becomes first responder (no timing involved).
+        (NSApp.keyWindow as? PastePanel)?.placeCaretAtEndOnNextTextFocus = true
         focusTarget = .search
-        let end = TextSelection(insertionPoint: store.query.endIndex)
-        searchSelection = end
-        // The focus change lands on the next view update; re-place the caret
-        // after it so the select-all that comes with first responder loses.
-        Task { @MainActor in searchSelection = TextSelection(insertionPoint: store.query.endIndex) }
+        searchSelection = TextSelection(insertionPoint: store.query.endIndex)
     }
 
     /// Completes a Return that waited for the current query's results.
