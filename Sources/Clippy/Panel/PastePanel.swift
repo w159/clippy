@@ -27,27 +27,45 @@ final class PastePanel: NSPanel {
         hasShadow = true
     }
 
-    /// Set by the list when a typed character moves focus to the search field.
-    /// AppKit selects all of a field's text when it becomes first responder, so
-    /// the next key would replace the character just typed. The caret is moved
-    /// to the end in the same run-loop turn as the responder change, which no key
-    /// event can interleave with. One-shot: consumed by the first non-nil
-    /// responder change so it can never move the caret on an unrelated focus.
-    var placeCaretAtEndOnNextTextFocus = false
-
-    /// Collapsed selection at the end of a field editor holding `length` UTF-16 units.
-    static func caretRange(forFieldEditorLength length: Int) -> NSRange {
-        NSRange(location: max(0, length), length: 0)
+    /// The panel's search field: the editable text field whose accessibility
+    /// label or placeholder is "Search clips". Other editable fields can share the
+    /// window (assistant prompt, command palette), so when neither identifies the
+    /// search field the one nearest the top of the window wins, which is the
+    /// header search bar.
+    static func searchField(in root: NSView) -> NSTextField? {
+        var fields: [NSTextField] = []
+        func collect(_ view: NSView) {
+            if let field = view as? NSTextField, field.isEditable, !field.isHiddenOrHasHiddenAncestor { fields.append(field) }
+            view.subviews.forEach(collect)
+        }
+        collect(root)
+        func isSearch(_ field: NSTextField) -> Bool {
+            let label = field.accessibilityLabel() ?? ""
+            let placeholder = field.placeholderAttributedString?.string ?? field.placeholderString ?? ""
+            return label == "Search clips" || placeholder == "Search clips"
+        }
+        if let named = fields.first(where: isSearch) { return named }
+        return fields.max { $0.convert($0.bounds, to: nil).maxY < $1.convert($1.bounds, to: nil).maxY }
     }
 
-    override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
-        let accepted = super.makeFirstResponder(responder)
-        guard responder != nil, placeCaretAtEndOnNextTextFocus else { return accepted }
-        placeCaretAtEndOnNextTextFocus = false
-        if accepted, let editor = firstResponder as? NSTextView {
-            editor.selectedRange = Self.caretRange(forFieldEditorLength: (editor.string as NSString).length)
+    /// Types `characters` into the search field through its field editor, in the
+    /// same call as the key event. Every character then takes the text system's
+    /// own path (the editor edits, SwiftUI's binding follows), so nothing races
+    /// the binding sync the way a store write plus a later focus change did.
+    /// False when the field or its editor cannot be reached; the caller then
+    /// falls back to writing the query itself.
+    func insertIntoSearchField(_ characters: String) -> Bool {
+        guard let root = contentView, let field = Self.searchField(in: root) else { return false }
+        var editor = firstResponder as? NSTextView
+        if editor?.delegate as? NSTextField !== field {
+            guard makeFirstResponder(field) else { return false }
+            editor = firstResponder as? NSTextView ?? fieldEditor(false, for: field) as? NSTextView
         }
-        return accepted
+        guard let editor else { return false }
+        // Becoming first responder selects the whole text; typing would replace it.
+        editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+        editor.insertText(characters, replacementRange: NSRange(location: NSNotFound, length: 0))
+        return true
     }
 
     /// Bound by PanelController so Escape routes through hide() (which saves the

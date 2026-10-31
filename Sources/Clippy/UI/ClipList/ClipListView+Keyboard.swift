@@ -100,22 +100,19 @@ extension ClipListView {
     }
 
     /// A printable key pressed while the list has focus starts or extends the
-    /// search. AppKit selects a field's whole text when it becomes first
-    /// responder, so without the caret placed at the end the next keystroke
-    /// replaced everything typed so far ("abc" typed from the list became "c").
+    /// search. The character goes through the search field's own editor in this
+    /// same key event, so the first character takes the path every later one
+    /// does. Writing store.query and moving focus afterwards raced SwiftUI's
+    /// binding sync and the select-all on focus, and the second key replaced the
+    /// first. Focus is left to AppKit: FocusState follows the responder, and
+    /// setting focusTarget here would re-run the select-all.
     func typeIntoSearch(_ characters: String) {
+        // The panel is nonactivating, so key-window lookups can miss it.
+        let panels = ([NSApp.keyWindow as? PastePanel].compactMap { $0 })
+            + NSApp.windows.compactMap { $0 as? PastePanel }.filter(\.isVisible)
+        if panels.contains(where: { $0.insertIntoSearchField(characters) }) { return }
+        // Search field unreachable: still keep the character.
         store.query += characters
-        // Armed before the focus change: the panel puts the caret at the end in
-        // the same turn the field becomes first responder (no timing involved).
-        // The panel is nonactivating, so key-window lookups can miss it; there
-        // is one visible panel, and the flag is one-shot, so arm the visible ones.
-        if let key = NSApp.keyWindow as? PastePanel {
-            key.placeCaretAtEndOnNextTextFocus = true
-        } else {
-            for panel in NSApp.windows.compactMap({ $0 as? PastePanel }) where panel.isVisible {
-                panel.placeCaretAtEndOnNextTextFocus = true
-            }
-        }
         focusTarget = .search
         searchSelection = TextSelection(insertionPoint: store.query.endIndex)
     }
