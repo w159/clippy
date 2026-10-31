@@ -30,10 +30,11 @@ struct ClippyToast: View {
     let severity: BannerSeverity
     let actionTitle: String?
     let action: (() -> Void)?
-    let dismiss: () -> Void
+    /// nil hides the close button (non-interactive toasts such as the paste-stack HUD).
+    let dismiss: (() -> Void)?
 
     /// Creates a safe toast with optional one-shot action and dismiss callback.
-    init(_ message: String, severity: BannerSeverity = .neutral, actionTitle: String? = nil, action: (() -> Void)? = nil, dismiss: @escaping () -> Void = {}) {
+    init(_ message: String, severity: BannerSeverity = .neutral, actionTitle: String? = nil, action: (() -> Void)? = nil, dismiss: (() -> Void)? = nil) {
         self.message = message
         self.severity = severity
         self.actionTitle = actionTitle
@@ -42,23 +43,27 @@ struct ClippyToast: View {
     }
 
     var body: some View {
-        GlassSurface(in: Capsule()) {
+        // A rounded rectangle reads as a capsule for one line and stays tidy when a
+        // warning wraps; instructions must never be cut off with an ellipsis.
+        GlassSurface(in: RoundedRectangle(cornerRadius: 18, style: .continuous)) {
             HStack(spacing: tokens.metrics.space.two) {
                 Image(systemName: severity.symbol).foregroundStyle(severity.foreground(in: tokens))
-                Text(message).font(.callout).lineLimit(1)
+                Text(message).font(.callout).lineLimit(3).fixedSize(horizontal: false, vertical: true)
                 if let actionTitle, let action {
                     Button(actionTitle, action: action).buttonStyle(.plain).foregroundStyle(tokens.accentText)
                 }
-                Button(action: dismiss) {
-                    Image(systemName: "xmark").font(.caption.weight(.semibold)).frame(minWidth: 24, minHeight: 24)
+                if let dismiss {
+                    Button(action: dismiss) {
+                        Image(systemName: "xmark").font(.caption.weight(.semibold)).frame(minWidth: 24, minHeight: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Dismiss notification")
+                    .accessibilityLabel("Dismiss notification")
                 }
-                .buttonStyle(.plain)
-                .help("Dismiss notification")
-                .accessibilityLabel("Dismiss notification")
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: 360)
+        .frame(maxWidth: 460)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.updatesFrequently)
     }

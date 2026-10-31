@@ -26,6 +26,7 @@ struct AppearanceSettingsTab: View {
                         Text(preset.label).tag(preset)
                     }
                 }
+                .settingsRow("appearance.theme")
                 ThemeSwatchStrip(tokens: settings.theme, themeName: settings.themePreset.label)
 
                 Picker("System appearance", selection: $settings.appearanceMode) {
@@ -35,6 +36,7 @@ struct AppearanceSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(settings.themePreset != .system)
+                .settingsRow("appearance.system")
                 if settings.themePreset != .system {
                     Text("Light/dark is set by the chosen theme. Pick \"Match system\" to follow macOS instead.")
                         .font(.caption)
@@ -52,6 +54,7 @@ struct AppearanceSettingsTab: View {
                         .font(.caption)
                         .foregroundStyle(tokens.textSecondary)
                 }
+                .settingsRow("appearance.accent")
             }
 
             // MARK: Transparency
@@ -59,6 +62,7 @@ struct AppearanceSettingsTab: View {
                 LabeledContent("Opacity: \(Int(settings.panelOpacity * 100))") {
                     Slider(value: $settings.panelOpacity, in: 0.3...1.0, step: 0.05)
                 }
+                .settingsRow("appearance.opacity")
                 Text("100% is fully solid. Lower values let the desktop show through a blur behind the panel.")
                     .font(.caption)
                     .foregroundStyle(tokens.textSecondary)
@@ -67,6 +71,7 @@ struct AppearanceSettingsTab: View {
             // MARK: Customize colors (overrides on top of the active preset)
             Section {
                 customColorRow("Text (primary)", $settings.customTextPrimaryHex, resolved.textPrimary)
+                    .settingsRow("appearance.colors")
                 customColorRow("Text (secondary)", $settings.customTextSecondaryHex, resolved.textSecondary)
                 customColorRow("Accent", $settings.customAccentHex, resolved.accent)
                 customColorRow("Success", $settings.customSuccessHex, resolved.success)
@@ -101,18 +106,20 @@ struct AppearanceSettingsTab: View {
                         Text(style.label).tag(style)
                     }
                 }
+                .settingsRow("appearance.cardStyle")
 
                 Picker("Card color", selection: $settings.cardColorMode) {
                     ForEach(CardColorMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
-                Text("\"By source app\" tints each card with the app icon's dominant color.")
+                .settingsRow("appearance.cardColor")
+                Text("Tints the card face by the source app's icon color, the content type, or your accent. Neutral adds no tint.")
                     .font(.caption)
                     .foregroundStyle(tokens.textSecondary)
 
-                // Tint strength slider only makes a visible difference for Filled and Bordered.
-                if settings.cardStyle != .plain {
+                // Tint strength shows only on a card face (not Plain) and when a tint source is chosen.
+                if settings.cardStyle != .plain, settings.cardColorMode != .neutral {
                     LabeledContent("Color tint: \(settings.cardTintStrength)%") {
                         Slider(
                             value: Binding(
@@ -126,12 +133,15 @@ struct AppearanceSettingsTab: View {
                 }
 
                 Toggle("High-contrast card text", isOn: $settings.highContrastCardText)
-                Text("Uses primary label color on both title and preview text instead of subdued gray.")
+                    .settingsRow("appearance.contrast")
+                Text("Draws the app name, time and link lines in the primary text color instead of subdued gray.")
                     .font(.caption)
                     .foregroundStyle(tokens.textSecondary)
 
                 Toggle("Show app icons on cards", isOn: $settings.showAppIcons)
+                    .settingsRow("appearance.appIcons")
                 Toggle("Group clips under date headers", isOn: $settings.showSectionHeaders)
+                    .settingsRow("appearance.sectionHeaders")
             }
 
             // MARK: Typography
@@ -196,12 +206,14 @@ struct AppearanceSettingsTab: View {
                         Image(systemName: "checkmark")
                             .font(SettingsTypography.swatchCheck(settings))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AccentSwatchContrast.markColor(for: theme.color, isDark: tokens.scheme == .dark))
                     }
                 }
         }
         .buttonStyle(.plain)
         .help(theme.label)
+        .accessibilityLabel("\(theme.label) accent")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     /// One editable surface color: a hex field plus the macOS color wheel, both

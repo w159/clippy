@@ -104,7 +104,7 @@ final class SettingsShellModel: ObservableObject {
         settings.reloadFromDefaults()
         AIProviderStore.shared.reloadFromDefaults()
         let count = pending.plan.changes.count + pending.plan.requiresConfirmation.filter { confirmedKeys.contains($0.key) }.count
-        status = StatusOutcome(succeeded: true, message: "Imported \(count) setting(s) from \(pending.fileName).")
+        status = StatusOutcome(succeeded: true, message: CountCopy.importedSettings(count, from: pending.fileName))
         pendingImport = nil
     }
 }

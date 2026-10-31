@@ -35,7 +35,7 @@ struct SecurityAuditSection: View {
 
     private var verificationText: Text {
         guard let report = verification else { return Text("Checks every entry's hash chain for tampering.") }
-        if report.isValid { return Text("No tampering found in \(report.entriesChecked) entries across \(report.filesChecked) files.") }
+        if report.isValid { return Text(CountCopy.tamperingNotFound(entries: report.entriesChecked, files: report.filesChecked)) }
         return Text("Tampering detected: \(report.failures.count) problem\(report.failures.count == 1 ? "" : "s") in \(CopyFormat.counted(Set(report.failures.map(\.file)).count, "file")).")
             .foregroundColor(tokens.danger)
     }
@@ -58,7 +58,7 @@ struct SecurityAuditSection: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let count = try AuditLog.shared.export(to: url, format: format)
-            notice = .success("Exported \(count) entries.")
+            notice = .success(CountCopy.exportedEntries(count))
         } catch {
             notice = .failure("Export failed.")
         }

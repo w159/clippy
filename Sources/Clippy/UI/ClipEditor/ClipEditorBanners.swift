@@ -2,6 +2,14 @@ import SwiftUI
 
 // MARK: - Banners
 
+/// Button titles of the conflict banner and the save error that points at them, kept in one
+/// place so renaming a button cannot leave the message naming a button that is gone.
+enum EditorConflictCopy {
+    static let useStored = "Use Stored"
+    static let keepMine = "Keep Mine"
+    static let resolveFirst = "Resolve the conflict first: \(useStored) or \(keepMine)."
+}
+
 /// Shown when the stored clip changed under unsaved edits (EDT-02): Use Stored, Keep Mine, Compare.
 struct EditorConflictBanner: View {
     @Environment(\.clippyTokens) private var tokens
@@ -23,8 +31,8 @@ struct EditorConflictBanner: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: tokens.metrics.space.two)
             // Labels name the outcome: "Reload" read as harmless but discarded the edits.
-            Button("Use Stored", action: onReload).help("Discard your edits and load the stored text").fixedSize()
-            Button("Keep Mine", action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
+            Button(EditorConflictCopy.useStored, action: onReload).help("Discard your edits and load the stored text").fixedSize()
+            Button(EditorConflictCopy.keepMine, action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
             Button("Compare\u{2026}", action: onCompare).help("Show both versions side by side").fixedSize()
         }
         .buttonStyle(.bordered)

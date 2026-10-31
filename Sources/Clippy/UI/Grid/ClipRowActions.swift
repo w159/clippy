@@ -27,7 +27,10 @@ struct ClipAccessibilityModifier: ViewModifier {
             .accessibilityLabel(model.accessibilityLabel)
             .accessibilityValue(model.accessibilityValue)
             .accessibilityAddTraits(model.isSelected ? [.isButton, .isSelected] : .isButton)
+            // The visual click only selects, so the hint is true only because the
+            // default action below pastes. Keep the two together.
             .accessibilityHint("Activate to paste. Use actions for more.")
+            .accessibilityAction(.default, actions.paste)
             .accessibilityActions {
                 Button("Paste", action: actions.paste)
                 Button("Paste as Plain Text", action: actions.pastePlain)

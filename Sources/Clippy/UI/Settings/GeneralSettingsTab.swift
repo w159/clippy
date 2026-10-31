@@ -44,6 +44,11 @@ struct GeneralSettingsTab: View {
             editors = ExternalEditorPreference.installedEditors()
             launchStatus = LaunchAtLogin.status
         }
+        // A pane reset or import only rewrites storage; re-read the cached picker value.
+        .onReceive(settings.objectWillChange) { _ in
+            let stored = ExternalEditorPreference.bundleID() ?? ""
+            if stored != editorID { editorID = stored }
+        }
         .confirmationDialog("Reset all settings to defaults?", isPresented: $showResetConfirmation, titleVisibility: .visible) {
             Button("Reset all settings", role: .destructive) { settings.resetAllToDefaults() }
             Button("Cancel", role: .cancel) {}
@@ -60,8 +65,8 @@ struct GeneralSettingsTab: View {
             // The Shift+Return note belongs to the plain-text toggle above.
             SettingsNote("Shift+Return in the panel always pastes in the non-default mode.")
             Toggle("Move pasted item to top of history", isOn: $settings.movePastedItemToTop).settingsRow("general.moveToTop")
-            Toggle("Clicking a clip copies it without pasting", isOn: $settings.clickCopyOnly).settingsRow("general.clickCopyOnly")
-            SettingsNote("Off by default: clicking pastes into the active app.")
+            Toggle(SettingsCopy.clickCopyOnlyTitle, isOn: $settings.clickCopyOnly).settingsRow("general.clickCopyOnly")
+            SettingsNote("A single click only selects. Off by default: double-click or Return pastes into the active app.")
             Picker("Keystroke typing speed", selection: $settings.keystrokeSpeed) {
                 ForEach(KeystrokeSpeed.allCases) { Text($0.label).tag($0) }
             }

@@ -92,7 +92,7 @@ extension ClipCardView {
             // Consistent box, aspect-fit, checkerboard behind for alpha (LAY-10).
             PreviewCheckerboard(tileSize: 12) {
                 if let filename = clip.thumbFilename,
-                   let nsImage = Self.cachedThumbnail(for: filename) ?? decodedThumbnail {
+                   let nsImage = decodedThumbnail ?? Self.cachedThumbnail(for: filename) {
                     Image(nsImage: nsImage)
                         .resizable()
                         .scaledToFit()
@@ -109,9 +109,10 @@ extension ClipCardView {
             .frame(height: 84)
             .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.inset, style: .continuous))
             .task(id: clip.thumbFilename) {
-                guard let filename = clip.thumbFilename,
-                      Self.cachedThumbnail(for: filename) == nil else { return }
+                guard let filename = clip.thumbFilename else { return }
                 decodedThumbnail = nil
+                // Hold the image in view state even on a cache hit: a memory-pressure purge
+                // empties the shared cache, and a card that only read the cache would go blank.
                 decodedThumbnail = await Self.thumbnail(for: filename)
             }
             if let width = clip.pixelWidth, let height = clip.pixelHeight {

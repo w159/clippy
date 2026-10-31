@@ -28,7 +28,7 @@ extension CategorySidePane {
             }
             .buttonStyle(.plain)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(count.map { "\(title), \($0) items" } ?? title)
+            .accessibilityLabel(CountCopy.sectionLabel(title: title, count: count))
             .accessibilityValue(open ? "expanded" : "collapsed")
             .accessibilityHint("Shows or hides this section.")
             if let onAdd {

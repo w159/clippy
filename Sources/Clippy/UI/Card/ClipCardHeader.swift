@@ -50,7 +50,7 @@ extension ClipCardView {
             if variant.kept.contains(.appName), let name = clip.sourceAppName {
                 Text(name)
                     .font(PanelTypography.metadata(settings))
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(cardSecondaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -58,10 +58,10 @@ extension ClipCardView {
             if variant.kept.contains(.richBadge), clip.isRich {
                 Image(systemName: "textformat")
                     .font(.system(size: iconSize - 1))
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(cardSecondaryText)
                     .help("Has rich formatting")
             }
-            if model.isSensitive { Image(systemName: "lock.fill").font(.system(size: iconSize - 2)).foregroundStyle(tokens.textSecondary) }
+            if model.isSensitive { Image(systemName: "lock.fill").font(.system(size: iconSize - 2)).foregroundStyle(cardSecondaryText) }
             if model.matchedInOCR { ClippyBadge("OCR match") }
             Spacer(minLength: 4)
             if isPinned { Image(systemName: "pin.fill").font(.system(size: iconSize - 1)).foregroundStyle(tokens.accentText) }
@@ -94,7 +94,7 @@ extension ClipCardView {
             if let icon = AppIconProvider.shared.icon(forBundleID: category.iconValue) {
                 Image(nsImage: icon).resizable()
             } else {
-                Image(systemName: "app.dashed").foregroundStyle(tokens.textSecondary)
+                Image(systemName: "app.dashed").foregroundStyle(cardSecondaryText)
             }
         }
     }
@@ -111,7 +111,7 @@ extension ClipCardView {
     var timestampText: some View {
         Text(RelativeTime.string(for: clip.createdAt))
             .font(PanelTypography.metadata(settings))
-            .foregroundStyle(tokens.textSecondary)
+            .foregroundStyle(cardSecondaryText)
             .monospacedDigit()
             .lineLimit(1)
             .fixedSize()

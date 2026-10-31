@@ -30,7 +30,7 @@ extension TextClipEditor {
             return false
         }
         if conflictText != nil {
-            saveError = "Resolve the conflict first: Reload or Keep mine."
+            saveError = EditorConflictCopy.resolveFirst
             return false
         }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
