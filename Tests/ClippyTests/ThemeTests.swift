@@ -60,6 +60,51 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(ThemePreset.selectable.count, ThemePreset.allCases.count)
     }
 
+    // MARK: - Follow-system default
+
+    /// Seeded fault: a default that ignores the appearance gives a dark macOS a light Clippy.
+    func testAutomaticPresetResolvesByAppearance() {
+        XCTAssertEqual(ThemePreset.automatic.concrete(isDark: false), .cleanLight)
+        XCTAssertEqual(ThemePreset.automatic.concrete(isDark: true), .githubDark)
+        XCTAssertFalse(ThemePreset.automatic.concrete(isDark: false).fixedTokens!.isDark)
+        XCTAssertTrue(ThemePreset.automatic.concrete(isDark: true).fixedTokens!.isDark)
+        XCTAssertNil(ThemePreset.automatic.fixedTokens)
+    }
+
+    /// A user who picked a fixed preset keeps it in either appearance.
+    func testExplicitPresetsIgnoreAppearance() {
+        for preset in ThemePreset.allCases where preset != .automatic {
+            XCTAssertEqual(preset.concrete(isDark: true), preset)
+            XCTAssertEqual(preset.concrete(isDark: false), preset)
+        }
+    }
+
+    func testDefaultThemeFollowsTheSystem() {
+        let defaults = UserDefaults(suiteName: "clippy.theme.defaults.\(UUID())")!
+        AppSettings.registerDefaults(defaults)
+        XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.automatic.rawValue)
+    }
+
+    func testAutomaticTokensFollowTheHostColorScheme() {
+        let settings = AppSettings.shared
+        let savedPreset = settings.themePreset
+        let savedHost = settings.hostColorSchemeIsDark
+        let savedMode = settings.appearanceMode
+        defer {
+            settings.themePreset = savedPreset
+            settings.appearanceMode = savedMode
+            if let savedHost { settings.hostColorSchemeChanged(isDark: savedHost) }
+        }
+        settings.themePreset = .automatic
+        settings.appearanceMode = .system
+        settings.hostColorSchemeChanged(isDark: true)
+        XCTAssertTrue(settings.theme.isDark)
+        XCTAssertEqual(settings.theme.panel.themeHexString, ThemePreset.githubDark.fixedTokens!.panel.themeHexString)
+        settings.hostColorSchemeChanged(isDark: false)
+        XCTAssertFalse(settings.theme.isDark)
+        XCTAssertEqual(settings.theme.panel.themeHexString, ThemePreset.cleanLight.fixedTokens!.panel.themeHexString)
+    }
+
     // MARK: - Authoritative palette hex (round-trip against canonical sources)
 
     func testNordPanelIsPolarNightNotOldValue() {

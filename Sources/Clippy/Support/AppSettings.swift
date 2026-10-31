@@ -147,7 +147,7 @@ final class AppSettings: ObservableObject {
     // MARK: - Theme
 
     /// Named theme preset. Drives the whole token table; see Theme.tokens().
-    @AppDefault(Keys.themePreset, default: ThemePreset.cleanLight)
+    @AppDefault(Keys.themePreset, default: ThemePreset.automatic)
     var themePreset: ThemePreset
 
     /// Whether the custom palette is a dark theme (affects scrollbar/appearance).
@@ -503,6 +503,18 @@ final class AppSettings: ObservableObject {
     /// lives on the instance; AppSettings is a singleton, so this is safe.
     var cachedTokensStorage: ThemeTokens?
     var cachedTokenSignatureStorage: Int = 0
+
+    /// Whether the window hosting the design system currently renders dark, as
+    /// reported by its SwiftUI color scheme. nil until a host reports. Not
+    /// persisted; "Match system" themes resolve from it so they flip live.
+    private(set) var hostColorSchemeIsDark: Bool?
+
+    /// Records the hosting window's scheme. Silent on purpose: it runs while a
+    /// view body evaluates, where publishing is not allowed; the host calls
+    /// `objectWillChange.send()` from `onChange` so observers re-render.
+    func hostColorSchemeChanged(isDark: Bool) {
+        hostColorSchemeIsDark = isDark
+    }
 
     // MARK: - Init
 

@@ -33,8 +33,8 @@ extension AppSettings {
                 Keys.highContrastCardText: false,
                 Keys.fontFamily: PanelFontFamily.systemDefault.rawValue,
                 Keys.fontSizeBase: 13,
-                // Clean Light is the default look; it fixes the washed-out grey.
-                Keys.themePreset: ThemePreset.cleanLight.rawValue,
+                // Clean Light in light mode, its GitHub Dark counterpart in dark mode.
+                Keys.themePreset: ThemePreset.automatic.rawValue,
                 Keys.panelOpacity: 1.0,
                 Keys.customIsDark: false,
                 // Per-token overrides default to "" (no override) so a fresh install

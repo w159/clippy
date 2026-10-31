@@ -35,9 +35,9 @@ struct AppearanceSettingsTab: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(settings.themePreset != .system)
+                .disabled(![.system, .automatic].contains(settings.themePreset))
                 .settingsRow("appearance.system")
-                if settings.themePreset != .system {
+                if ![.system, .automatic].contains(settings.themePreset) {
                     Text("Light/dark is set by the chosen theme. Pick \"Match system\" to follow macOS instead.")
                         .font(.caption)
                         .foregroundStyle(tokens.textSecondary)
