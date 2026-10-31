@@ -107,7 +107,9 @@ extension ClipListView {
         store.query += characters
         // Armed before the focus change: the panel puts the caret at the end in
         // the same turn the field becomes first responder (no timing involved).
-        (NSApp.keyWindow as? PastePanel)?.placeCaretAtEndOnNextTextFocus = true
+        let panel = (NSApp.keyWindow as? PastePanel)
+            ?? NSApp.windows.lazy.compactMap { $0 as? PastePanel }.first { $0.isKeyWindow }
+        panel?.placeCaretAtEndOnNextTextFocus = true
         focusTarget = .search
         searchSelection = TextSelection(insertionPoint: store.query.endIndex)
     }
