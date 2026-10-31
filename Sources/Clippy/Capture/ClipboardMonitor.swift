@@ -512,9 +512,13 @@ extension ClipboardMonitor {
                 flagStore.record(key: key, findings: findings)
                 let inserted = try database.saveCapturedClip(&clip, cap: cap)
                 // A re-copy of an existing clip only bumps it. That older clip is not
-                // this capture's to append to, retitle or auto-clear: only a row this
-                // capture created is handed on.
+                // this capture's to append to or retitle: only a row this capture
+                // created is handed on for those.
                 let clipID = inserted ? clip.id : nil
+                // Auto-clear is different: the bumped row holds the same secret, and it may
+                // have been captured while auto-clear was off. deleteClipUnlessFiled still
+                // spares anything filed or pinned.
+                let autoClearID = clip.id
                 if inserted {
                     appendTracker.recordSaved(clipID: clip.id, text: text, bundleID: bundleID, date: createdAt, sensitive: sensitive)
                 } else {
@@ -530,7 +534,7 @@ extension ClipboardMonitor {
                     if sensitive {
                         let delay = TimeInterval(CapturePreferences.sensitiveAutoClearSeconds)
                         if delay > 0 {
-                            self.scheduleAutoClear(changeCount: capturedChangeCount, clipID: clipID, key: key, after: delay)
+                            self.scheduleAutoClear(changeCount: capturedChangeCount, clipID: autoClearID, key: key, after: delay)
                         }
                     } else {
                         // Sensitive text is never handed to the title suggester.
