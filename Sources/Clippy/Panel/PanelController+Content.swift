@@ -10,7 +10,7 @@ extension PanelController {
         showsLockView = locked
         if locked {
             let view = LockView(lock: AppLock.shared, onClose: { [weak self] in self?.hide() })
-            panel.contentView = clearHostingView(view.clippyDesignSystem())
+            panel.contentView = Self.clearHostingView(view.clippyDesignSystem())
             return
         }
         let root = ClipListView(
@@ -29,7 +29,7 @@ extension PanelController {
                 self?.onOpenSettings?()
             }
         )
-        panel.contentView = clearHostingView(root.clippyDesignSystem())
+        panel.contentView = Self.clearHostingView(root.clippyDesignSystem())
     }
 
     /// Swaps the lock view for the clip list when the lock opens, and back to the
@@ -47,7 +47,7 @@ extension PanelController {
 
     /// Hosts SwiftUI content with a clear layer and no titlebar safe area, so the
     /// content's own GlassSurface is the window backdrop under the hidden titlebar.
-    func clearHostingView<Root: View>(_ root: Root) -> NSHostingView<Root> {
+    static func clearHostingView<Root: View>(_ root: Root) -> NSHostingView<Root> {
         let hosting = NSHostingView(rootView: root)
         hosting.safeAreaRegions = []
         hosting.wantsLayer = true

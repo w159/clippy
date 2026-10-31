@@ -67,6 +67,14 @@ final class SidebarBehaviorTests: XCTestCase {
         XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: ids, membership: membership, query: "invoice"), 2)
         XCTAssertEqual(SidebarCounts.displayedHistoryCount(clipIDs: ids, membership: membership, query: "   "), 1)
     }
+    /// Seeded fault: counting every member while searching shows "Work 1" beside
+    /// a Work pane that lists no matches.
+    func testCategoryCountFollowsTheSearch() {
+        XCTAssertEqual(SidebarCounts.displayedCategoryCount(total: 3, query: "", matching: { 1 }), 3)
+        XCTAssertEqual(SidebarCounts.displayedCategoryCount(total: 3, query: "zqxj", matching: { 0 }), 0)
+        XCTAssertEqual(SidebarCounts.displayedCategoryCount(total: 3, query: "invoice", matching: { 1 }), 1)
+        XCTAssertEqual(SidebarCounts.displayedCategoryCount(total: 3, query: "   ", matching: { 0 }), 3)
+    }
     private func makeCategory(id: Int64, name: String, sortOrder: Int) -> Clippy.Category {
         Clippy.Category(id: id, name: name, colorHex: "#112233", iconKind: .symbol, iconValue: "folder", sortOrder: sortOrder, isStarter: false, createdAt: .distantPast)
     }
