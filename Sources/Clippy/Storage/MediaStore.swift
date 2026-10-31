@@ -167,12 +167,21 @@ final class MediaStore: Sendable {
         }
     }
 
+    /// Entries of the media directory that can be clip payloads or thumbnails.
+    /// Excludes the sidecar directory, which holds preserved paste flavors and
+    /// the user's sensitive-flag overrides and is never referenced by a clip row.
+    /// The one definition shared by the launch sweep and the Settings report, so
+    /// neither can ever treat the sidecar as an orphan.
+    func payloadFilenamesOnDisk() -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+            .filter { $0 != Self.sidecarDirectoryName }
+    }
+
     /// Removes files no clip references (leftovers from a crash between file
     /// write and row insert). Files younger than a minute are spared: they may
     /// belong to a capture whose database row is still in flight.
     func sweepOrphans(referencedFilenames: Set<String>) {
-        let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        for filename in onDisk where !referencedFilenames.contains(filename) && filename != Self.sidecarDirectoryName {
+        for filename in payloadFilenamesOnDisk() where !referencedFilenames.contains(filename) {
             let fileURL = url(for: filename)
             if let modified = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
                 .contentModificationDate,

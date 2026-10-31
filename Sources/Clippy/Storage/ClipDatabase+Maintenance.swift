@@ -214,7 +214,7 @@ extension ClipDatabase {
     func orphanMediaReport(remove: Bool = false) throws -> OrphanMediaReport {
         let fm = FileManager.default
         let referenced = try referencedMediaFilenames()
-        let onDisk = Set((try? fm.contentsOfDirectory(atPath: media.directory.path)) ?? [])
+        let onDisk = Set(media.payloadFilenamesOnDisk())
         var orphans: [String] = []
         var bytes: Int64 = 0
         for name in onDisk.subtracting(referenced).sorted() {

@@ -29,7 +29,13 @@ extension ClipDatabase {
 
     /// Forgets all recognised text so the indexer rescans (used when the user
     /// turns indexing off and wants the data gone).
-    func clearAllOCRText() throws {
-        try dbQueue.write { db in try db.execute(sql: "UPDATE clips SET ocrText = NULL") }
+    @discardableResult
+    func clearAllOCRText() throws -> Int {
+        // Only rows that hold text (or a scanned marker): an unconditional UPDATE
+        // rewrote every row and its FTS entry, text clips included.
+        try dbQueue.write { db -> Int in
+            try db.execute(sql: "UPDATE clips SET ocrText = NULL WHERE ocrText IS NOT NULL")
+            return db.changesCount
+        }
     }
 }

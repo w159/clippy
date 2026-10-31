@@ -298,12 +298,7 @@ final class ClipStore: ObservableObject {
             ? []
             : (membership[clipID] ?? []).subtracting([categoryID])
         performWrite("fileClip") { [database] in
-            // Mirror the removal path used by setClip(... false): clear the clip
-            // from each other category before adding it to the target.
-            for existing in others {
-                try database.setClip(clipID, inCategory: existing, false)
-            }
-            try database.setClip(clipID, inCategory: categoryID, true)
+            try database.fileClip(clipID, into: categoryID, leaving: others)
         }
     }
 

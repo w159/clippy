@@ -160,22 +160,28 @@ final class ClipDatabase: Sendable {
     // MARK: - Writes
 
     /// Insert a freshly captured clip. A duplicate of an existing clip is not
-    /// re-inserted; its timestamp is bumped so it surfaces at the top.
-    func saveCapturedClip(_ clip: inout Clip, cap: Int) throws {
+    /// re-inserted; its timestamp is bumped so it surfaces at the top. Returns
+    /// true when a new row was inserted, false when an existing row was bumped
+    /// (the caller must then treat `clip.id` as an older clip it did not create).
+    @discardableResult
+    func saveCapturedClip(_ clip: inout Clip, cap: Int) throws -> Bool {
         try upsertCaptured(&clip, cap: cap, matchedBy: Clip.duplicateText(of: clip.contentText))
     }
 
     /// Insert a captured image clip. Media files are written by MediaStore
     /// BEFORE this runs. Dedupe key is the content-hash filename; a re-copy
-    /// bumps the timestamp.
-    func saveCapturedImageClip(_ clip: inout Clip, cap: Int) throws {
+    /// bumps the timestamp. Returns true when a new row was inserted.
+    @discardableResult
+    func saveCapturedImageClip(_ clip: inout Clip, cap: Int) throws -> Bool {
         try upsertCaptured(&clip, cap: cap, matchedBy: Clip.duplicateImage(mediaFilename: clip.mediaFilename))
     }
 
     /// Insert a captured file clip. When bytes were stored, the dedupe key is
     /// the content-hash mediaFilename (same file re-copied bumps the timestamp).
     /// When only a path reference was kept, the dedupe key is the filePath.
-    func saveCapturedFileClip(_ clip: inout Clip, cap: Int) throws {
+    /// Returns true when a new row was inserted.
+    @discardableResult
+    func saveCapturedFileClip(_ clip: inout Clip, cap: Int) throws -> Bool {
         try upsertCaptured(&clip, cap: cap, matchedBy: Clip.duplicateFile(
             mediaFilename: clip.mediaFilename,
             filePath: clip.filePath
@@ -186,15 +192,22 @@ final class ClipDatabase: Sendable {
     /// delete the media files freed by eviction. The dedupe predicate is the only
     /// thing that differs between text and image capture.
     private func upsertCaptured(_ clip: inout Clip, cap: Int,
-                                matchedBy request: QueryInterfaceRequest<Clip>) throws {
+                                matchedBy request: QueryInterfaceRequest<Clip>) throws -> Bool {
         let newClip = clip
         var evicted: [String] = []
         var savedID: Int64?
+        var inserted = false
         try dbQueue.write { connection in
             if var existing = try request.fetchOne(connection) {
                 existing.createdAt = newClip.createdAt
                 existing.sourceAppBundleID = newClip.sourceAppBundleID
                 existing.sourceAppName = newClip.sourceAppName
+                if existing.contentKind == .file {
+                    // Identical bytes copied from another path or under another
+                    // name: the clip must describe the latest copy, not the first.
+                    existing.contentText = newClip.contentText
+                    existing.filePath = newClip.filePath
+                }
                 try existing.update(connection)
                 savedID = existing.id
                 return
@@ -202,17 +215,28 @@ final class ClipDatabase: Sendable {
             var inserting = newClip
             try inserting.insert(connection)
             savedID = inserting.id
+            inserted = true
             evicted = try Self.enforceLimits(connection, cap: cap)
         }
         // Report the row id (inserted or bumped) to the caller, e.g. for the
         // clippyClipCaptured notification.
         clip.id = savedID
         media.delete(filenames: evicted)
+        return inserted
     }
+
+    /// Eviction order key: when a clip entered the history. A clip the user
+    /// unfiled (category deleted, unpinned, moved) enters history at that
+    /// moment, so it ranks as new instead of as its possibly ancient capture
+    /// date. Without this, unfiling old clips made them the first victims of
+    /// the very next capture's eviction pass (silent data loss).
+    static let historyEntrySQL = "MAX(createdAt, COALESCE(unfiledAt, createdAt))"
 
     /// Deletes uncategorized clips beyond the cap, oldest first, and returns
     /// the media filenames of evicted image clips so callers can remove files.
-    /// Clips in any category never count against the cap.
+    /// Clips in any category never count against the cap. "Oldest" is by
+    /// `historyEntrySQL`, so "History keeps N clips" keeps the N most recent
+    /// arrivals in history, unfiled clips included.
     @discardableResult
     static func evictOverCap(_ connection: Database, cap: Int) throws -> [String] {
         guard cap > 0 else { return [] }
@@ -228,10 +252,18 @@ final class ClipDatabase: Sendable {
             AND id NOT IN (
                 SELECT id FROM clips
                 WHERE id NOT IN (SELECT clipID FROM clip_category)
-                ORDER BY createdAt DESC, id DESC
+                ORDER BY \(historyEntrySQL) DESC, id DESC
                 LIMIT \(cap)
             )
             """
+        return try deleteClips(connection, matching: doomedSQL)
+    }
+
+    /// Deletes the rows `doomedSQL` selects and returns the media filenames no
+    /// remaining row references. A file clip and an image clip of the same
+    /// bytes share one media file and thumbnail, so a file is freed only when
+    /// its last owner goes.
+    private static func deleteClips(_ connection: Database, matching doomedSQL: String) throws -> [String] {
         let filenames = try String.fetchAll(
             connection,
             sql: """
@@ -243,7 +275,22 @@ final class ClipDatabase: Sendable {
                 """
         )
         try connection.execute(sql: "DELETE FROM clips WHERE id IN (\(doomedSQL))")
-        return filenames
+        return try unreferencedFilenames(connection, among: filenames)
+    }
+
+    /// The subset of `filenames` that no clip row references as media or
+    /// thumbnail. Call after the owning rows are deleted or repointed, inside
+    /// the same transaction, and delete only what this returns.
+    static func unreferencedFilenames(_ connection: Database, among filenames: [String]) throws -> [String] {
+        var free: [String] = []
+        for name in Set(filenames) where !name.isEmpty {
+            let inUse = try Bool.fetchOne(
+                connection,
+                sql: "SELECT EXISTS(SELECT 1 FROM clips WHERE mediaFilename = ? OR thumbFilename = ?)",
+                arguments: [name, name]) ?? false
+            if !inUse { free.append(name) }
+        }
+        return free
     }
 
     /// THE eviction chokepoint (DAT-11). Every path that adds rows (capture,
@@ -270,20 +317,10 @@ final class ClipDatabase: Sendable {
         let doomedSQL = """
             SELECT id FROM clips
             WHERE id NOT IN (SELECT clipID FROM clip_category)
-            ORDER BY createdAt ASC, id ASC
+            ORDER BY \(historyEntrySQL) ASC, id ASC
             LIMIT \(excess)
             """
-        let filenames = try String.fetchAll(
-            connection,
-            sql: """
-                SELECT mediaFilename FROM clips
-                WHERE mediaFilename IS NOT NULL AND id IN (\(doomedSQL))
-                UNION ALL
-                SELECT thumbFilename FROM clips
-                WHERE thumbFilename IS NOT NULL AND id IN (\(doomedSQL))
-                """
-        )
-        try connection.execute(sql: "DELETE FROM clips WHERE id IN (\(doomedSQL))")
+        let filenames = try deleteClips(connection, matching: doomedSQL)
         ClippyLog.info("Ceiling eviction: over by \(excess) (total was \(total))", category: ClippyLog.storage)
         return filenames
     }
@@ -315,6 +352,27 @@ final class ClipDatabase: Sendable {
         }
     }
 
+    /// "Copy twice to append": replaces a text clip's text with the merged text,
+    /// but only while no category holds it. Returns false (and writes nothing)
+    /// when the clip is gone, is not text, or has been pinned or filed since it
+    /// was captured: an append drops the RTF/HTML, which must never happen to a
+    /// clip the user organized.
+    func appendClipText(id: Int64, newText: String) throws -> Bool {
+        try dbQueue.write { connection in
+            try connection.execute(
+                sql: """
+                    UPDATE clips
+                    SET contentText = ?, contentRTF = NULL, contentHTML = NULL,
+                        typeIdentifier = 'public.utf8-plain-text'
+                    WHERE id = ? AND contentKind = 'text'
+                      AND id NOT IN (SELECT clipID FROM clip_category)
+                    """,
+                arguments: [newText, id]
+            )
+            return connection.changesCount > 0
+        }
+    }
+
     /// Persists a user-assigned display name. Pass nil to clear the custom title
     /// and revert to showing the source app name in the card header.
     func updateClipTitle(id: Int64, userTitle: String?) throws {
@@ -330,7 +388,7 @@ final class ClipDatabase: Sendable {
     /// BEFORE this runs; the row is repointed at them and the now-unreferenced old
     /// files are deleted (unless the new content hashes to the same filename).
     func updateClipImage(id: Int64, stored: MediaStore.StoredImage) throws {
-        let oldFilenames: [String] = try dbQueue.write { connection in
+        let freed: [String] = try dbQueue.write { connection in
             let existing = try Clip.fetchOne(connection, key: id)
             try connection.execute(
                 sql: """
@@ -343,10 +401,10 @@ final class ClipDatabase: Sendable {
                             stored.pixelWidth, stored.pixelHeight, stored.byteSize,
                             ClipContentKind.image.rawValue, id]
             )
-            return existing?.mediaFilenames ?? []
+            // After the repoint: anything the new row or another clip still uses stays.
+            return try Self.unreferencedFilenames(connection, among: existing?.mediaFilenames ?? [])
         }
-        let keep: Set<String> = [stored.mediaFilename, stored.thumbFilename]
-        media.delete(filenames: oldFilenames.filter { !keep.contains($0) })
+        media.delete(filenames: freed)
     }
 
     /// Insert a plain-text clip from a non-capture source (script output, OCR,
@@ -382,18 +440,44 @@ final class ClipDatabase: Sendable {
         let filenames: [String] = try dbQueue.write { connection in
             let clip = try Clip.fetchOne(connection, key: id)
             try Clip.deleteOne(connection, key: id)
-            return clip?.mediaFilenames ?? []
+            return try Self.unreferencedFilenames(connection, among: clip?.mediaFilenames ?? [])
         }
         media.delete(filenames: filenames)
     }
 
+    /// Deletes a clip only if no category holds it. Returns whether it was
+    /// deleted. Sensitive auto-clear uses this so a pinned or filed clip is
+    /// never removed by an automatic pass, whatever its content.
+    @discardableResult
+    func deleteClipUnlessFiled(id: Int64) throws -> Bool {
+        let (deleted, filenames): (Bool, [String]) = try dbQueue.write { connection in
+            guard let clip = try Clip.fetchOne(connection, key: id) else { return (false, []) }
+            let filed = try Bool.fetchOne(
+                connection,
+                sql: "SELECT EXISTS(SELECT 1 FROM clip_category WHERE clipID = ?)",
+                arguments: [id]) ?? false
+            if filed { return (false, []) }
+            try Clip.deleteOne(connection, key: id)
+            return (true, try Self.unreferencedFilenames(connection, among: clip.mediaFilenames))
+        }
+        media.delete(filenames: filenames)
+        return deleted
+    }
+
     func deleteUnclassifiedClips() throws {
         let filenames: [String] = try dbQueue.write { connection in
-            let doomed = try Clip
-                .filter(sql: "id NOT IN (SELECT clipID FROM clip_category)")
-                .fetchAll(connection)
+            // Only the filenames are needed, not every row's text and blobs.
+            let candidates = try String.fetchAll(
+                connection,
+                sql: """
+                    SELECT mediaFilename FROM clips
+                    WHERE mediaFilename IS NOT NULL AND id NOT IN (SELECT clipID FROM clip_category)
+                    UNION
+                    SELECT thumbFilename FROM clips
+                    WHERE thumbFilename IS NOT NULL AND id NOT IN (SELECT clipID FROM clip_category)
+                    """)
             try connection.execute(sql: "DELETE FROM clips WHERE id NOT IN (SELECT clipID FROM clip_category)")
-            return doomed.flatMap(\.mediaFilenames)
+            return try Self.unreferencedFilenames(connection, among: candidates)
         }
         media.delete(filenames: filenames)
     }
@@ -471,8 +555,11 @@ extension Clip {
 
     /// The capture/import dedupe predicate for an image clip: same media filename
     /// (a content hash), so a re-copy of the same image bumps rather than duplicates.
+    /// Image kind only: a .png file clip stores identical bytes under the same
+    /// filename, and a bump must never retarget that file clip.
     static func duplicateImage(mediaFilename: String?) -> QueryInterfaceRequest<Clip> {
-        Clip.filter(Column("mediaFilename") == mediaFilename)
+        Clip.filter(Column("contentKind") == ClipContentKind.image.rawValue)
+            .filter(Column("mediaFilename") == mediaFilename)
     }
 
     /// The capture/import dedupe predicate for a file clip. When bytes are stored,

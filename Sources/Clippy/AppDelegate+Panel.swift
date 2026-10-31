@@ -120,9 +120,13 @@ extension AppDelegate {
         // NSApp.activate(ignoringOtherApps:) deprecated in macOS 14; use activate().
         NSApp.activate()
         if alert.runModal() == .alertFirstButtonReturn {
-            try? database.deleteUnclassifiedClips()
-            // Bulk delete bypasses the per-clip hook, so drop the Spotlight donations too.
-            ClipSpotlightIndexer.removeAll()
+            do {
+                try database.deleteUnclassifiedClips()
+                // Bulk delete bypasses the per-clip hook, so drop the Spotlight donations too.
+                ClipSpotlightIndexer.removeAll()
+            } catch {
+                ClippyLog.error("Clear history failed: \(error)", category: ClippyLog.storage)
+            }
         }
     }
 

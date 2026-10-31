@@ -244,5 +244,35 @@ extension ClipDatabase {
                 ON clips (contentKind, createdAt DESC, id DESC)
                 """)
         }
+        migrator.registerMigration("v12-unfiled-at") { connection in
+            // When a clip last left a category. Eviction ranks a clip by the later
+            // of createdAt and unfiledAt, so unfiling old clips (delete category,
+            // unpin, move) does not make them the next capture's eviction victims.
+            // Nullable and additive: NULL = never unfiled.
+            try connection.alter(table: "clips") { tableBuilder in
+                tableBuilder.add(column: "unfiledAt", .datetime)
+            }
+            // A trigger so every removal path stamps it, including other writers
+            // (the MCP server process). Same text format GRDB uses for Date, so
+            // the stamp compares correctly against createdAt. Rows removed by a
+            // cascading clip delete simply match nothing.
+            try connection.execute(sql: """
+                CREATE TRIGGER clip_category_unfiled AFTER DELETE ON clip_category
+                BEGIN
+                    UPDATE clips SET unfiledAt = strftime('%Y-%m-%d %H:%M:%f', 'now')
+                    WHERE id = OLD.clipID;
+                END
+                """)
+            // Media/thumbnail sharing checks ("does any other row use this file?")
+            // run on every delete and eviction.
+            try connection.execute(sql: """
+                CREATE INDEX IF NOT EXISTS clips_media_filename ON clips (mediaFilename)
+                WHERE mediaFilename IS NOT NULL
+                """)
+            try connection.execute(sql: """
+                CREATE INDEX IF NOT EXISTS clips_thumb_filename ON clips (thumbFilename)
+                WHERE thumbFilename IS NOT NULL
+                """)
+        }
     }
 }
