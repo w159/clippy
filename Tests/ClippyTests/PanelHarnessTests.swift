@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Vision
 import XCTest
 @testable import Clippy
 
@@ -149,37 +150,64 @@ final class PanelHarnessTests: XCTestCase {
         }
     }
 
-    // MARK: - Accessibility lookup
+    // MARK: - On-screen text lookup
 
-    private func accessibilityNodes(_ root: Any, depth: Int = 0) -> [NSAccessibilityProtocol] {
-        guard depth < 40, let node = root as? NSAccessibilityProtocol else { return [] }
-        let children = (node.accessibilityChildren() ?? []).flatMap { accessibilityNodes($0, depth: depth + 1) }
-        return [node] + children
+    /// One recognized line of text with its box in normalized image space
+    /// (origin bottom-left, as Vision reports it).
+    private struct RecognizedLine {
+        let text: String
+        let box: CGRect
     }
 
-    private func describe(_ node: NSAccessibilityProtocol) -> String {
-        let label = node.accessibilityLabel() ?? ""
-        let value = (node.accessibilityValue() as? String) ?? ""
-        let title = node.accessibilityTitle() ?? ""
-        return [label, value, title].filter { !$0.isEmpty }.joined(separator: " | ")
-    }
-
-    private func visibleTexts() -> [String] {
-        guard let content = window.contentView else { return [] }
-        return accessibilityNodes(content).map(describe).filter { !$0.isEmpty }
+    /// The SwiftUI tree is not reachable through `accessibilityChildren` of the
+    /// hosting view, so assertions read what is actually drawn: render the content
+    /// view at 2x and run text recognition over it.
+    private func recognizedLines() -> [RecognizedLine] {
+        guard let view = window?.contentView else { return [] }
+        let bounds = view.bounds
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return [] }
+        rep.size = bounds.size
+        view.cacheDisplay(in: bounds, to: rep)
+        guard let cgImage = rep.cgImage else { return [] }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        guard (try? VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])) != nil else { return [] }
+        return (request.results ?? []).compactMap { observation in
+            observation.topCandidates(1).first.map { RecognizedLine(text: $0.string, box: observation.boundingBox) }
+        }
     }
 
     private func isShown(_ fragment: String) -> Bool {
-        visibleTexts().contains { $0.localizedCaseInsensitiveContains(fragment) }
+        recognizedLines().contains { $0.text.localizedCaseInsensitiveContains(fragment) }
     }
 
-    /// Window-coordinate center of the first accessibility node mentioning `fragment`.
-    private func centerOfNode(mentioning fragment: String) -> NSPoint? {
-        guard let content = window.contentView else { return nil }
-        let node = accessibilityNodes(content).last { describe($0).localizedCaseInsensitiveContains(fragment) }
-        guard let frame = node?.accessibilityFrame(), frame.width > 0 else { return nil }
-        let inWindow = window.convertFromScreen(frame)
-        return NSPoint(x: inWindow.midX, y: inWindow.midY)
+    private func assertShown(_ fragment: String, _ message: String = "",
+                             file: StaticString = #filePath, line: UInt = #line) {
+        guard !isShown(fragment) else { return }
+        dumpDiagnostics("expected on screen: \(fragment)")
+        XCTFail("\"\(fragment)\" is not on screen. \(message)", file: file, line: line)
+    }
+
+    private func assertNotShown(_ fragment: String, _ message: String = "",
+                                file: StaticString = #filePath, line: UInt = #line) {
+        guard isShown(fragment) else { return }
+        dumpDiagnostics("expected absent from screen: \(fragment)")
+        XCTFail("\"\(fragment)\" is on screen. \(message)", file: file, line: line)
+    }
+
+    /// Window-coordinate center of the first recognized line containing `fragment`.
+    private func centerOfText(_ fragment: String) -> NSPoint? {
+        guard let view = window?.contentView,
+              let line = recognizedLines().first(where: { $0.text.localizedCaseInsensitiveContains(fragment) })
+        else { return nil }
+        let bounds = view.bounds
+        let y = view.isFlipped ? (1 - line.box.midY) * bounds.height : line.box.midY * bounds.height
+        return view.convert(NSPoint(x: line.box.midX * bounds.width, y: y), to: nil)
     }
 
     // MARK: - Screenshots and diagnostics
@@ -211,7 +239,7 @@ final class PanelHarnessTests: XCTestCase {
                      "pasted: \(pasted)",
                      "firstResponder: \(String(describing: window?.firstResponder))",
                      "isKey: \(window?.isKeyWindow ?? false)",
-                     "ax: \(visibleTexts().prefix(80))"]
+                     "onScreen: \(recognizedLines().map(\.text))"]
         let text = lines.joined(separator: "\n")
         print("HARNESS diagnostics\n\(text)")
         try? text.write(to: shotDirectory.appendingPathComponent("diagnostics-\(UUID().uuidString.prefix(6)).txt"),
@@ -223,16 +251,16 @@ final class PanelHarnessTests: XCTestCase {
     func testSearchFlowsInTheRealPanel() throws {
         try openPanel(appearance: .aqua)
         screenshot("01-panel-light")
-        XCTAssertFalse(isShown("Quarterly invoice"), "a filed clip stays out of History while browsing")
+        assertNotShown("Quarterly invoice", "a filed clip stays out of History while browsing")
 
         // 1. Typing searches, and a filed clip is found from History.
         typeText("invoice")
         XCTAssertEqual(store.query, "invoice")
         pump(seconds: 0.8)  // debounce plus the search itself
         screenshot("02-search-results-light")
-        XCTAssertTrue(isShown("Quarterly invoice"), "filed clip found from History search")
-        XCTAssertTrue(isShown("invoice reminder"))
-        XCTAssertFalse(isShown("pad thai"))
+        assertShown("Quarterly invoice", "filed clip found from History search")
+        assertShown("invoice reminder")
+        assertNotShown("pad thai")
 
         // 2. Return straight after typing pastes the top match of what was typed.
         clearQuery()
@@ -253,13 +281,13 @@ final class PanelHarnessTests: XCTestCase {
         pump(until: "no results") { self.store.clips.isEmpty }
         pump(seconds: 0.3)
         screenshot("03-no-results-light")
-        XCTAssertTrue(isShown("No clips match"))
+        assertShown("No clips match")
         pressEscape()
         pump(until: "Escape cleared the query") { self.store.query.isEmpty }
 
         // 5. Typing while the list has focus keeps every character.
         pump(seconds: 0.3)
-        let card = try XCTUnwrap(centerOfNode(mentioning: "pad thai"), "card for the lunch clip on screen")
+        let card = try XCTUnwrap(centerOfText("pad thai"), "card for the lunch clip on screen")
         click(at: card)
         pump(seconds: 0.7)  // the double-click gesture delays the single tap
         pump(until: "list focused after a card click") { !(self.window.firstResponder is NSTextView) }
