@@ -27,11 +27,15 @@ final class ClipStore: ObservableObject {
     /// False once `loadOlder` reached the oldest clip.
     @Published var hasMoreOlder = true
     @Published private(set) var categories: [Category] = []
-    @Published private(set) var membership: [Int64: Set<Int64>] = [:]
+    @Published private(set) var membership: [Int64: Set<Int64>] = [:] {
+        didSet { categoryPaneVersion &+= 1 }
+    }
     /// Per-category ordered clip ID lists, keyed by categoryID.
     /// Reflects clip_category.sortOrder so category panes can present clips
     /// in user-defined order rather than global createdAt order.
-    @Published var categoryClipOrder: [Int64: [Int64]] = [:]
+    @Published var categoryClipOrder: [Int64: [Int64]] = [:] {
+        didSet { categoryPaneVersion &+= 1 }
+    }
     /// Last search failure. Non-nil triggers an error banner with Retry in the
     /// panel. Cleared on the next successful search or when the query empties.
     @Published var searchError: String?
@@ -71,6 +75,11 @@ final class ClipStore: ObservableObject {
 
     var recents: [Clip] = [] {
         didSet {
+            // The observation window is re-published for any write to clips (OCR
+            // every ~2 s, each capture). An identical window changes nothing the
+            // list or an active search shows, so it must not restart the search.
+            guard recents != oldValue else { return }
+            categoryPaneVersion &+= 1
             // Rebuilt once per observation pulse instead of once per
             // clipsForCategory call: the id lookup is hit several times per
             // redraw (sections, metadata, keyboard handling all query it).
@@ -94,6 +103,34 @@ final class ClipStore: ObservableObject {
     var refilterToken = 0
     /// Where each semantic-merged hit came from (search pass 2); empty unless the semantic opt-in produced results.
     var semanticMatches: [Int64: SearchMatchSource] = [:]
+    /// Runs the keyword search off the main actor. A seam so tests can make it fail.
+    typealias SearchRunner = @Sendable (ClipDatabase, String, Int) throws -> [Clip]
+    var searchRunner: SearchRunner = { database, query, limit in
+        try database.searchClips(matching: query, limit: limit)
+    }
+    /// Gate and engine of the semantic pass; replaced in tests.
+    var semanticEnvironment = SemanticSearchEnvironment.standard
+    /// The in-flight semantic merge; cancelled by every new search so overlapping
+    /// runs do not each load and embed the candidate pool.
+    var semanticTask: Task<Void, Never>?
+    /// Generation of the newest merge. A merge whose id is no longer current drops
+    /// its result even if it finished before the cancel reached it.
+    var semanticRunID = 0
+    /// Highest merge generation that finished (published or fell back).
+    var semanticCompletedRunID = 0
+    /// Trimmed query whose fused (keyword plus semantic) order is on screen. While
+    /// it matches the query being refreshed, a DB pulse keeps that order up
+    /// instead of flashing the keyword-only one.
+    var fusedQuery: String?
+    /// Bumped whenever the inputs of `clipsForCategory` change.
+    var categoryPaneVersion = 0
+    /// Filtered category-pane results for one query and data version.
+    var categoryPaneCache: (query: String, version: Int, results: [Int64: [Clip]])?
+    /// The query last parsed for category-pane filtering, with when it was parsed
+    /// (relative dates such as `#yesterday` move with the clock).
+    var localQueryParse: (query: String, parsed: ParsedQuery, at: Date)?
+    /// How many times a category-pane query was parsed; observable in tests.
+    var localQueryParseCount = 0
     /// Generation for async suggestion ranking; stale completions are dropped.
     var suggestionsToken = 0
     private var clipsCancellable: AnyDatabaseCancellable?
@@ -150,11 +187,14 @@ final class ClipStore: ObservableObject {
         // window for every category edit.
         // Recents window plus every categorized clip: categorized clips must
         // stay visible in their panes even when older than the window.
-        let clipObservation = ValueObservation.tracking { db -> ([Clip], Int) in
+        let clipObservation = ValueObservation.tracking { db -> ClipWindow in
             let total = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
             let window = try Clip.fetchAll(db, sql: ClipDatabase.observationWindowSQL, arguments: [limit])
-            return (window, total)
+            return ClipWindow(clips: window, total: total)
         }
+        // Identical windows (a write that touched nothing the list shows) are dropped
+        // on the observation queue, not compared and republished on the main thread.
+        .removeDuplicates()
         // Initial count + list fetch are deliberately scheduled away from the
         // main thread: opening the panel must not wait for SQLite. The first
         // observation is published as soon as it completes.
@@ -165,12 +205,12 @@ final class ClipStore: ObservableObject {
                 ClippyLog.error("Clip observation failed: \(error)", category: ClippyLog.storage)
                 DispatchQueue.main.async { self?.observationError = error.localizedDescription }
             },
-            onChange: { [weak self] clips, total in
+            onChange: { [weak self] window in
                 guard let self else { return }
                 DispatchQueue.main.async {
                     self.observationError = nil
-                    self.recents = clips
-                    let usage = StorageUsage(count: total, ceiling: StorageCeiling.current)
+                    self.recents = window.clips
+                    let usage = StorageUsage(count: window.total, ceiling: StorageCeiling.current)
                     let warning = usage.isNearCeiling ? usage : nil
                     if self.storageWarning != warning { self.storageWarning = warning }
                 }
@@ -328,6 +368,7 @@ final class ClipStore: ObservableObject {
             // Immediate: clearing search should never feel laggy.
             searchError = nil
             semanticMatches = [:]
+            fusedQuery = nil
             clips = residentClips()
             completedQuery = ""
             return
@@ -360,6 +401,8 @@ final class ClipStore: ObservableObject {
         refilterToken &+= 1
         searchTask?.cancel()
         searchTask = nil
+        semanticTask?.cancel()
+        semanticTask = nil
     }
 
     private func refilter() {
@@ -368,6 +411,7 @@ final class ClipStore: ObservableObject {
         if trimmed.isEmpty {
             searchError = nil
             semanticMatches = [:]
+            fusedQuery = nil
             clips = residentClips()
             completedQuery = ""
             return
@@ -375,13 +419,14 @@ final class ClipStore: ObservableObject {
         let token = refilterToken
         let database = self.database
         let limit = displayLimit
+        let run = searchRunner
         // A cancellable task keyed by the generation: cancelled before the read
         // starts or before publishing, it does nothing.
         searchTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard !Task.isCancelled else { return }
             let outcome: Result<[Clip], Error>
             do {
-                outcome = .success(try database.searchClips(matching: trimmed, limit: limit))
+                outcome = .success(try run(database, trimmed, limit))
             } catch {
                 outcome = .failure(error)
             }
@@ -390,20 +435,47 @@ final class ClipStore: ObservableObject {
                 guard let self, self.refilterToken == token else { return }
                 switch outcome {
                 case .success(let found):
-                    self.clips = found
                     self.searchError = nil
                     self.completedQuery = trimmed
-                    self.scheduleSemanticMerge(query: trimmed, token: token, keyword: found)
+                    self.publishKeywordResults(found, query: trimmed, token: token)
                 case .failure(let error):
                     ClippyLog.error("Search failed: \(error)", category: ClippyLog.storage)
-                    // Keep the last results on screen rather than wiping to empty; the
-                    // banner carries the failure and a Retry action.
+                    // The banner carries the failure and a Retry action. The list is
+                    // emptied because `completedQuery` now names this query: leaving
+                    // the previous query's results would let Return paste its top clip.
                     self.searchError = error.localizedDescription
+                    self.fusedQuery = nil
+                    self.publishResults([], matches: [:])
                     self.completedQuery = trimmed
                 }
             }
         }
     }
+
+    /// Shows the keyword hits, then lets the semantic pass fuse them. When the
+    /// fused order for this very query is already on screen (a DB pulse refreshing
+    /// the search), it stays until the new fused order is ready, so the list does
+    /// not flash keyword order or lose the cursor's anchor in between.
+    private func publishKeywordResults(_ found: [Clip], query trimmed: String, token: Int) {
+        let semantic = SemanticSearchGate.shouldRun(query: trimmed, optedIn: semanticEnvironment.isEnabled())
+        if !(semantic && fusedQuery == trimmed) {
+            fusedQuery = nil
+            publishResults(found, matches: [:])
+        }
+        if semantic { scheduleSemanticMerge(query: trimmed, token: token, keyword: found) }
+    }
+
+    /// Assigns only what changed, so an identical refresh invalidates no view.
+    func publishResults(_ newClips: [Clip], matches: [Int64: SearchMatchSource]) {
+        if clips != newClips { clips = newClips }
+        if semanticMatches != matches { semanticMatches = matches }
+    }
+}
+
+/// The observed list window: recents plus every categorized clip, and the table size.
+struct ClipWindow: Equatable {
+    var clips: [Clip]
+    var total: Int
 }
 
 extension Clip {
@@ -415,8 +487,12 @@ extension Clip {
     /// app name is not free text in either place (`app:` filters it), so a
     /// result never appears without a visible match.
     func matchesLocally(query: String) -> Bool {
-        let parsed = ClipQueryParser.parse(query)
+        matchesLocally(ClipQueryParser.parse(query))
+    }
 
+    /// Same match for an already parsed query, so a pane filtering many clips
+    /// parses once.
+    func matchesLocally(_ parsed: ParsedQuery) -> Bool {
         if !parsed.kinds.isEmpty, !parsed.kinds.contains(where: { $0.matches(self) }) { return false }
         if parsed.excludedKinds.contains(where: { $0.matches(self) }) { return false }
         let name = sourceAppName?.lowercased() ?? ""
