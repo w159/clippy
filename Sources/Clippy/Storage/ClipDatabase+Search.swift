@@ -22,10 +22,11 @@ extension ClipDatabase {
         try search(matching: query, limit: limit).clips
     }
 
-    /// Full search: free text and phrases go through FTS5 (clip text, title and
-    /// OCR text), everything else is SQL. Derived kinds (`#link`...) and their
-    /// negations finish in Swift, paging until `limit` results or exhaustion.
-    /// Filter-only queries are ordered newest-first; text queries by FTS rank.
+    /// Full search: free text and phrases match the clip text, title and OCR text
+    /// (FTS5 word prefixes plus LIKE fragments), everything else is SQL. Derived
+    /// kinds (`#link`...) and their negations finish in Swift, paging until
+    /// `limit` results or exhaustion. Ordering: whole-word matches first, then
+    /// fragment matches, newest first within each.
     func search(matching query: String, limit: Int, now: Date = Date(),
                 calendar: Calendar = .current) throws -> SearchOutcome {
         let parsed = ClipQueryParser.parse(query, now: now, calendar: calendar)
@@ -86,26 +87,31 @@ extension ClipDatabase {
     private static func plan(_ parsed: ParsedQuery, db: Database, warnings: inout [QueryWarning]) throws -> SearchPlan {
         var clauses: [String] = []
         var args: [DatabaseValueConvertible] = []
-        var joinFTS = false
 
-        // Positive text: a single MATCH so rank ordering works.
-        var positives: [String] = []
-        if !parsed.text.isEmpty, let pattern = FTS5Pattern(matchingAllPrefixesIn: parsed.text) {
-            positives.append("(\(pattern.rawPattern))")
+        // Free text: every word and phrase must occur in the clip's text, title
+        // or recognised text. A word matches as the start of a word through the
+        // FTS5 index (case and diacritic insensitive, so "inv" finds "Invoice"
+        // and "cafe" finds its accented spelling) or anywhere as a fragment through LIKE, so
+        // "hub" finds "github", "Name" finds "getUserName" and "@" or "c++" find
+        // themselves. Punctuation-only text used to be dropped and returned
+        // every clip; it is now a literal fragment like any other word.
+        let words = parsed.text.split(separator: " ").map(String.init)
+        var wordPatterns: [String] = []
+        for word in words {
+            let pattern = wordPattern(word)
+            if let pattern { wordPatterns.append("(\(pattern.rawPattern))") }
+            clauses.append(containsClause(pattern, word, &args))
         }
         for phrase in parsed.phrases {
-            if let pattern = FTS5Pattern(matchingPhrase: phrase) { positives.append("(\(pattern.rawPattern))") }
+            let pattern = FTS5Pattern(matchingPhrase: phrase)
+            if let pattern { wordPatterns.append("(\(pattern.rawPattern))") }
+            clauses.append(containsClause(pattern, phrase, &args))
         }
-        if !positives.isEmpty {
-            joinFTS = true
-            clauses.append("clips_fts MATCH ?")
-            args.append(positives.joined(separator: " AND "))
+        for word in parsed.excludedTerms {
+            clauses.append("NOT " + containsClause(wordPattern(word), word, &args))
         }
-        var negatives: [FTS5Pattern] = parsed.excludedTerms.compactMap { FTS5Pattern(matchingAllPrefixesIn: $0) }
-        negatives += parsed.excludedPhrases.compactMap { FTS5Pattern(matchingPhrase: $0) }
-        for pattern in negatives {
-            clauses.append("clips.id NOT IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)")
-            args.append(pattern)
+        for phrase in parsed.excludedPhrases {
+            clauses.append("NOT " + containsClause(FTS5Pattern(matchingPhrase: phrase), phrase, &args))
         }
 
         if !parsed.kinds.isEmpty {
@@ -144,10 +150,46 @@ extension ClipDatabase {
         }
 
         var sql = "SELECT clips.id FROM clips"
-        if joinFTS { sql += " JOIN clips_fts ON clips_fts.rowid = clips.id" }
         if !clauses.isEmpty { sql += " WHERE " + clauses.joined(separator: " AND ") }
-        sql += joinFTS ? " ORDER BY rank, clips.id DESC" : " ORDER BY clips.createdAt DESC, clips.id DESC"
+        // Clips where every word starts a word rank above fragment-only matches;
+        // within each tier the newest clip comes first, which is what a clipboard
+        // history is for (bm25 used to float a weeks-old one-liner above the clip
+        // copied a minute ago).
+        sql += " ORDER BY "
+        if words.count + parsed.phrases.count == wordPatterns.count, !wordPatterns.isEmpty {
+            sql += "(clips.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)) DESC, "
+            args.append(wordPatterns.joined(separator: " AND "))
+        }
+        sql += "clips.createdAt DESC, clips.id DESC"
         return SearchPlan(sql: sql, arguments: args)
+    }
+
+    /// FTS5 prefix pattern for a plain word. A word with punctuation in it
+    /// ("c++", "w159/clip", "jo@x") gets none: the tokenizer would split it into
+    /// loose prefixes ("c*" matches every word starting with c), so it is matched
+    /// literally as a fragment instead.
+    private static func wordPattern(_ word: String) -> FTS5Pattern? {
+        guard word.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+        return FTS5Pattern(matchingAllPrefixesIn: word)
+    }
+
+    /// True when the clip contains `needle`: as a word prefix through the FTS5
+    /// index when `pattern` exists, else (or also) as a LIKE fragment of the text,
+    /// title or OCR text. The IN subquery is uncorrelated, so SQLite builds it once
+    /// per search and LIKE only runs on rows the index did not already match.
+    private static func containsClause(_ pattern: FTS5Pattern?, _ needle: String,
+                                       _ args: inout [DatabaseValueConvertible]) -> String {
+        var options: [String] = []
+        if let pattern {
+            options.append("clips.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)")
+            args.append(pattern)
+        }
+        let like = likePattern(needle)
+        options.append("clips.contentText LIKE ? ESCAPE '\\'")
+        options.append("COALESCE(clips.userTitle, '') LIKE ? ESCAPE '\\'")
+        options.append("COALESCE(clips.ocrText, '') LIKE ? ESCAPE '\\'")
+        args.append(contentsOf: [like, like, like])
+        return "(" + options.joined(separator: " OR ") + ")"
     }
 
     private static let appPredicate =

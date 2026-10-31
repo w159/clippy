@@ -9,8 +9,10 @@ import GRDB
 /// # Grammar
 /// Tokens are separated by whitespace and combine with AND unless noted.
 ///
-///     word            free text, FTS5 prefix match ("inv" finds "invoice")
-///     "exact phrase"  FTS5 phrase; `\"` and `\\` escape inside quotes
+///     word            free text found anywhere in the text, title or OCR text:
+///                     "inv" finds "invoice", "hub" finds "github", "@" finds "@";
+///                     word-start matches rank above fragment matches
+///     "exact phrase"  contiguous phrase; `\"` and `\\` escape inside quotes
 ///     -word  -"phrase"  exclude clips containing it
 ///     kind:image      content kind (also `kind:image,link`); same names as `#kind`
 ///     app:chrome      source app name or bundle id (substring, case-insensitive)
@@ -88,7 +90,7 @@ typealias ParsedClipQuery = ParsedQuery
 struct QueryWarning: Equatable {
     enum Kind: String {
         case unterminatedQuote, emptyOperatorValue, unknownKind, invalidDate, invalidSize
-        case unsupportedNegation, unsearchableText, emptyDateRange, unknownCategory
+        case unsupportedNegation, emptyDateRange, unknownCategory
     }
 
     let kind: Kind
@@ -103,7 +105,6 @@ struct QueryWarning: Equatable {
         case .invalidDate: return "Couldn't read the date in \(token)"
         case .invalidSize: return "Couldn't read the size in \(token)"
         case .unsupportedNegation: return "\(token) can't be negated"
-        case .unsearchableText: return "\(token) has no searchable words and was ignored"
         case .emptyDateRange: return "The date range in your search matches nothing"
         case .unknownCategory: return "No category named \(token)"
         }
@@ -206,7 +207,6 @@ enum ClipQueryParser {
         private mutating func consumeWord(_ word: String, _ token: QueryToken) {
             guard !word.isEmpty else { return }
             residual.append(token.source)
-            if FTS5Pattern(matchingAllPrefixesIn: word) == nil { warn(.unsearchableText, token) }
             if token.negated { query.excludedTerms.append(word) } else { words.append(word) }
         }
 
@@ -214,10 +214,6 @@ enum ClipQueryParser {
             if !terminated { warn(.unterminatedQuote, token) }
             guard !phrase.trimmingCharacters(in: .whitespaces).isEmpty else { return }
             residual.append(token.source)
-            guard FTS5Pattern(matchingPhrase: phrase) != nil else {
-                warn(.unsearchableText, token)
-                return
-            }
             if token.negated { query.excludedPhrases.append(phrase) } else { query.phrases.append(phrase) }
         }
 

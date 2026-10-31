@@ -28,6 +28,7 @@ extension ClipListView {
     func moveCursor(to index: Int, extend: Bool) {
         let clips = visibleClips
         guard clips.indices.contains(index), let id = clips[index].id else { return }
+        selectionFollowsTop = false
         syncRangeModel()
         if extend {
             rangeModel.extend(to: id, order: clips.compactMap(\.id))
@@ -65,6 +66,13 @@ extension ClipListView {
             return .handled
         }
         if press.key == .return {
+            // Typed faster than the search debounce: paste the top result of
+            // what is in the field, not of the previous query.
+            if store.hasPendingSearch {
+                pendingReturnShift = mods.contains(.shift)
+                store.searchNow()
+                return .handled
+            }
             pasteSelected(shiftHeld: mods.contains(.shift))
             return .handled
         }
@@ -82,11 +90,34 @@ extension ClipListView {
         }
         if command { return handleCommandKey(press, source: source) }
         if source == .list, isPrintable(press) {
-            store.query += press.characters
-            focusTarget = .search
+            typeIntoSearch(press.characters)
             return .handled
         }
         return .ignored
+    }
+
+    /// A printable key pressed while the list has focus starts or extends the
+    /// search. AppKit selects a field's whole text when it becomes first
+    /// responder, so without the caret placed at the end the next keystroke
+    /// replaced everything typed so far ("abc" typed from the list became "c").
+    func typeIntoSearch(_ characters: String) {
+        store.query += characters
+        focusTarget = .search
+        let end = TextSelection(insertionPoint: store.query.endIndex)
+        searchSelection = end
+        // The focus change lands on the next view update; re-place the caret
+        // after it so the select-all that comes with first responder loses.
+        Task { @MainActor in searchSelection = TextSelection(insertionPoint: store.query.endIndex) }
+    }
+
+    /// Completes a Return that waited for the current query's results.
+    func finishPendingReturn() {
+        guard let shift = pendingReturnShift, !store.hasPendingSearch else { return }
+        pendingReturnShift = nil
+        // Stale results stay on screen when a search fails; never paste from them.
+        guard store.searchError == nil else { return }
+        if selectionFollowsTop { selectedIndex = 0 }
+        pasteSelected(shiftHeld: shift)
     }
 
     private func navigationMove(for key: KeyEquivalent) -> GridNavigator.Move? {
@@ -135,8 +166,7 @@ extension ClipListView {
             return .handled
         }
         if source == .list, isPrintable(press) {
-            store.query += press.characters
-            focusTarget = .search
+            typeIntoSearch(press.characters)
             return .handled
         }
         return .ignored

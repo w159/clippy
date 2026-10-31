@@ -55,6 +55,12 @@ struct ClipListView: View {
     /// every DB pulse). Re-indexed to the anchored clip's new position when
     /// store.clips republishes.
     @State var anchoredClipID: Int64?
+    /// True from a query edit until the user moves the cursor: new results then
+    /// select their top match instead of the previously anchored clip.
+    @State var selectionFollowsTop = false
+    /// Return pressed while the typed query's search had not landed yet; holds
+    /// the Shift state and pastes once the results arrive.
+    @State var pendingReturnShift: Bool?
     /// The clip awaiting delete confirmation. Every delete path (hover button,
     /// context menu, Cmd-Delete) routes through this single piece of state so
     /// there is one confirmation entry point and deletion is never destructive
@@ -134,7 +140,8 @@ struct ClipListView: View {
     /// Clips shown for the current selection, in keyboard-navigation order.
     /// History is the "loose" root: once a clip is filed into any category it
     /// behaves like a file moved into a folder and no longer appears here, only
-    /// inside that category's pane.
+    /// inside that category's pane. A search from History covers filed clips too
+    /// (see `HistoryPanePolicy`).
     ///
     /// Category panes return clips in user-defined sortOrder (drag-reorderable).
     /// History stays createdAt DESC (a live recency feed, not reorderable).
@@ -146,7 +153,7 @@ struct ClipListView: View {
     func clips(for selection: PanelSelection) -> [Clip] {
         switch selection {
         case .history:
-            return smartFiltered(store.clips.filter { !store.isPinned($0) })
+            return smartFiltered(HistoryPanePolicy.visible(store.clips, query: store.query, isFiled: { store.isPinned($0) }))
         case .category(let categoryID):
             return store.clipsForCategory(categoryID)
         case .onePassword:
@@ -208,15 +215,22 @@ struct ClipListView: View {
             let newIDs = Set(visibleClips.compactMap { $0.id })
             selectedClipIDs.formIntersection(newIDs)
             rangeModel.prune(keeping: newIDs)
-            if let anchor = anchoredClipID,
-               let newIndex = visibleClips.firstIndex(where: { $0.id == anchor }) {
-                selectedIndex = newIndex
-            } else {
-                selectedIndex = 0
-                anchoredClipID = visibleClips.first?.id
-            }
+            selectedIndex = ResultSelectionPolicy.index(in: visibleClips, anchor: anchoredClipID,
+                                                        followsTop: selectionFollowsTop)
+            anchoredClipID = visibleClips.indices.contains(selectedIndex) ? visibleClips[selectedIndex].id : nil
             attemptPendingReveal()
         }
+        // A new query: the cursor jumps to the top and follows the best match;
+        // a pending Return belongs to the old text and is dropped.
+        .onChange(of: store.query) { _, _ in
+            selectionFollowsTop = true
+            pendingReturnShift = nil
+            syncRangeModel()
+            rangeModel.collapseToCursor()
+            selectedClipIDs = []
+            selectedIndex = 0
+        }
+        .onChange(of: store.completedQuery) { _, _ in finishPendingReturn() }
         .onChange(of: store.suggestionsState) { _, newState in
             // Auto-open: show the Suggestions pane once results land, unless
             // the user already navigated somewhere this presentation.
