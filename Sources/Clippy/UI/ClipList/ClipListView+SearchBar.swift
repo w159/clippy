@@ -35,7 +35,12 @@ extension ClipListView {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(tokens.textSecondary)
                 .accessibilityHidden(true)
-            TextField("Search clips", text: $store.query, selection: $searchSelection)
+            // Explicit prompt color: the system placeholder follows the window
+            // appearance, not the theme, and vanishes when the two disagree.
+            TextField(text: $store.query, selection: $searchSelection,
+                      prompt: Text("Search clips").foregroundStyle(tokens.textSecondary)) {
+                Text("Search clips")
+            }
                 .textFieldStyle(.plain)
                 .font(PanelTypography.body(settings))
                 .foregroundStyle(tokens.textPrimary)
