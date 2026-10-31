@@ -86,6 +86,7 @@ final class PanelHarnessTests: XCTestCase {
         window.appearance = NSAppearance(named: appearance)
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
+        window.hidesOnDeactivate = false  // as PanelController configures the real panel
         window.contentView = NSHostingView(rootView: view)
         window.makeKeyAndOrderFront(nil)
         self.window = window
