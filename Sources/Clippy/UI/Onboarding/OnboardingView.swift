@@ -83,6 +83,7 @@ struct OnboardingView: View {
             }
             Button(viewModel.model.isLast ? "Get started" : "Continue") { viewModel.advance() }
                 .buttonStyle(.borderedProminent)
+                .tint(tokens.accent)
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 20).padding(.vertical, 12)
