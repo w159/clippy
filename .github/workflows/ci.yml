@@ -41,8 +41,8 @@ jobs:
                   set -o pipefail
                   status=0
                   swift build 2>&1 | tee "$RUNNER_TEMP/swift-build.log" || status=$?
-                  grep -E ': error: ' "$RUNNER_TEMP/swift-build.log" | sort -u | head -100
-                  grep -E ': error: ' "$RUNNER_TEMP/swift-build.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done
+                  grep -E ': error: ' "$RUNNER_TEMP/swift-build.log" | sort -u | head -100 || true
+                  grep -E ': error: ' "$RUNNER_TEMP/swift-build.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
                   exit $status
 
             # Tee the output so the XCTest totals are printed as their own line:
@@ -53,8 +53,8 @@ jobs:
                   status=0
                   swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log" || status=$?
                   echo "::notice title=XCTest totals::$(grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/swift-test.log" | tail -1)"
-                  grep -E ': error: ' "$RUNNER_TEMP/swift-test.log" | sort -u | head -100
-                  grep -E ': error: ' "$RUNNER_TEMP/swift-test.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done
+                  grep -E ': error: ' "$RUNNER_TEMP/swift-test.log" | sort -u | head -100 || true
+                  grep -E ': error: ' "$RUNNER_TEMP/swift-test.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
                   exit $status
 
     app:
@@ -80,8 +80,8 @@ jobs:
                   status=0
                   swift test --filter PanelHarnessTests 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
                   grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/harness.log" | tail -1 || true
-                  grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -100
-                  grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done
+                  grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -100 || true
+                  grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
                   exit $status
 
             - name: Build Clippy.app
