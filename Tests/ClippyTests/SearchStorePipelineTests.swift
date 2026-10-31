@@ -69,7 +69,8 @@ final class SearchStorePipelineTests: XCTestCase {
         waitFor("alpha landed") { !store.hasPendingSearch }
 
         let token = store.refilterToken
-        store.recents = store.recents
+        let unchanged = store.recents
+        store.recents = unchanged
         XCTAssertEqual(store.refilterToken, token, "an unchanged window must leave the search alone")
         store.recents = store.recents + [clip(99, "alpha fresh")]
         XCTAssertNotEqual(store.refilterToken, token, "a changed window refreshes the search")
