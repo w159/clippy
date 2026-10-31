@@ -2,14 +2,41 @@ import SwiftUI
 
 // Capture policy rows backed by CapturePreferences and PasteProfiles (UserDefaults-backed, not AppSettings).
 
+/// Stored values behind the Capture policy rows. The rows keep a local copy for
+/// editing, so a pane reset or preferences import (which only touch storage) must
+/// re-read it or the next edit would write the old list back.
+struct CapturePolicySnapshot: Equatable {
+    var captureOnLaunch: Bool
+    var clearSeconds: Int
+    var deletesHistory: Bool
+    var blocklist: [String]
+    var overrides: [String: PasteProfiles.Mode]
+
+    static func load() -> CapturePolicySnapshot {
+        CapturePolicySnapshot(
+            captureOnLaunch: CapturePreferences.captureOnLaunch,
+            clearSeconds: CapturePreferences.sensitiveAutoClearSeconds,
+            deletesHistory: CapturePreferences.autoClearDeletesHistory,
+            blocklist: CapturePreferences.typeBlocklist,
+            overrides: PasteProfiles.overrides
+        )
+    }
+}
+
 /// Capture-on-launch toggle.
 struct CaptureLaunchRow: View {
+    @ObservedObject private var settings = AppSettings.shared
     @State private var captureOnLaunch = CapturePreferences.captureOnLaunch
 
     var body: some View {
         Toggle("Capture the current clipboard on launch", isOn: $captureOnLaunch)
             .settingsRow("capture.onLaunch")
             .onChange(of: captureOnLaunch) { _, value in CapturePreferences.captureOnLaunch = value }
+            // reloadFromDefaults() announces after a reset or import, once storage is final.
+            .onReceive(settings.objectWillChange) { _ in
+                let stored = CapturePreferences.captureOnLaunch
+                if stored != captureOnLaunch { captureOnLaunch = stored }
+            }
         SettingsNote("Off by default: whatever you copied before Clippy started is not recorded.")
     }
 }
@@ -17,6 +44,7 @@ struct CaptureLaunchRow: View {
 /// Sensitive auto-clear, type blocklist and per-app paste profiles.
 struct CapturePolicySections: View {
     @Environment(\.clippyTokens) private var tokens
+    @ObservedObject private var settings = AppSettings.shared
     @State private var clearSeconds = CapturePreferences.sensitiveAutoClearSeconds
     @State private var deletesHistory = CapturePreferences.autoClearDeletesHistory
     @State private var blocklist = CapturePreferences.typeBlocklist
@@ -76,6 +104,16 @@ struct CapturePolicySections: View {
             SettingsNote("Terminals and code editors paste plain text by default. Overrides here win over that built-in list.")
         }
         .settingsRow("capture.pasteProfiles")
+        .onReceive(settings.objectWillChange) { _ in refreshFromStorage() }
+    }
+
+    /// Pulls storage back into the local copies after a reset or import.
+    private func refreshFromStorage() {
+        let stored = CapturePolicySnapshot.load()
+        if clearSeconds != stored.clearSeconds { clearSeconds = stored.clearSeconds }
+        if deletesHistory != stored.deletesHistory { deletesHistory = stored.deletesHistory }
+        if blocklist != stored.blocklist { blocklist = stored.blocklist }
+        if overrides != stored.overrides { overrides = stored.overrides }
     }
 
     private func modeBinding(_ bundleID: String) -> Binding<PasteProfiles.Mode> {

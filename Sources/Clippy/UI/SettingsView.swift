@@ -249,7 +249,7 @@ private struct ImportSummarySheet: View {
         case .int(let number): return String(number)
         case .double(let number): return String(number)
         case .string(let text): return text.isEmpty ? "(empty)" : text
-        case .strings(let list): return "\(list.count) item(s)"
+        case .strings(let list): return CountCopy.listSummary(list.count)
         case .map(let map): return "\(map.count) entr\(map.count == 1 ? "y" : "ies")"
         }
     }

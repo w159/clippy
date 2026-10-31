@@ -22,6 +22,23 @@ final class ClipCardModelTests: XCTestCase {
         XCTAssertTrue(model.accessibilityValue.contains("pinned"))
     }
 
+    func testSensitivityCacheKeyChangesForSameLengthEdit() {
+        let before = "xxxx xxxx xxxx xxxx"
+        let after = "4111 1111 1111 1111"
+        XCTAssertEqual(before.utf8.count, after.utf8.count)
+        XCTAssertNotEqual(CardSensitivity.cacheKey(id: 7, text: before), CardSensitivity.cacheKey(id: 7, text: after))
+        XCTAssertEqual(CardSensitivity.cacheKey(id: 7, text: after), CardSensitivity.cacheKey(id: 7, text: after))
+        XCTAssertNotEqual(CardSensitivity.cacheKey(id: 7, text: after), CardSensitivity.cacheKey(id: 8, text: after))
+    }
+
+    func testMaskedLineFollowsInPlaceEdit() {
+        let plain = clip("xxxx xxxx xxxx xxxx")
+        _ = CardSensitivity.maskedLine(plain)
+        var edited = plain
+        edited.contentText = "4111 1111 1111 1111"
+        XCTAssertFalse(CardSensitivity.maskedLine(edited).contains("4111 1111 1111 1111"))
+    }
+
     func testValueReportsOCRStates() {
         let image = clip("", ocr: "hello world", image: true)
         let running = ClipCardModel.make(clip: image, isSelected: false, isPinned: false,

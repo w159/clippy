@@ -49,7 +49,7 @@ extension IntegrationsSettingsTab {
             let summary = try ClippyArchive.importTOML(text, into: ClipDatabase.shared)
             var message = "Imported \(CopyFormat.counted(summary.categories, "category", plural: "categories")) and \(CopyFormat.counted(summary.clips, "clip"))."
             if summary.skippedImages > 0 {
-                message += " Skipped \(summary.skippedImages) image(s) whose files were missing."
+                message += " " + CountCopy.skippedImages(summary.skippedImages)
             }
             return message
         }

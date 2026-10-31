@@ -74,14 +74,18 @@ struct CategoryEditorView: View {
                 Text("Color")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
-                HStack(spacing: 6) {
+                // Wrapped into balanced rows so every swatch stays inside the 252 pt popover.
+                LazyVGrid(columns: swatchColumns, alignment: .leading, spacing: Self.swatchSpacing) {
                     ForEach(Array(CategoryPalette.hexes.enumerated()), id: \.element) { index, hex in
                         colorSwatch(hex, index: index + 1)
                     }
-                    // Audit finding: palette was limited to 10 fixed swatches.
-                    // A Custom swatch opens the system color picker; the chosen
-                    // color is written back to colorHex as "#RRGGBB".
+                }
+                // Audit finding: palette was limited to 10 fixed swatches.
+                // A Custom swatch opens the system color picker; the chosen
+                // color is written back to colorHex as "#RRGGBB".
+                HStack(spacing: 8) {
                     customColorSwatch
+                    Text("Custom").font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -110,6 +114,19 @@ struct CategoryEditorView: View {
         }
         .padding(14)
         .frame(width: 280)
+    }
+
+    private static let swatchSize: CGFloat = 20
+    private static let swatchSpacing: CGFloat = 8
+    /// Popover content width: 280 minus 14 pt padding on each side.
+    private static let contentWidth: CGFloat = 252
+
+    private var swatchColumns: [GridItem] {
+        let count = SwatchRowLayout.columns(
+            available: Self.contentWidth, itemWidth: Self.swatchSize, spacing: Self.swatchSpacing,
+            itemCount: CategoryPalette.hexes.count
+        )
+        return Array(repeating: GridItem(.fixed(Self.swatchSize), spacing: Self.swatchSpacing), count: count)
     }
 
     private func colorSwatch(_ hex: String, index: Int) -> some View {
@@ -147,4 +164,17 @@ struct CategoryEditorView: View {
         .accessibilityAddTraits(!isInPalette ? .isSelected : [])
     }
 
+}
+
+/// Pure row-fit math for the palette swatches.
+enum SwatchRowLayout {
+    /// Columns that keep a row inside `available`, balanced so a wrapped palette
+    /// gets even rows (10 swatches in 252 pt: 2 rows of 5, not 8 + 2).
+    static func columns(available: CGFloat, itemWidth: CGFloat, spacing: CGFloat, itemCount: Int) -> Int {
+        guard itemCount > 0 else { return 1 }
+        let fit = max(1, Int((available + spacing) / (itemWidth + spacing)))
+        guard itemCount > fit else { return itemCount }
+        let rows = (itemCount + fit - 1) / fit
+        return (itemCount + rows - 1) / rows
+    }
 }

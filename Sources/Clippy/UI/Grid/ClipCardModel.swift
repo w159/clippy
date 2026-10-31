@@ -85,6 +85,14 @@ enum CardSensitivity {
         return cache
     }()
 
+    /// Cache key derived from the text itself, so an in-place edit that keeps the
+    /// length ("xxxx xxxx xxxx xxxx" -> "4111 1111 1111 1111") cannot reuse a stale verdict.
+    static func cacheKey(id: Int64?, text: String) -> String {
+        var hasher = Hasher()
+        hasher.combine(text)
+        return "\(id ?? -1)-\(text.utf8.count)-\(hasher.finalize())"
+    }
+
     /// Same rules as `SensitiveContent.isSensitive(clip:)` with the text scan cached.
     static func isSensitive(_ clip: Clip) -> Bool {
         if let entry = SensitiveFlagStore.current?.entry(for: clip.contentKey) {
@@ -92,7 +100,7 @@ enum CardSensitivity {
             if entry.confidence >= SensitiveContent.sensitiveThreshold { return true }
         }
         guard clip.contentKind == .text else { return false }
-        let key = "\(clip.id ?? -1)-\(clip.contentText.utf8.count)" as NSString
+        let key = cacheKey(id: clip.id, text: clip.contentText) as NSString
         if let hit = scanCache.object(forKey: key) { return hit.boolValue }
         let result = SensitiveContent.isSensitive(text: clip.contentText)
         scanCache.setObject(NSNumber(value: result), forKey: key)
@@ -109,7 +117,7 @@ extension CardSensitivity {
 
     /// Single-line preview with recognised secrets bulleted, cached per clip.
     static func maskedLine(_ clip: Clip) -> String {
-        let key = "\(clip.id ?? -1)-\(clip.contentText.utf8.count)" as NSString
+        let key = cacheKey(id: clip.id, text: clip.contentText + "\u{0}" + clip.previewText) as NSString
         if let hit = maskCache.object(forKey: key) { return hit as String }
         let line = SensitiveContent.maskedPreview(clip.previewText)
             .replacingOccurrences(of: "\n", with: " ")

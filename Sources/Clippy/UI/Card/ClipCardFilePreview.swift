@@ -29,7 +29,10 @@ extension ClipCardView {
 
     func fileRevealAction() {
         if let override = onRevealInFinder { override(); return }
-        guard let url = resolvedFileURL else { return }
+        guard let url = resolvedFileURL else {
+            FileActionAlert.present(title: "File not found", detail: FileActionAlert.missingFileDetail(clip.filePath))
+            return
+        }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
@@ -42,27 +45,48 @@ extension ClipCardView {
 
     func fileExtractAction() {
         if let override = onExtractZip { override(); return }
-        guard let archiveURL = resolvedFileURL else { return }
-        let name = archiveURL.deletingPathExtension().lastPathComponent
+        guard let archiveURL = resolvedFileURL else {
+            FileActionAlert.present(title: "Can't extract", detail: FileActionAlert.missingFileDetail(clip.filePath))
+            return
+        }
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Downloads")
-        let destDir = downloads.appendingPathComponent(name, isDirectory: true)
+        // A fresh folder every time ("report", "report 2", ...): extraction must never merge into
+        // or overwrite something that is already in Downloads.
+        let destDir = ZipExtractNaming.uniqueDirectory(
+            baseName: archiveURL.deletingPathExtension().lastPathComponent, in: downloads
+        ) { FileManager.default.fileExists(atPath: $0.path) }
         do {
-            try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
-        } catch { return }
+            try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: false)
+        } catch {
+            FileActionAlert.present(title: "Can't extract", detail: "Couldn't create the folder \(destDir.lastPathComponent) in Downloads: \(error.localizedDescription)")
+            return
+        }
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         proc.arguments = ["-x", "-k", archiveURL.path, destDir.path]
+        let errorPipe = Pipe()
+        proc.standardError = errorPipe
         proc.terminationHandler = { process in
-            DispatchQueue.main.async {
-                if process.terminationStatus == 0 {
+            let status = process.terminationStatus
+            let stderr = (process.standardError as? Pipe)?.fileHandleForReading.readDataToEndOfFile() ?? Data()
+            let reason = String(decoding: stderr, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            Task { @MainActor in
+                if status == 0 {
                     NSWorkspace.shared.activateFileViewerSelecting([destDir])
+                } else {
+                    try? FileManager.default.removeItem(at: destDir)
+                    FileActionAlert.present(title: "Extraction failed", detail: ZipExtractNaming.failureDetail(reason: reason))
                 }
-                // Failure is silently swallowed; no partial state to clean up.
             }
         }
-        try? proc.run()
+        do {
+            try proc.run()
+        } catch {
+            try? FileManager.default.removeItem(at: destDir)
+            FileActionAlert.present(title: "Extraction failed", detail: ZipExtractNaming.failureDetail(reason: error.localizedDescription))
+        }
     }
 
     var filePreview: some View {
@@ -80,14 +104,14 @@ extension ClipCardView {
                 if let byteSize = clip.byteSize {
                     Text(ByteCountFormatter.string(fromByteCount: Int64(byteSize), countStyle: .file))
                         .font(PanelTypography.micro(settings))
-                        .foregroundStyle(tokens.textSecondary)
+                        .foregroundStyle(cardSecondaryText)
                         .monospacedDigit()
                 }
                 // Reference-only badge: stored bytes not available.
                 if clip.mediaFilename == nil {
                     Text("Path reference only")
                         .font(PanelTypography.micro(settings))
-                        .foregroundStyle(tokens.textSecondary)
+                        .foregroundStyle(cardSecondaryText)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

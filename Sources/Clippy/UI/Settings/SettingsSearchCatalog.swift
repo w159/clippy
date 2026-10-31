@@ -2,6 +2,12 @@ import Foundation
 
 // Searchable rows for the settings window. `id` matches the `.settingsRow(_:)` anchor in the pane.
 
+/// Setting titles shown both in a pane and in search results, so they cannot drift apart.
+enum SettingsCopy {
+    /// Governs the primary action (double-click and Return); a single click only selects.
+    static let clickCopyOnlyTitle = "Double-click and Return copy without pasting"
+}
+
 enum SettingsSearchCatalog {
     private static func row(_ id: String, _ pane: SettingsPaneID, _ title: String, _ words: [String] = []) -> SettingsSearchEntry {
         SettingsSearchEntry(id: id, pane: pane.rawValue, title: title, keywords: words)
@@ -16,7 +22,7 @@ enum SettingsSearchCatalog {
         row("general.statusItem", .general, "Menu bar icon click", ["status item", "menu", "left click"]),
         row("general.plainText", .general, "Paste as plain text by default", ["formatting", "rich text"]),
         row("general.moveToTop", .general, "Move pasted item to top of history", ["reorder"]),
-        row("general.clickCopyOnly", .general, "Clicking a clip copies it without pasting", ["click"]),
+        row("general.clickCopyOnly", .general, SettingsCopy.clickCopyOnlyTitle, ["click", "double-click", "return", "enter"]),
         row("general.keystrokeSpeed", .general, "Keystroke typing speed", ["type", "send as keystrokes"]),
         row("general.keystrokeWarn", .general, "Confirm before typing long clips", ["characters", "confirmation"]),
         row("general.maxHistory", .general, "History size", ["keep", "limit", "items"]),

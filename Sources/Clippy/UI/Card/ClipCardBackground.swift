@@ -33,26 +33,49 @@ extension ClipCardView {
             .accessibilityHidden(true)
     }
 
+    /// Settings resolved to draw values (read once per body, like `settings`).
+    var cardAppearance: CardAppearance {
+        CardAppearance.resolve(style: settings.cardStyle, colorMode: settings.cardColorMode,
+                               tintStrength: settings.cardTintStrength, highContrast: settings.highContrastCardText)
+    }
+
+    /// Color of the face tint for the active "Card color" mode.
+    var cardTintColor: Color? {
+        switch cardAppearance.tint {
+        case .none: return nil
+        case .sourceApp: return AppIconProvider.shared.dominantColor(forBundleID: clip.sourceAppBundleID)
+        case .kind: return kindHue
+        case .accent: return tokens.accent
+        }
+    }
+
+    /// Metadata and secondary lines; primary when "High-contrast card text" is on.
+    var cardSecondaryText: Color {
+        cardAppearance.usesPrimaryForSecondaryText ? tokens.textPrimary : tokens.textSecondary
+    }
+
     @ViewBuilder
     var cardBackground: some View {
-        if settings.cardStyle == .plain {
+        let appearance = cardAppearance
+        if appearance.edge == .none {
             (isHovering ? tokens.textPrimary.opacity(0.06) : Color.clear)
         } else {
             ZStack {
-                tokens.surfaceElevated
+                if appearance.face == .solid { tokens.surfaceElevated }
+                if let tint = cardTintColor { tint.opacity(appearance.tintOpacity) }
                 if model.isSelected { tokens.selection }
                 if isHovering { tokens.textPrimary.opacity(0.05) }
             }
         }
     }
 
-    /// Selection draws the only colored stroke; otherwise a neutral hairline.
+    /// Selection draws the only colored stroke; otherwise a neutral outline
+    /// (hairline for Filled, stronger for Bordered, none for Plain).
     var cardStroke: some View {
-        RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous)
-            .strokeBorder(
-                model.isSelected ? tokens.accent : (settings.cardStyle == .plain ? Color.clear : tokens.stroke),
-                lineWidth: model.isSelected ? 2 : 1
-            )
+        let edge = cardAppearance.edge
+        let rest: Color = edge == .none ? .clear : (edge == .strong ? tokens.strokeStrong : tokens.stroke)
+        return RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous)
+            .strokeBorder(model.isSelected ? tokens.accent : rest, lineWidth: model.isSelected ? 2 : 1)
     }
 }
 

@@ -44,7 +44,7 @@ extension ClipCardView {
             }
             Text(HighlightedPreview.attributed(text, query: query, color: tokens.accent))
                 .font(PanelTypography.metadata(settings))
-                .foregroundStyle(tokens.textSecondary)
+                .foregroundStyle(cardSecondaryText)
                 .lineLimit(2)
                 .truncationMode(.middle)
         }
