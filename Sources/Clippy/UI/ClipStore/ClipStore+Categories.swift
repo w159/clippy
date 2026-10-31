@@ -73,6 +73,14 @@ extension ClipStore {
     /// When a search query is active, the result is further filtered in-memory
     /// so the search bar scopes to the pane the user is viewing.
     func clipsForCategory(_ categoryID: Int64) -> [Clip] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Called several times per render (sections, counts, keyboard), so a
+        // filtered pane is kept until the query or the data behind it changes.
+        if !trimmed.isEmpty, let cache = categoryPaneCache, cache.query == trimmed,
+            cache.version == categoryPaneVersion, let hit = cache.results[categoryID]
+        {
+            return hit
+        }
         // Source from `recents` (every categorized clip, unconditionally) rather
         // than `clips` (overwritten by FTS search results): otherwise an active
         // global search query makes category members that do not match the query
@@ -83,9 +91,27 @@ extension ClipStore {
         } else {
             ordered = recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
         }
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return ordered }
-        return ordered.filter { $0.matchesLocally(query: trimmed) }
+        let parsed = parsedLocalQuery(trimmed)
+        let filtered = ordered.filter { $0.matchesLocally(parsed) }
+        if let cache = categoryPaneCache, cache.query == trimmed, cache.version == categoryPaneVersion {
+            categoryPaneCache?.results[categoryID] = filtered
+        } else {
+            categoryPaneCache = (trimmed, categoryPaneVersion, [categoryID: filtered])
+        }
+        return filtered
+    }
+
+    /// The parsed form of `query`, reused until the query changes or a minute
+    /// passes (relative dates such as `#yesterday` are resolved at parse time).
+    private func parsedLocalQuery(_ query: String) -> ParsedQuery {
+        if let last = localQueryParse, last.query == query, Date().timeIntervalSince(last.at) < 60 {
+            return last.parsed
+        }
+        let parsed = ClipQueryParser.parse(query)
+        localQueryParse = (query, parsed, Date())
+        localQueryParseCount += 1
+        return parsed
     }
 
     /// Move a clip to a new position within a category (drag-to-reorder).

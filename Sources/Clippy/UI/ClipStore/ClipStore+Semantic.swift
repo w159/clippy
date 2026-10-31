@@ -34,43 +34,99 @@ enum SemanticSearchGate {
     }
 }
 
+/// What the semantic pass reads: the opt-in, the asset probe and the engine.
+/// `standard` is the shipped on-device engine; tests substitute their own.
+struct SemanticSearchEnvironment: Sendable {
+    var isEnabled: @Sendable () -> Bool
+    var availability: @Sendable () -> SemanticAvailability
+    var engine: @Sendable () -> SemanticSearch
+
+    static let standard = SemanticSearchEnvironment(
+        isEnabled: { SemanticSearchPreferences.standard.isEnabled },
+        availability: {
+            SemanticAvailability.evaluate(isEnabled: true, probe: SemanticSearchService.embedder)
+        },
+        engine: { SemanticSearchService.engine })
+}
+
 extension ClipStore {
     /// Second search pass: fuses the keyword hits with the semantic ranking and republishes if this search is still current.
     /// Free-text queries only, and only with the opt-in on; sensitive clips are never embedded (`SemanticCandidate.isSensitive`).
+    /// Only the newest call runs to completion: it cancels the previous merge, and a merge that was already past
+    /// its cancel checks is dropped by its run id.
     func scheduleSemanticMerge(query: String, token: Int, keyword: [Clip]) {
-        semanticMatches = [:]
-        let preferences = SemanticSearchPreferences.standard
-        guard SemanticSearchGate.shouldRun(query: query, optedIn: preferences.isEnabled) else { return }
+        semanticTask?.cancel()
+        semanticTask = nil
+        let environment = semanticEnvironment
+        guard SemanticSearchGate.shouldRun(query: query, optedIn: environment.isEnabled()) else { return }
+        semanticRunID &+= 1
+        let runID = semanticRunID
         let database = self.database
         let limit = displayLimit
-        Task.detached(priority: .utility) { [weak self] in
-            let availability = SemanticAvailability.evaluate(isEnabled: true, probe: SemanticSearchService.embedder)
-            guard availability == .ready, !Task.isCancelled else { return }
-            let recent = Self.recentTextClips(database)
-            let candidates = recent.compactMap { clip in
-                clip.id.map { SemanticCandidate(id: $0, text: clip.contentText, isSensitive: SensitiveContent.isSensitive(clip: clip)) }
+        semanticTask = Task.detached(priority: .utility) { [weak self] in
+            guard !Task.isCancelled else { return }
+            var fused: (clips: [Clip], sources: [Int64: SearchMatchSource])?
+            if environment.availability() == .ready {
+                let recent = Self.recentTextCandidates(database)
+                guard !Task.isCancelled else { return }
+                let candidates = recent.compactMap { clip in
+                    clip.id.map { SemanticCandidate(id: $0, text: clip.contentText, isSensitive: SensitiveContent.isSensitive(clip: clip)) }
+                }
+                let engine = environment.engine()
+                engine.index(candidates)
+                guard !Task.isCancelled else { return }
+                let results = engine.hybridSearch(query: query, ftsRankedIDs: keyword.compactMap(\.id), candidates: candidates,
+                                                  availability: .ready, limit: limit)
+                let known = Set(keyword.compactMap(\.id))
+                let missing = results.map(\.clipID).filter { !known.contains($0) }
+                let pool = Self.fullClips(database, ids: missing)
+                let merged = SemanticSearchGate.merge(results, keyword: keyword, pool: pool)
+                if !merged.isEmpty {
+                    fused = (merged, Dictionary(results.map { ($0.clipID, $0.matchedIn) }, uniquingKeysWith: { first, _ in first }))
+                }
             }
-            let engine = SemanticSearchService.engine
-            engine.index(candidates)
-            let results = engine.hybridSearch(query: query, ftsRankedIDs: keyword.compactMap(\.id), candidates: candidates,
-                                              availability: availability, limit: limit)
-            let pool = Dictionary(recent.compactMap { clip in clip.id.map { ($0, clip) } }, uniquingKeysWith: { first, _ in first })
-            let merged = SemanticSearchGate.merge(results, keyword: keyword, pool: pool)
-            guard !Task.isCancelled, !merged.isEmpty else { return }
-            let sources = Dictionary(results.map { ($0.clipID, $0.matchedIn) }, uniquingKeysWith: { first, _ in first })
+            guard !Task.isCancelled else { return }
+            let outcome = fused
             await MainActor.run { [weak self] in
-                guard let self, self.refilterToken == token else { return }
-                self.semanticMatches = sources
-                self.clips = merged
+                self?.finishSemanticMerge(runID: runID, token: token, query: query, keyword: keyword, fused: outcome)
             }
         }
     }
 
-    /// Newest text clips, the semantic candidate pool. Synchronous so it can run inside a detached task.
-    private nonisolated static func recentTextClips(_ database: ClipDatabase) -> [Clip] {
+    /// Publishes a finished merge if it is still the newest one for the current search. Without a fused
+    /// result (assets missing, nothing found) the keyword hits are shown, covering a list that was held
+    /// back while the merge ran.
+    private func finishSemanticMerge(runID: Int, token: Int, query: String, keyword: [Clip],
+                                     fused: (clips: [Clip], sources: [Int64: SearchMatchSource])?) {
+        guard runID == semanticRunID, refilterToken == token else { return }
+        semanticCompletedRunID = runID
+        if let fused {
+            fusedQuery = query
+            publishResults(fused.clips, matches: fused.sources)
+        } else {
+            fusedQuery = nil
+            publishResults(keyword, matches: [:])
+        }
+    }
+
+    /// Newest text clips, the semantic candidate pool. The rich-text blobs of up to 2000 rows are selected as
+    /// NULL (every other Clip column stays, so the record decodes as usual); embedding and the sensitivity
+    /// scan read only the text. Synchronous so it can run inside a detached task.
+    private nonisolated static func recentTextCandidates(_ database: ClipDatabase) -> [Clip] {
         (try? database.dbQueue.read { db in
-            try Clip.fetchAll(db, sql: "SELECT * FROM clips WHERE contentKind = ? ORDER BY createdAt DESC, id DESC LIMIT ?",
-                              arguments: [ClipContentKind.text.rawValue, SemanticSearch.candidateCap])
+            try Clip.fetchAll(db, sql: """
+                SELECT id, contentText, NULL AS contentRTF, NULL AS contentHTML, typeIdentifier, sourceAppBundleID,
+                       sourceAppName, createdAt, contentKind, mediaFilename, thumbFilename, pixelWidth, pixelHeight,
+                       byteSize, userTitle, filePath, ocrText
+                FROM clips WHERE contentKind = ? ORDER BY createdAt DESC, id DESC LIMIT ?
+                """, arguments: [ClipContentKind.text.rawValue, SemanticSearch.candidateCap])
         }) ?? []
+    }
+
+    /// Full rows for the semantic-only hits, which are shown and so need every field.
+    private nonisolated static func fullClips(_ database: ClipDatabase, ids: [Int64]) -> [Int64: Clip] {
+        guard !ids.isEmpty else { return [:] }
+        let rows = (try? database.dbQueue.read { db in try Clip.fetchAll(db, keys: ids) }) ?? []
+        return Dictionary(rows.compactMap { clip in clip.id.map { ($0, clip) } }, uniquingKeysWith: { first, _ in first })
     }
 }

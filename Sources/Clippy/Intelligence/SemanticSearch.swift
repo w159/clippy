@@ -86,7 +86,8 @@ final class SemanticSearch: @unchecked Sendable {
         return progressValue
     }
 
-    /// Stops a running `index` after the current clip.
+    /// Stops a running `index` after the current clip. The request stays until a run
+    /// consumes it, so cancelling just before a queued `index` starts still stops it.
     func cancelIndexing() {
         lock.lock(); cancelFlag = true; lock.unlock()
     }
@@ -102,11 +103,11 @@ final class SemanticSearch: @unchecked Sendable {
     /// Blocking; call from a background queue.
     func index(_ candidates: [SemanticCandidate]) {
         let work = Self.eligible(candidates)
-        lock.lock(); cancelFlag = false; lock.unlock()
         publish(SemanticIndexProgress(indexed: 0, total: work.count, isRunning: true))
         for (offset, item) in work.enumerated() {
+            // Also honours cancellation of the Task that called this blocking function.
             lock.lock(); let stop = cancelFlag; lock.unlock()
-            if stop { break }
+            if stop || Task.isCancelled { break }
             let hash = StableHash.fnv1a(item.text)
             if cache.lookup(id: item.id, textHash: hash) == nil, let vector = embedder.embedding(for: item.text) {
                 cache.store(id: item.id, textHash: hash, value: vector)
@@ -116,6 +117,9 @@ final class SemanticSearch: @unchecked Sendable {
             }
         }
         cache.flush()
+        // The cancel request is spent; the next run starts clean. Resetting it at the
+        // start of a run instead would swallow a cancel issued before the run began.
+        lock.lock(); cancelFlag = false; lock.unlock()
         var done = progress
         done.isRunning = false
         publish(done)
