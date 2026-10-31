@@ -358,8 +358,7 @@ enum ClippyArchive {
                            baseURL: URL? = nil) throws -> ImportSummary {
         let document = try TOMLDecoder().decode(ClippyArchiveDocument.self, from: text)
         let iso = isoFormatter
-        let fileManager = FileManager.default
-        let before = Set((try? fileManager.contentsOfDirectory(atPath: database.media.directory.path)) ?? [])
+        let before = Set(database.media.payloadFilenamesOnDisk())
 
         func mediaURL(for clip: ArchivedClip) -> URL? {
             if let rel = clip.media {
@@ -423,7 +422,8 @@ enum ClippyArchive {
         } catch {
             // Rolled back: drop media this import newly wrote and nothing references.
             let referenced = (try? database.referencedMediaFilenames()) ?? []
-            let now = Set((try? fileManager.contentsOfDirectory(atPath: database.media.directory.path)) ?? [])
+            // Payload files only: the sidecar directory is not an orphan, even if import created it.
+            let now = Set(database.media.payloadFilenamesOnDisk())
             database.media.delete(filenames: now.subtracting(before).subtracting(referenced).map { $0 })
             throw error
         }
