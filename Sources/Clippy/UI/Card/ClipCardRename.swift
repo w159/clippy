@@ -9,7 +9,7 @@ extension ClipCardView {
     /// selection happen automatically via SelectAllTextField.
     var titleEditor: some View {
         SelectAllTextField(
-            initialText: clip.userTitle ?? clip.displayTitle,
+            initialText: renameSeed,
             font: PanelTypography.nsTitleFont(settings),
             textColor: NSColor(tokens.textPrimary),
             accessibilityLabel: "Rename clip",
@@ -44,14 +44,15 @@ extension ClipCardView {
         isRenaming = true
     }
 
+    /// Text the rename field starts with; commit compares against this exact value.
+    var renameSeed: String { clip.userTitle ?? clip.displayTitle }
+
     func commitRename(_ value: String) {
         isRenaming = false
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Empty, or unchanged-from-the-app-name, clears the custom title.
-        if trimmed.isEmpty || trimmed == clip.sourceAppName {
-            onRename(nil)
-        } else {
-            onRename(trimmed)
+        switch RenameOutcome.resolve(input: value, seeded: renameSeed, sourceAppName: clip.sourceAppName) {
+        case .unchanged: break
+        case .clear: onRename(nil)
+        case .set(let title): onRename(title)
         }
     }
 

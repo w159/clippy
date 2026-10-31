@@ -94,7 +94,7 @@ extension ClipListView {
     func batchContextMenu() -> some View {
         Button("Paste \(selectedClipIDs.count) in Order") { onPasteMany(actionableClips, false, settings.pastePlainTextByDefault) }
         Button("Paste \(selectedClipIDs.count) as One") { onPasteMany(actionableClips, true, settings.pastePlainTextByDefault) }
-        Menu("Move \(selectedClipIDs.count) to Category") {
+        Menu(BatchCategoryMenuLabel.title(count: actionableClips.count, allowsMultipleCategories: settings.allowMultipleCategories)) {
             ForEach(store.categories) { cat in
                 Button(cat.name) {
                     for clip in actionableClips { if let id = clip.id, let cid = cat.id { store.fileClip(id: id, intoCategory: cid) } }

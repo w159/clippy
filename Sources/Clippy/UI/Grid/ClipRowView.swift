@@ -153,15 +153,19 @@ struct ClipRowView: View {
     }
 
     private var renameField: some View {
-        SelectAllTextField(
-            initialText: clip.userTitle ?? clip.displayTitle,
+        let seed = clip.userTitle ?? clip.displayTitle
+        return SelectAllTextField(
+            initialText: seed,
             font: PanelTypography.nsTitleFont(settings),
             textColor: NSColor(tokens.textPrimary),
             accessibilityLabel: "Rename clip",
             onCommit: { value in
                 isRenaming = false
-                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                onRename(trimmed.isEmpty || trimmed == clip.sourceAppName ? nil : trimmed)
+                switch RenameOutcome.resolve(input: value, seeded: seed, sourceAppName: clip.sourceAppName) {
+                case .unchanged: break
+                case .clear: onRename(nil)
+                case .set(let title): onRename(title)
+                }
             },
             onCancel: { isRenaming = false }
         )
