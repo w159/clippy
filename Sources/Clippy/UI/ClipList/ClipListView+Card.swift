@@ -102,7 +102,7 @@ extension ClipListView {
         let density = GridPreferences.shared.density
         let extract: (() -> Void)? = clip.isImageLike ? { runOCR(on: clip) } : nil
         let similar: (() -> Void)? = settings.suggestionsEnabled && clip.contentKind == .text
-            ? { store.findSimilar(to: clip); selection = .suggestions }
+            ? { showSimilarClips(to: clip) }
             : nil
         return Group {
             if density == .cards {

@@ -80,11 +80,42 @@ extension ClipListView {
 
     /// Hidden Cmd+K trigger.
     var paletteShortcut: some View {
-        Button("Command Palette") { paletteVisible.toggle() }
+        Button("Command Palette") { togglePalette() }
             .keyboardShortcut("k", modifiers: .command)
             .opacity(0)
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
+    }
+
+    /// Runs the `clippy://` request waiting for the panel, if any.
+    func applyLaunchRequest() {
+        guard let action = PanelLaunchRequest.shared.take() else { return }
+        switch action {
+        case .search(let query):
+            selection = .history
+            store.query = query
+            focusTarget = .search
+            searchSelection = TextSelection(insertionPoint: query.endIndex)
+        case .reveal(let id):
+            if let clip = store.recentsByID[id] {
+                revealInTimeline(clip)
+            } else {
+                // Not in the loaded window: attemptPendingReveal reports that.
+                pendingRevealClipID = id
+                selection = .history
+                store.query = ""
+                Task { @MainActor in attemptPendingReveal() }
+            }
+        case .palette:
+            paletteVisible = true
+        }
+    }
+
+    /// Cmd+K: opens the palette; a second press closes it through `closePalette`
+    /// so focus returns instead of being left on nothing.
+    func togglePalette() {
+        let next = PaletteTogglePolicy.next(isVisible: paletteVisible)
+        if next.visible { paletteVisible = true } else { closePalette() }
     }
 
     /// Closes the palette and returns focus to the search field.
@@ -108,9 +139,10 @@ extension ClipListView {
             togglePin: { if let clip { store.togglePin(clip) } },
             // Matches Cmd+Delete: a multi-selection deletes every selected clip, not just the anchor.
             deleteSelection: {
-                if selectedClipIDs.count >= 2 { requestBatchDelete() } else if let clip { requestDelete(clip) }
+                let targets = actionableClips
+                if targets.count >= 2 { requestBatchDelete() } else if let target = targets.first { requestDelete(target) }
             },
-            findSimilar: { if let clip { store.findSimilar(to: clip); selection = .suggestions } },
+            findSimilar: { if let clip { showSimilarClips(to: clip) } },
             openSettings: onOpenSettings,
             toggleSidebar: { NotificationCenter.default.post(name: .clippyToggleSidebar, object: nil) },
             currentDensity: grid.density,

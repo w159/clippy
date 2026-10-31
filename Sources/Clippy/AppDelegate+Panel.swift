@@ -67,13 +67,25 @@ extension AppDelegate {
     // MARK: - Actions
 
     @objc func openPanel() {
+        openPanelPerforming(nil)
+    }
+
+    /// Opens the panel, then hands it `action` (a `clippy://` link's arguments).
+    func openPanelPerforming(_ action: PanelLaunchAction?) {
         // Re-opening a visible panel must not rebuild it (that resets the
         // query, selection, and scroll): ask it to focus its search field.
-        if panelController.isVisible {
+        switch PanelOpenPolicy.step(isVisible: panelController.isVisible, isKey: panelController.panel?.isKeyWindow ?? false) {
+        case .show:
+            panelController.show()
+        case .focusSearch:
             NotificationCenter.default.post(name: .clippyFocusPanelSearch, object: nil)
-            return
+        case .makeKeyAndFocusSearch:
+            // A visible panel that is not key ignored the focus request: its
+            // field cannot take focus until the window is key.
+            panelController.panel?.makeKeyAndOrderFront(nil)
+            NotificationCenter.default.post(name: .clippyFocusPanelSearch, object: nil)
         }
-        panelController.show()
+        if let action { PanelLaunchRequest.shared.post(action) }
     }
 
     @objc func openSettings() {

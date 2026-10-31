@@ -58,6 +58,8 @@ struct ClipListView: View {
     /// True from a query edit until the user moves the cursor: new results then
     /// select their top match instead of the previously anchored clip.
     @State var selectionFollowsTop = false
+    /// Armed by "Show in Timeline" so its query clear does not reset the cursor.
+    @State var revealQueryGuard = RevealQueryGuard()
     /// Return pressed while the typed query's search had not landed yet; holds
     /// the Shift state and pastes once the results arrive.
     @State var pendingReturnShift: Bool?
@@ -153,7 +155,13 @@ struct ClipListView: View {
     func clips(for selection: PanelSelection) -> [Clip] {
         switch selection {
         case .history:
-            return smartFiltered(HistoryPanePolicy.visible(store.clips, query: store.query, isFiled: { store.isPinned($0) }))
+            let shown = smartFiltered(HistoryPanePolicy.visible(store.clips, query: store.query, isFiled: { store.isPinned($0) }))
+            // Search results interleave days (word-start tier first, then newest-first
+            // within each tier). Group by day so each date header shows once and the
+            // keyboard order equals the visual order.
+            guard settings.showSectionHeaders, HistoryPanePolicy.isSearching(store.query) else { return shown }
+            return SearchSectionOrder.groupedByBucket(shown, bucket: { TimelineBucket.title(for: $0.createdAt) },
+                                                      date: { $0.createdAt })
         case .category(let categoryID):
             return store.clipsForCategory(categoryID)
         case .onePassword:
@@ -220,25 +228,14 @@ struct ClipListView: View {
         // due to a new capture prepended at the top); otherwise reset to the
         // first row. Intersect the explicit multi-selection with the surviving
         // clip ids so removed clips drop out but the rest of the selection stays.
-        .onChange(of: store.clips) { _, _ in
-            let newIDs = Set(visibleClips.compactMap { $0.id })
-            selectedClipIDs.formIntersection(newIDs)
-            rangeModel.prune(keeping: newIDs)
-            selectedIndex = ResultSelectionPolicy.index(in: visibleClips, anchor: anchoredClipID,
-                                                        followsTop: selectionFollowsTop)
-            anchoredClipID = visibleClips.indices.contains(selectedIndex) ? visibleClips[selectedIndex].id : nil
-            attemptPendingReveal()
-        }
+        .onChange(of: store.clips) { _, _ in handleClipsChanged() }
+        // Filing or pinning changes what a pane lists without touching
+        // store.clips; the cursor must be re-clamped then too.
+        .onChange(of: store.membership) { _, _ in handleClipsChanged() }
+        .onChange(of: suggestionClipIDs) { _, _ in handleClipsChanged() }
         // A new query: the cursor jumps to the top and follows the best match;
         // a pending Return belongs to the old text and is dropped.
-        .onChange(of: store.query) { _, _ in
-            selectionFollowsTop = true
-            pendingReturnShift = nil
-            syncRangeModel()
-            rangeModel.collapseToCursor()
-            selectedClipIDs = []
-            selectedIndex = 0
-        }
+        .onChange(of: store.query) { _, _ in handleQueryChanged() }
         .onChange(of: store.completedQuery) { _, _ in finishPendingReturn() }
     }
 
@@ -253,35 +250,27 @@ struct ClipListView: View {
             isAutoOpeningSuggestions = true
             selection = .suggestions
         }
-        .onChange(of: selection) { oldValue, newValue in
-            if isAutoOpeningSuggestions {
-                isAutoOpeningSuggestions = false
-            } else {
-                userChangedSelection = true
-            }
-            // Opening the assistant carries the anchored text clip in as the
-            // context chip. Resolve against the OUTGOING pane's clips because
-            // `selection` (and thus visibleClips) has already switched. An
-            // explicit "Open AI Assistant" set the clip itself; do not clobber it.
-            if newValue == .assistant {
-                if assistantContextExplicit {
-                    assistantContextExplicit = false
-                } else {
-                    let outgoing = clips(for: oldValue)
-                    if outgoing.indices.contains(selectedIndex),
-                       outgoing[selectedIndex].contentKind == .text {
-                        assistantContextClip = outgoing[selectedIndex]
-                    }
-                }
-            }
-            selectedIndex = 0
-            selectedClipIDs = []
-            attemptPendingReveal()
+        .onChange(of: selection) { oldValue, newValue in handleSelectionChanged(from: oldValue, to: newValue) }
+        .onChange(of: renamingClipID) { oldValue, newValue in
+            // The rename field took AppKit first responder outside SwiftUI focus.
+            if oldValue != nil, newValue == nil { refocus(PanelFocusPolicy.afterRenameEnded()) }
+        }
+        .onChange(of: visibleClips.isEmpty) { _, isEmpty in
+            guard isEmpty, let target = PanelFocusPolicy.afterListEmptied(
+                previous: focusTarget, showsSearchField: SearchFieldPolicy.showsSearchField(for: selection)) else { return }
+            refocus(target)
         }
     }
 
-    private var sheetsLayer: some View {
+    /// External requests (`clippy://` links) waiting for this panel.
+    private var launchLayer: some View {
         trackedLayout
+        .onAppear { applyLaunchRequest() }
+        .onReceive(PanelLaunchRequest.shared.$token.dropFirst()) { _ in applyLaunchRequest() }
+    }
+
+    private var sheetsLayer: some View {
+        launchLayer
         // AI action sheet, shown when a context-menu AI action produces a proposal.
         .sheet(isPresented: Binding(
             get: { aiRunner.isPresenting },

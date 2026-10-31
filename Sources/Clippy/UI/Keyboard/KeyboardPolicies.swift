@@ -8,12 +8,17 @@ enum EscapeAction: Equatable {
     case clearQuery
     /// Nothing left to dismiss: hide the panel.
     case hidePanel
+    /// Nothing left to dismiss, but the user turned Escape-closes-panel off or
+    /// pinned the panel: Escape does nothing.
+    case stay
 
-    /// Two-stage Escape: selection, then query, then the panel.
-    static func next(hasMultiSelection: Bool, query: String) -> EscapeAction {
+    /// Two-stage Escape: selection, then query, then the panel (unless the
+    /// "Escape closes the panel" setting is off or the panel is pinned).
+    static func next(hasMultiSelection: Bool, query: String,
+                     hideOnEscape: Bool = true, panelPinned: Bool = false) -> EscapeAction {
         if hasMultiSelection { return .clearSelection }
         if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .clearQuery }
-        return .hidePanel
+        return hideOnEscape && !panelPinned ? .hidePanel : .stay
     }
 }
 

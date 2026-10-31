@@ -58,18 +58,22 @@ extension CategorySidePane {
         if let restore { focus = .category(restore) }
     }
 
-    func commitRename(_ category: Category) {
+    func commitRename(_ category: Category, focusLost: Bool = false) {
         guard renamingID == category.id else { return }
-        let name = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty || name == category.name { cancelRename(); return }
-        if store.existingCategoryNames(excluding: category).contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+        let isDuplicate = store.existingCategoryNames(excluding: category)
+            .contains(where: { $0.caseInsensitiveCompare(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame })
+        switch CategoryRenameOutcome.resolve(draft: renameDraft, original: category.name,
+                                             isDuplicate: isDuplicate, focusLost: focusLost) {
+        case .cancel:
+            cancelRename()
+        case .rejectDuplicate:
             renameDuplicate = true
-            return
+        case .save(let name):
+            var updated = category
+            updated.name = name
+            store.updateCategory(updated)
+            cancelRename()
         }
-        var updated = category
-        updated.name = name
-        store.updateCategory(updated)
-        cancelRename()
     }
 
     // MARK: - Delete
