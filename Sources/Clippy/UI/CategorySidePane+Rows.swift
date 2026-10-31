@@ -87,7 +87,7 @@ extension CategorySidePane {
 
     func categoryRow(_ category: Category) -> some View {
         let categoryID = category.id ?? -1
-        let count = store.clipCount(inCategory: categoryID)
+        let count = SidebarCounts.displayedCategoryCount(store: store, categoryID: categoryID)
         let renaming = renamingID == categoryID
         return SidebarRow(
             rowID: .category(categoryID), focus: $focus, title: category.name, tint: Color(hexString: category.colorHex),

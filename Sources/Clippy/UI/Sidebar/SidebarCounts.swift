@@ -14,6 +14,19 @@ struct SidebarCounts: Equatable {
         return clipIDs.filter { id in id.map { (membership[$0] ?? []).isEmpty } ?? true }.count
     }
 
+    /// Counts what a category pane displays: every member while browsing, only the
+    /// members matching `query` while searching (`ClipStore.clipsForCategory`).
+    static func displayedCategoryCount(total: Int, query: String, matching: () -> Int) -> Int {
+        HistoryPanePolicy.isSearching(query) ? matching() : total
+    }
+
+    /// Resolves a category's count from a store, mirroring `ClipListView.clips(for: .category)`.
+    @MainActor
+    static func displayedCategoryCount(store: ClipStore, categoryID: Int64) -> Int {
+        displayedCategoryCount(total: store.clipCount(inCategory: categoryID), query: store.query,
+                               matching: { store.clipsForCategory(categoryID).count })
+    }
+
     /// Resolves the History count from a store, mirroring `ClipListView.clips(for: .history)`.
     @MainActor
     static func displayedHistoryCount(store: ClipStore) -> Int {

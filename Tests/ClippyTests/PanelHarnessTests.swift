@@ -10,7 +10,7 @@ import XCTest
 /// to `CLIPPY_SCREENSHOT_DIR` (default: a temporary folder, printed).
 @MainActor
 final class PanelHarnessTests: XCTestCase {
-    private var window: PastePanel!
+    private var window: NSWindow!
     private var store: ClipStore!
     private var pasted: [String] = []
     private var shotDirectory: URL!
@@ -73,12 +73,12 @@ final class PanelHarnessTests: XCTestCase {
             onClose: {},
             onOpenSettings: {}
         )
-        show(view.clippyDesignSystem(), size: NSSize(width: 820, height: 600), appearance: appearance)
+        show(view.clippyDesignSystem(), size: NSSize(width: 820, height: 600), appearance: appearance, panelChrome: true)
         pump(until: "clips loaded") { self.store.clips.count == 8 && !self.store.categories.isEmpty }
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
 
-    private func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name) {
+    private func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
         NSApp.appearance = NSAppearance(named: appearance)
         let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
                                  styleMask: PastePanel.chromeStyleMask,
@@ -87,7 +87,17 @@ final class PanelHarnessTests: XCTestCase {
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false  // as PanelController configures the real panel
-        window.contentView = NSHostingView(rootView: view)
+        if panelChrome {
+            // Dressed as PanelController dresses the real panel: no titlebar strip.
+            window.applyChrome()
+            window.contentView = PanelController.clearHostingView(view)
+        } else {
+            window.contentView = NSHostingView(rootView: view)
+        }
+        present(window)
+    }
+
+    private func present(_ window: NSWindow) {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         pump(seconds: 0.5)
@@ -312,6 +322,9 @@ final class PanelHarnessTests: XCTestCase {
         typeText("zqxj")
         pump(until: "no results") { self.store.clips.isEmpty }
         pump(seconds: 0.3)
+        let work = try XCTUnwrap(store.categories.first { $0.name == "Work" }?.id)
+        XCTAssertEqual(SidebarCounts.displayedCategoryCount(store: store, categoryID: work), 0,
+                       "the Work badge must match its empty pane while nothing matches")
         screenshot("06-no-results-dark")
     }
 
@@ -325,8 +338,11 @@ final class PanelHarnessTests: XCTestCase {
             window.orderOut(nil)
 
             let defaults = try XCTUnwrap(UserDefaults(suiteName: "clippy.harness.onboarding.\(UUID())"))
-            show(OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem(),
-                 size: NSSize(width: 640, height: 520), appearance: appearance)
+            NSApp.appearance = NSAppearance(named: appearance)
+            let onboarding = OnboardingWindowController.makeWindow(
+                rootView: OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem())
+            onboarding.appearance = NSAppearance(named: appearance)
+            present(onboarding)
             pump(seconds: 0.8)
             screenshot("08-onboarding-\(suffix)")
             window.orderOut(nil)
