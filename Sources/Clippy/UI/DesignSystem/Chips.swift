@@ -41,6 +41,7 @@ struct FilterChip: View {
                 if let count = model.count { Text("\(count)").font(.caption2.monospacedDigit()).foregroundStyle(tokens.textSecondary) }
             }
             .font(.caption.weight(.medium))
+            .foregroundStyle(tokens.textPrimary)
             .padding(.horizontal, tokens.metrics.space.three)
             .padding(.vertical, tokens.metrics.space.one)
             .background {

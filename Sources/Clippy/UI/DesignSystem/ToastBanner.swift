@@ -48,7 +48,7 @@ struct ClippyToast: View {
         GlassSurface(in: RoundedRectangle(cornerRadius: 18, style: .continuous)) {
             HStack(spacing: tokens.metrics.space.two) {
                 Image(systemName: severity.symbol).foregroundStyle(severity.foreground(in: tokens))
-                Text(message).font(.callout).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                Text(message).font(.callout).foregroundStyle(tokens.textPrimary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
                 if let actionTitle, let action {
                     Button(actionTitle, action: action).buttonStyle(.plain).foregroundStyle(tokens.accentText)
                 }
