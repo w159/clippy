@@ -27,7 +27,7 @@ struct DataBackupSection: View {
                     Button("Copy To\u{2026}") { chooseFolder() }.disabled(working)
                         .help("Create a backup and copy it to a folder you choose")
                     Button(working ? "Working\u{2026}" : "Back Up Now") { create(copyTo: nil) }
-                        .buttonStyle(.borderedProminent).disabled(working)
+                        .buttonStyle(.accent).disabled(working)
                 }
             }
             if rows.isEmpty {

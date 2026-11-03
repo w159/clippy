@@ -147,7 +147,7 @@ struct ModelBrowserView: View {
                 .disabled(model.selectedID.isEmpty || model.measuring)
             Button("Cancel") { model.onClose?() }.keyboardShortcut(.cancelAction)
             Button("Select") { model.select() }.keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent).tint(tokens.accent).disabled(model.selectedID.isEmpty)
+                .buttonStyle(.accent).disabled(model.selectedID.isEmpty)
         }
     }
 }

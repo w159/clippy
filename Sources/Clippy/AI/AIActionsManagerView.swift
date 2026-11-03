@@ -106,8 +106,7 @@ struct AIActionsManagerView: View {
                 Label("New Action", systemImage: "plus")
             }
             .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .tint(tokens.accent)
+            .buttonStyle(.accent)
         }
         .padding(.horizontal, tokens.metrics.space.three)
         .padding(.vertical, tokens.metrics.space.two)
