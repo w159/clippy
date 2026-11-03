@@ -65,6 +65,12 @@ extension ClipListView {
             navigate(move, extend: mods.contains(.shift))
             return .handled
         }
+        if press.key == .return, command, source == .list {
+            toggleCursorSelection()
+            return .handled
+        }
+        if press.key == .tab { return moveFocusRing(from: source, backward: mods.contains(.shift)) }
+        if let result = handleActionsKey(press) { return result }
         if press.key == .return {
             // Typed faster than the search debounce: paste the top result of
             // what is in the field, not of the previous query.
@@ -182,7 +188,16 @@ extension ClipListView {
 
     private func handleCommandKey(_ press: KeyPress, source: PanelFocusTarget) -> KeyPress.Result {
         let fieldSelected = searchSelectionIsNonEmpty
-        switch press.key.character {
+        let shifted = press.modifiers.contains(.shift)
+        switch press.key.character.lowercased().first ?? press.key.character {
+        case "c" where shifted:
+            if source == .search, fieldSelected { return .ignored }
+            copyActionableClips(plainText: true)
+            return .handled
+        case "r" where shifted:
+            return toggleKeyReveal() ? .handled : .ignored
+        case "r":
+            return beginRenameSelected() ? .handled : .ignored
         case "a":
             let target = SelectAllTarget.resolve(query: store.query, searchHasFocus: source == .search, fieldHasSelection: fieldSelected)
             guard target == .clips else { return .ignored }
@@ -243,11 +258,12 @@ extension ClipListView {
     }
 
     /// Cmd+C: copy the selected clip(s) to the clipboard without pasting.
-    func copyActionableClips() {
+    func copyActionableClips(plainText: Bool = false) {
         let clips = actionableClips
         guard !clips.isEmpty else { return }
-        if ClipCopyBridge.copy(clips, media: store.database.media, database: store.database) {
-            showStatusBanner(clips.count == 1 ? "Copied" : "Copied \(clips.count) clips", severity: .success)
+        if ClipCopyBridge.copy(clips, media: store.database.media, database: store.database, plainText: plainText) {
+            let verb = plainText ? "Copied as plain text" : "Copied"
+            showStatusBanner(clips.count == 1 ? verb : "\(verb): \(clips.count) clips", severity: .success)
         } else {
             showStatusBanner("Could not copy to the clipboard", severity: .failure)
         }

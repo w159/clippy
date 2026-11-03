@@ -5,8 +5,8 @@ extension ClipCardView {
     @ViewBuilder
     var cardContent: some View {
         if model.isSensitive {
-            MaskedText(clip.previewText, sensitive: true)
-                .help("Sensitive. Hold to reveal.")
+            MaskedText(clip.previewText, sensitive: true, keyRevealed: model.isKeyRevealed)
+                .help("Sensitive. Hold to reveal, or press \u{21E7}\u{2318}R.")
         } else if isImage {
             imagePreview
         } else if isFile {

@@ -12,7 +12,9 @@ import XCTest
 final class PanelHarnessTests: XCTestCase {
     var window: NSWindow!
     var store: ClipStore!
-    private var pasted: [String] = []
+    var pasted: [String] = []
+    /// Texts of each multi-clip paste, in call order.
+    var pastedMany: [[String]] = []
     var shotDirectory: URL!
 
     override func setUp() async throws {
@@ -62,10 +64,11 @@ final class PanelHarnessTests: XCTestCase {
     private func openPanel(appearance: NSAppearance.Name) throws {
         store = try seededStore()
         pasted = []
+        pastedMany = []
         let view = ClipListView(
             store: store,
             onPaste: { [weak self] clip, _ in self?.pasted.append(clip.contentText) },
-            onPasteMany: { _, _, _ in },
+            onPasteMany: { [weak self] clips, _, _ in self?.pastedMany.append(clips.map(\.contentText)) },
             onPasteFile: { _, _ in },
             onPrimary: { [weak self] clip in self?.pasted.append(clip.contentText) },
             onSendKeystrokes: { _ in },
@@ -120,31 +123,6 @@ final class PanelHarnessTests: XCTestCase {
             XCTFail("Timed out waiting for \(description)", file: file, line: line)
         }
     }
-
-    private func key(_ characters: String, code: UInt16, flags: NSEvent.ModifierFlags = []) {
-        for type in [NSEvent.EventType.keyDown, .keyUp] {
-            guard let event = NSEvent.keyEvent(
-                with: type, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
-                windowNumber: window.windowNumber, context: nil, characters: characters,
-                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
-            else { return XCTFail("could not make key event") }
-            window.sendEvent(event)
-        }
-        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-    }
-
-    private static let keyCodes: [Character: UInt16] = [
-        "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
-        "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40,
-        "n": 45, "m": 46, "+": 24, "@": 19,
-    ]
-
-    private func typeText(_ text: String) {
-        for character in text { key(String(character), code: Self.keyCodes[character] ?? 0) }
-    }
-
-    private func pressReturn() { key("\r", code: 36) }
-    private func pressEscape() { key("\u{1b}", code: 53) }
 
     private func clearQuery() {
         store.query = ""
@@ -310,6 +288,87 @@ final class PanelHarnessTests: XCTestCase {
         if store.query != "deck" { dumpDiagnostics("typing from the list") }
         pump(seconds: 0.8)
         XCTAssertEqual(store.clips.map(\.contentText), ["Send the deck to jo@example.com before the review"])
+    }
+
+    // MARK: - Keyboard-only journeys
+
+    /// Clip texts in the order History shows them (the filed clip is not listed).
+    private var historyOrder: [String] {
+        store.clips.map(\.contentText).filter { !$0.hasPrefix("Quarterly") }
+    }
+
+    private var focusIsInTextField: Bool { window.firstResponder is NSTextView }
+
+    /// Every clip action without touching the mouse: navigation, paste, focus
+    /// moves, plain-text copy, rename, preview, multi-select and the actions key.
+    func testKeyboardOnlyJourneys() throws {
+        try openPanel(appearance: .aqua)
+        let order = historyOrder
+        XCTAssertGreaterThanOrEqual(order.count, 4, "fixture lists at least four clips in History: \(order)")
+
+        // Down, Down, Up lands on the second clip; Return pastes it.
+        press(.downArrow)
+        press(.downArrow)
+        press(.upArrow)
+        pressReturn()
+        pump(until: "Return pasted the clip under the cursor") { !self.pasted.isEmpty }
+        XCTAssertEqual(pasted, [order[1]], "Down, Down, Up then Return pastes the second History clip")
+
+        // Tab moves focus from the search field to the list, Shift-Tab brings it back.
+        press(.tab)
+        pump(until: "Tab moved focus off the search field") { !self.focusIsInTextField }
+        press(.tab, flags: .shift)
+        pump(until: "Shift-Tab returned focus to the search field") { self.focusIsInTextField }
+        press(.tab)
+        pump(until: "Tab moved focus to the list again") { !self.focusIsInTextField }
+
+        // Cmd-Shift-C copies the clip under the cursor as plain text.
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("sentinel", forType: .string)
+        pressCommand("c", extra: .shift)
+        pump(until: "Cmd-Shift-C wrote the clip to the pasteboard") {
+            NSPasteboard.general.string(forType: .string) == order[1]
+        }
+        XCTAssertNil(NSPasteboard.general.data(forType: .rtf), "plain-text copy leaves out RTF")
+        XCTAssertNil(NSPasteboard.general.data(forType: .html), "plain-text copy leaves out HTML")
+
+        // Cmd-R opens the inline rename for the same clip; typing and Return commit it.
+        pressCommand("r")
+        pump(until: "Cmd-R put focus in the rename field") { self.focusIsInTextField }
+        typeText("kw")
+        pressReturn()
+        pump(until: "Return saved the typed title") {
+            self.store.clips.first { $0.contentText == order[1] }?.userTitle == "kw"
+        }
+        pump(until: "focus returned to the list after the rename") { !self.focusIsInTextField }
+
+        // Space opens the preview; Escape in the preview closes it and the list keeps focus.
+        press(.space)
+        pump(until: "Space opened the preview") { QuickLookController.shared.isVisible }
+        let preview = NSApp.windows.first { $0 !== window && $0.isVisible && $0.title == "kw" } ?? NSApp.keyWindow
+        press(.escape, to: preview)
+        pump(until: "Escape closed the preview") { !QuickLookController.shared.isVisible }
+        pump(until: "list focus after the preview closed") { !self.focusIsInTextField }
+        XCTAssertFalse(focusIsInTextField, "closing the preview leaves keyboard focus on the list, not the search field")
+
+        // Shift-Down selects two clips; Cmd-Return takes the cursor row back out.
+        press(.downArrow, flags: .shift)
+        pressReturn()
+        pump(until: "Return pasted the two selected clips") { !self.pastedMany.isEmpty }
+        XCTAssertEqual(pastedMany, [[order[1], order[2]]], "Shift-Down extends the selection by one clip")
+        pasted = []
+        press(.returnKey, flags: .command)
+        pressReturn()
+        pump(until: "Return pasted the remaining clip") { !self.pasted.isEmpty }
+        XCTAssertEqual(pasted, [order[1]], "Cmd-Return toggled the cursor clip out, leaving only the second clip")
+        XCTAssertEqual(pastedMany.count, 1, "no second multi-clip paste after the toggle")
+
+        // Shift-F10 opens the actions for the clip; Escape closes them.
+        press(.f10, flags: .shift)
+        pump(until: "Shift-F10 opened the actions") { self.isShown("Copy as Plain Text") }
+        assertShown("Rename", "the actions list offers the menu-only Rename")
+        pressEscape()
+        pump(until: "Escape closed the actions") { !self.isShown("Copy as Plain Text") }
     }
 
     func testDarkPanelScreenshots() throws {

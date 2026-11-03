@@ -136,5 +136,6 @@ struct CategorySidePane: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Categories")
         .onKeyPress(phases: .down) { press in handleKey(press) }
+        .onReceive(PanelFocusRequest.shared.$sidebarToken.dropFirst()) { _ in focusSelectedRow() }
     }
 }

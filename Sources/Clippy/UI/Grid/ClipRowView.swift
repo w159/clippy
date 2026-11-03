@@ -115,14 +115,14 @@ struct ClipRowView: View {
         if model.isSensitive {
             HStack(spacing: 6) {
                 ClippyBadge("Sensitive")
-                Text(MaskedTextLogic.isVisible(sensitive: true, revealHeld: revealHeld)
+                Text(MaskedTextLogic.isVisible(sensitive: true, revealHeld: revealHeld || model.isKeyRevealed)
                      ? clip.previewText.replacingOccurrences(of: "\n", with: " ")
                      : CardSensitivity.maskedLine(clip))
                     .foregroundStyle(tokens.textPrimary)
                     .lineLimit(1)
             }
             .font(PanelTypography.body(settings))
-            .help("Hold to reveal")
+            .help("Hold to reveal, or press \u{21E7}\u{2318}R")
             .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 12, pressing: { revealHeld = $0 }, perform: {})
         } else {
             let text = rowText

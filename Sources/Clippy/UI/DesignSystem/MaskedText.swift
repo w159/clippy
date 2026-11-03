@@ -20,14 +20,17 @@ struct MaskedText: View {
     @FocusState private var focused: Bool
     let text: String
     let sensitive: Bool
+    /// True while a key toggle (not the hold gesture) keeps the text revealed.
+    let keyRevealed: Bool
 
     /// Creates a sensitive-aware text preview. Non-sensitive content is shown normally.
-    init(_ text: String, sensitive: Bool) {
+    init(_ text: String, sensitive: Bool, keyRevealed: Bool = false) {
         self.text = text
         self.sensitive = sensitive
+        self.keyRevealed = keyRevealed
     }
 
-    private var visible: Bool { MaskedTextLogic.isVisible(sensitive: sensitive, revealHeld: revealHeld) }
+    private var visible: Bool { MaskedTextLogic.isVisible(sensitive: sensitive, revealHeld: revealHeld || keyRevealed) }
 
     var body: some View {
         Group {

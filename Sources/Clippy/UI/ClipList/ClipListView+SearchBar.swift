@@ -25,6 +25,7 @@ extension ClipListView {
         .onAppear { focusTarget = .search }
         // PNL-04: an already-visible panel focuses the field instead of rebuilding.
         .onReceive(PanelFocusRequest.shared.$token.dropFirst()) { _ in focusTarget = .search }
+        .onReceive(PanelFocusRequest.shared.$listToken.dropFirst()) { _ in focusList() }
     }
 
     /// The text field with a search glyph, grammar help and a clear button.
