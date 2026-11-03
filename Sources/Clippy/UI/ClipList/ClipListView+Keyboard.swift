@@ -55,6 +55,8 @@ extension ClipListView {
 
     /// Single entry point for keys from the search field and the list container.
     func handleKey(_ press: KeyPress, from source: PanelFocusTarget) -> KeyPress.Result {
+        // The inline title field owns every key (typing, Return, Escape) while it is open.
+        if renamingClipID != nil { return .ignored }
         let mods = press.modifiers
         let command = mods.contains(.command)
         let searchEditing = source == .search && !store.query.isEmpty
