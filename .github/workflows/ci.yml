@@ -57,6 +57,11 @@ jobs:
                   grep -E ': error: ' "$RUNNER_TEMP/swift-test.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
                   exit $status
 
+            - name: Perf numbers
+              if: always()
+              run: |
+                  grep -E 'PERF ' "$RUNNER_TEMP/swift-test.log" | sort -u | while IFS= read -r line; do echo "::notice title=Perf::$line"; done || true
+
     app:
         name: App bundle, UI harness and screenshots
         runs-on: macos-26

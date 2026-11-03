@@ -123,3 +123,135 @@ final class PerfBenchmarkTests: XCTestCase {
         XCTAssertLessThan(insert, 30 * slack, "10k-clip insert budget")
     }
 }
+
+/// Baselines for relaunch, capture, window memory and search at 50k clips. The printed
+/// numbers are the signal; budgets are 5x+ the expected cost so CI noise does not flake.
+extension PerfBenchmarkTests {
+    private static let ciSlack = ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] == nil ? 1.0 : 3.0
+
+    /// What the app pays on every relaunch: `ClipDatabase.init` opens the on-disk file as a
+    /// `DatabasePool` and runs the migrator (all migrations already applied).
+    func testLaunchOpenAndMigrateOn50kClips() throws {
+        let url: URL
+        let media: URL
+        do {
+            let db = try makeTestDatabase(self)
+            try seed(db, count: 50_000)
+            url = db.databaseURL
+            media = url.deletingLastPathComponent().appendingPathComponent("media", isDirectory: true)
+        }
+        let open = try ms("launch: open+migrate 50k clips") {
+            _ = try ClipDatabase(databaseURL: url, mediaDirectory: media)
+        }
+        let reopened = try ClipDatabase(databaseURL: url, mediaDirectory: media)
+        XCTAssertEqual(try reopened.dbQueue.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM clips") }, 50_000)
+        XCTAssertLessThan(open, 1_500 * Self.ciSlack, "50k-clip relaunch open+migrate budget")
+    }
+
+    /// The text path of the clipboard monitor (`saveCapturedClip`) against a full history:
+    /// a new unique clip (insert + dedupe lookup + eviction) and a duplicate (bump).
+    func testCaptureInsertAndDuplicateOn50kClips() throws {
+        let db = try makeTestDatabase(self)
+        try seed(db, count: 50_000)
+
+        var counter = 0
+        let insert = try ms("capture insert at 50k") {
+            counter += 1
+            var clip = Clip(id: nil, contentText: "fresh clip \(counter) \(UUID())", contentRTF: nil, contentHTML: nil,
+                            typeIdentifier: "public.utf8-plain-text", sourceAppBundleID: nil, sourceAppName: "Notes",
+                            createdAt: Date())
+            XCTAssertTrue(try db.saveCapturedClip(&clip, cap: 50_000))
+        }
+
+        var first = makeTextClip("duplicate target at 50k")
+        XCTAssertTrue(try db.saveCapturedClip(&first, cap: 50_000))
+        let duplicate = try ms("capture duplicate at 50k") {
+            var again = makeTextClip("duplicate target at 50k")
+            XCTAssertFalse(try db.saveCapturedClip(&again, cap: 50_000))
+        }
+
+        XCTAssertLessThan(insert, 250 * Self.ciSlack, "50k-clip capture insert budget")
+        XCTAssertLessThan(duplicate, 100 * Self.ciSlack, "50k-clip capture duplicate budget")
+    }
+
+    /// 3,000 filed rich clips (6,000-byte RTF and HTML each) plus 300 recents: what a full
+    /// `ClipWindowLoader` load keeps resident.
+    func testWindowMemoryWith3000FiledRichClips() throws {
+        let db = try makeTestDatabase(self)
+        let category = try db.createCategory(named: "Work", colorHex: "#154734", iconKind: .symbol, iconValue: "folder")
+        let categoryID = try XCTUnwrap(category.id)
+        let now = Date()
+        let rtf = Data(repeating: 0x7B, count: 6_000)
+        let html = Data(repeating: 0x3C, count: 6_000)
+        try db.dbQueue.write { conn in
+            for index in 0..<3_000 {
+                var clip = Clip(
+                    id: nil, contentText: "filed \(index)", contentRTF: rtf, contentHTML: html,
+                    typeIdentifier: "public.rtf", sourceAppBundleID: nil, sourceAppName: "Notes",
+                    createdAt: now.addingTimeInterval(-Double(100_000 + 3_000 - index)))
+                try clip.insert(conn)
+            }
+            try conn.execute(
+                sql: "INSERT INTO clip_category (clipID, categoryID, addedAt, sortOrder) SELECT id, ?, ?, id FROM clips",
+                arguments: [categoryID, now])
+            for index in 0..<300 {
+                var clip = Clip(
+                    id: nil, contentText: "recent \(index)", contentRTF: nil, contentHTML: nil,
+                    typeIdentifier: "public.utf8-plain-text", sourceAppBundleID: nil, sourceAppName: "Notes",
+                    createdAt: now.addingTimeInterval(-Double(index)))
+                try clip.insert(conn)
+            }
+        }
+
+        let loader = ClipWindowLoader()
+        let window = try db.dbQueue.read { try loader.load($0, limit: 300, generation: db.contentGeneration) }
+        var bytes = 0
+        for clip in window.clips {
+            bytes += clip.contentText.utf8.count + (clip.contentRTF?.count ?? 0) + (clip.contentHTML?.count ?? 0)
+            bytes += (clip.ocrText?.utf8.count ?? 0) + (clip.userTitle?.utf8.count ?? 0)
+        }
+        let megabytes = Double(bytes) / 1_048_576
+        print(String(format: "PERF window memory, 3000 filed rich clips + recents: %.1f MB held (%d clips)",
+                     megabytes, window.clips.count))
+        XCTAssertEqual(window.clips.count, 3_300)
+        XCTAssertGreaterThan(megabytes, 30, "the filed blobs are held by the window")
+        XCTAssertLessThan(megabytes, 250, "window memory budget")
+    }
+
+    /// A cold first window load (fresh loader) on a 50k-clip history with 500 filed clips.
+    func testWindowColdLoadOn50kClips() throws {
+        let db = try makeTestDatabase(self)
+        try seed(db, count: 50_000)
+        let category = try db.createCategory(named: "Work", colorHex: "#154734", iconKind: .symbol, iconValue: "folder")
+        let categoryID = try XCTUnwrap(category.id)
+        let now = Date()
+        try db.dbQueue.write { conn in
+            try conn.execute(
+                sql: "INSERT INTO clip_category (clipID, categoryID, addedAt, sortOrder) SELECT id, ?, ?, id FROM clips WHERE id % 100 = 0",
+                arguments: [categoryID, now])
+        }
+
+        var loaded = 0
+        let cold = try ms("window cold load at 50k") {
+            let window = try db.dbQueue.read { try ClipWindowLoader().load($0, limit: 300, generation: db.contentGeneration) }
+            XCTAssertEqual(window.total, 50_000)
+            loaded = window.clips.count
+        }
+        XCTAssertGreaterThanOrEqual(loaded, 500, "every filed clip is in the window")
+        XCTAssertLessThan(cold, 500 * Self.ciSlack, "50k-clip cold window load budget")
+    }
+
+    /// Same rich rows as the 10k test (RTF and HTML blobs between text and title), at 50k.
+    func testSearchBenchmarksOn50kRichTextClips() throws {
+        let db = try makeTestDatabase(self)
+        try seedRich(db, count: 50_000)
+
+        let word = try ms("rich 50k: plain word 'invoice'") { XCTAssertEqual(try db.search(matching: "invoice", limit: 300).hits.count, 300) }
+        let fragment = try ms("rich 50k: common fragment 'nvoic'") { XCTAssertEqual(try db.search(matching: "nvoic", limit: 300).hits.count, 300) }
+        let miss = try ms("rich 50k: no match 'zqxjv'") { XCTAssertEqual(try db.search(matching: "zqxjv", limit: 300).hits.count, 0) }
+
+        XCTAssertLessThan(word, 500 * Self.ciSlack, "50k rich-text plain word budget")
+        XCTAssertLessThan(fragment, 500 * Self.ciSlack, "50k rich-text common fragment budget")
+        XCTAssertLessThan(miss, 3_000 * Self.ciSlack, "50k rich-text no-match (full scan) budget")
+    }
+}
