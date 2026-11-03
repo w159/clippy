@@ -93,6 +93,8 @@ final class ClipStore: ObservableObject {
     }
     /// id -> clip lookup over `recents`, kept in sync by `recents.didSet`.
     var recentsByID: [Int64: Clip] = [:]
+    /// Decodes the observed window incrementally (see ClipWindowLoader).
+    let windowLoader = ClipWindowLoader()
     private var searchDebounce: Task<Void, Never>?
     /// The in-flight FTS read, cancelled whenever the query or window changes.
     private var searchTask: Task<Void, Never>?
@@ -191,12 +193,16 @@ final class ClipStore: ObservableObject {
         // and membership change rarely; separating them avoids refetching the clip
         // window for every category edit.
         // Recents window plus every categorized clip: categorized clips must
-        // stay visible in their panes even when older than the window.
-        let clipObservation = ValueObservation.tracking { db -> ClipWindow in
-            let total = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
-            let window = try Clip.fetchAll(db, sql: ClipDatabase.observationWindowSQL, arguments: [limit])
-            return ClipWindow(clips: window, total: total)
-        }
+        // stay visible in their panes even when older than the window. The
+        // loader decodes only rows that changed since the previous pulse.
+        let loader = windowLoader
+        let database = database
+        let clipObservation = ValueObservation.tracking(
+            // Explicit: a pulse with no changed rows reads only id and rowVersion,
+            // and a region inferred from that read would be narrower than the window.
+            region: Table("clips"), Table("clip_category"),
+            fetch: { db in try loader.load(db, limit: limit, generation: database.contentGeneration) }
+        )
         // Identical windows (a write that touched nothing the list shows) are dropped
         // on the observation queue, not compared and republished on the main thread.
         .removeDuplicates()
@@ -475,12 +481,6 @@ final class ClipStore: ObservableObject {
         if clips != newClips { clips = newClips }
         if semanticMatches != matches { semanticMatches = matches }
     }
-}
-
-/// The observed list window: recents plus every categorized clip, and the table size.
-struct ClipWindow: Equatable {
-    var clips: [Clip]
-    var total: Int
 }
 
 extension Clip {

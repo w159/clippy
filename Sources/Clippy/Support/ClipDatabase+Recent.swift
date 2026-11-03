@@ -8,12 +8,4 @@ extension ClipDatabase {
             try Clip.order(Column("createdAt").desc, Column("id").desc).limit(limit, offset: offset).fetchAll(connection)
         }
     }
-
-    /// The list window ClipStore observes: recents plus every categorized clip.
-    static let observationWindowSQL = """
-        SELECT * FROM clips
-        WHERE id IN (SELECT clipID FROM clip_category)
-        OR id IN (SELECT id FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?)
-        ORDER BY createdAt DESC, id DESC
-        """
 }

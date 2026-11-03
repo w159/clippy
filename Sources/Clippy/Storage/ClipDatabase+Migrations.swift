@@ -282,5 +282,23 @@ extension ClipDatabase {
                 ON clips (\(ClipDatabase.historyEntrySQL), id)
                 """)
         }
+        migrator.registerMigration("v13-row-version") { connection in
+            // A per-row change counter. The panel's observation compares it to decode
+            // only rows that changed since its last pulse, instead of every categorized
+            // clip on every write (ClipWindowLoader). A trigger bumps it so every update
+            // path counts, including other writers (the MCP server). The WHEN guard
+            // keeps the trigger's own UPDATE from firing it again. Inserts start at 0;
+            // ids are AUTOINCREMENT, so a new row never repeats an old (id, version).
+            try connection.alter(table: "clips") { tableBuilder in
+                tableBuilder.add(column: "rowVersion", .integer).notNull().defaults(to: 0)
+            }
+            try connection.execute(sql: """
+                CREATE TRIGGER clips_row_version AFTER UPDATE ON clips
+                WHEN NEW.rowVersion = OLD.rowVersion
+                BEGIN
+                    UPDATE clips SET rowVersion = OLD.rowVersion + 1 WHERE id = NEW.id;
+                END
+                """)
+        }
     }
 }
