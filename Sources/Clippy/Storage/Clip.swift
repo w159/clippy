@@ -100,26 +100,56 @@ struct Clip: Identifiable, Equatable, Codable, FetchableRecord, MutablePersistab
 // MARK: - Light rows
 
 extension Clip {
+    /// Light columns in select order. The raw value is the column index
+    /// `light(_:)` reads, so the SELECT list and the decoder share one source.
+    private enum LightColumn: Int, CaseIterable {
+        case id, contentText, typeIdentifier, sourceAppBundleID, sourceAppName, createdAt
+        case contentKind, mediaFilename, thumbFilename, pixelWidth, pixelHeight, byteSize
+        case userTitle, filePath, ocrText, hasRichContent
+    }
+
     /// Every `clips` column except the RTF and HTML blobs, plus `hasRichContent`
     /// computed in SQL. Lists need none of the blobs; paste, copy, edit, export
     /// and archive read them through `ClipDatabase.withRichContent`.
     /// `alias` is the table alias when the query joins other tables.
     static func lightColumns(alias: String? = nil) -> String {
         let prefix = alias.map { $0 + "." } ?? ""
-        let names = ["id", "contentText", "typeIdentifier", "sourceAppBundleID", "sourceAppName", "createdAt",
-                     "contentKind", "mediaFilename", "thumbFilename", "pixelWidth", "pixelHeight", "byteSize",
-                     "userTitle", "filePath", "ocrText"]
-        let columns = names.map { prefix + $0 }.joined(separator: ", ")
+        let columns = LightColumn.allCases.dropLast().map { column in prefix + String(describing: column) }.joined(separator: ", ")
         // typeof() reads only the record header; IS NOT NULL would load the blobs.
-        return columns + ", (typeof(\(prefix)contentRTF) = 'blob' OR typeof(\(prefix)contentHTML) = 'blob') AS hasRichContent"
+        return columns + ", (typeof(\(prefix)contentRTF) = 'blob' OR typeof(\(prefix)contentHTML) = 'blob') AS \(LightColumn.hasRichContent)"
     }
 
-    /// Decodes a row selected with `lightColumns`: blobs nil, and
+    /// Decodes a row selected with `lightColumns` (extra columns may follow) by
+    /// index, skipping the Codable row decoder: blobs nil, and
     /// `richContentOmitted` set only when the stored clip has formatting.
     static func light(_ row: Row) throws -> Clip {
-        var clip = try Clip(row: row)
-        let hasRich: Bool = row["hasRichContent"]
-        clip.richContentOmitted = hasRich
+        let createdAtValue: DatabaseValue = row[LightColumn.createdAt.rawValue]
+        let kindValue: DatabaseValue = row[LightColumn.contentKind.rawValue]
+        guard let createdAt = Date.fromDatabaseValue(createdAtValue) else {
+            throw DatabaseError(message: "Clip.light: undecodable createdAt")
+        }
+        guard let kindRaw = String.fromDatabaseValue(kindValue), let kind = ClipContentKind(rawValue: kindRaw) else {
+            throw DatabaseError(message: "Clip.light: undecodable contentKind")
+        }
+        var clip = Clip(
+            id: row[LightColumn.id.rawValue],
+            contentText: row[LightColumn.contentText.rawValue],
+            contentRTF: nil,
+            contentHTML: nil,
+            typeIdentifier: row[LightColumn.typeIdentifier.rawValue],
+            sourceAppBundleID: row[LightColumn.sourceAppBundleID.rawValue],
+            sourceAppName: row[LightColumn.sourceAppName.rawValue],
+            createdAt: createdAt)
+        clip.contentKind = kind
+        clip.mediaFilename = row[LightColumn.mediaFilename.rawValue]
+        clip.thumbFilename = row[LightColumn.thumbFilename.rawValue]
+        clip.pixelWidth = row[LightColumn.pixelWidth.rawValue]
+        clip.pixelHeight = row[LightColumn.pixelHeight.rawValue]
+        clip.byteSize = row[LightColumn.byteSize.rawValue]
+        clip.userTitle = row[LightColumn.userTitle.rawValue]
+        clip.filePath = row[LightColumn.filePath.rawValue]
+        clip.ocrText = row[LightColumn.ocrText.rawValue]
+        clip.richContentOmitted = row[LightColumn.hasRichContent.rawValue]
         return clip
     }
 
@@ -127,10 +157,13 @@ extension Clip {
     static func fetchLight(_ db: Database, ids: [Int64]) throws -> [Clip] {
         guard !ids.isEmpty else { return [] }
         let marks = Array(repeating: "?", count: ids.count).joined(separator: ",")
-        let rows = try Row.fetchAll(
+        let cursor = try Row.fetchCursor(
             db,
             sql: "SELECT \(lightColumns()) FROM clips WHERE id IN (\(marks))",
             arguments: StatementArguments(ids))
-        return try rows.map(light)
+        var clips: [Clip] = []
+        clips.reserveCapacity(ids.count)
+        while let row = try cursor.next() { clips.append(try light(row)) }
+        return clips
     }
 }
