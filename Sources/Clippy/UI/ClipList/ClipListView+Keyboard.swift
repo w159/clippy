@@ -277,8 +277,12 @@ extension ClipListView {
     func undoLastDelete() -> Bool {
         guard let batch = ClipUndoBuffer.shared.popLast() else { return false }
         let database = store.database
-        store.performWrite("undoDelete") {
-            try ClipUndoBuffer.restore(batch, into: database)
+        store.performWrite("undoDelete") { [store] in
+            try ClipUndoBuffer.restore(batch, into: database) { _ in
+                DispatchQueue.main.async {
+                    store.reportWriteFailure("Restored, but some categories couldn't be re-applied.")
+                }
+            }
         }
         showStatusBanner(batch.count == 1 ? "Restored clip" : "Restored \(batch.count) clips", severity: .success)
         return true

@@ -4,6 +4,7 @@ import SwiftUI
 struct DataSmartCollectionsSection: View {
     @Binding var notice: PaneNotice?
     @State private var collections: [SmartCollection] = []
+    @State private var loadFailed = false
     @State private var editing: EditTarget?
     @State private var deleting: SmartCollection?
 
@@ -18,7 +19,7 @@ struct DataSmartCollectionsSection: View {
 
     var body: some View {
         PaneSection("Smart collections", footer: "Rules that group clips automatically by type, source app, text pattern, age or sensitivity.") {
-            if collections.isEmpty {
+            if collections.isEmpty && !loadFailed {
                 SettingsRow(title: "No smart collections") { EmptyView() }
                 Divider()
             }
@@ -47,7 +48,15 @@ struct DataSmartCollectionsSection: View {
         }
     }
 
-    private func reload() { collections = (try? ClipDatabase.shared.smartCollections()) ?? [] }
+    private func reload() {
+        do {
+            collections = try ClipDatabase.shared.smartCollections()
+            loadFailed = false
+        } catch {
+            loadFailed = true
+            notice = .failure("Could not load smart collections.")
+        }
+    }
 
     private func deleteSelected() {
         guard let collectionID = deleting?.id else { return }

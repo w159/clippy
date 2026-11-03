@@ -27,9 +27,13 @@ struct ClipStoreTranslateSink: @MainActor TranslateActionSink {
 
     func saveAsNewClip(_ text: String) -> Bool { store.saveDerivedText(text, source: "Clippy Translate") }
 
-    func replaceClip(_ clipID: Int64, with text: String) {
-        do { try store.database.updateClipText(id: clipID, newText: text) } catch {
+    func replaceClip(_ clipID: Int64, with text: String) -> Bool {
+        do {
+            try store.database.updateClipText(id: clipID, newText: text)
+            return true
+        } catch {
             ClippyLog.error("failed to replace translated clip: \(error)", category: ClippyLog.storage)
+            return false
         }
     }
 }
@@ -64,7 +68,12 @@ struct ClipDatabaseAutoFileSource: AutoFileDataSource {
     let database: ClipDatabase
 
     func categories() -> [AutoFileCategory] {
-        ((try? database.categories()) ?? []).compactMap { category in
+        let rows: [Category]
+        do { rows = try database.categories() } catch {
+            ClippyLog.error("auto-file category read failed: \(error)", category: ClippyLog.storage)
+            return []
+        }
+        return rows.compactMap { category in
             category.id.map { AutoFileCategory(id: $0, name: category.name) }
         }
     }
@@ -91,7 +100,12 @@ struct ClipDatabaseAutoFileSource: AutoFileDataSource {
     }
 
     private func fetch(_ sql: String, _ arguments: [DatabaseValueConvertible]) -> [AutoFileClip] {
-        let rows = (try? database.dbQueue.read { try Clip.fetchAll($0, sql: sql, arguments: StatementArguments(arguments)) }) ?? []
-        return rows.compactMap(Self.autoFileClip)
+        do {
+            let rows = try database.dbQueue.read { try Clip.fetchAll($0, sql: sql, arguments: StatementArguments(arguments)) }
+            return rows.compactMap(Self.autoFileClip)
+        } catch {
+            ClippyLog.error("auto-file clip read failed: \(error)", category: ClippyLog.storage)
+            return []
+        }
     }
 }

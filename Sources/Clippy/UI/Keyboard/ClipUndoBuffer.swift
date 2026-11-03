@@ -80,10 +80,15 @@ final class ClipUndoBuffer {
     /// Re-inserts the snapshotted clips through the database's public APIs:
     /// media files first, then the row (a fresh id when the old one was reused),
     /// then category memberships (a category deleted meanwhile is skipped).
-    /// Returns the number of clips restored.
+    /// Returns the number of clips restored. `onCategoryFailures` is called once,
+    /// after all clips are restored, with the count of memberships that could not be re-applied.
     @discardableResult
-    static func restore(_ snapshots: [DeletedClipSnapshot], into database: ClipDatabase) throws -> Int {
+    static func restore(
+        _ snapshots: [DeletedClipSnapshot], into database: ClipDatabase,
+        onCategoryFailures: (@Sendable (Int) -> Void)? = nil
+    ) throws -> Int {
         var restored = 0
+        var categoryFailures = 0
         for snap in snapshots {
             for (name, data) in snap.media {
                 let url = database.media.url(for: name)
@@ -95,11 +100,13 @@ final class ClipUndoBuffer {
             guard let newID = clip.id else { continue }
             for categoryID in snap.categoryIDs {
                 do { try database.setClip(newID, inCategory: categoryID, true) } catch {
+                    categoryFailures += 1
                     ClippyLog.error("undo delete: category restore failed: \(error)", category: ClippyLog.storage)
                 }
             }
             restored += 1
         }
+        if categoryFailures > 0 { onCategoryFailures?(categoryFailures) }
         return restored
     }
 }

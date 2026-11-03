@@ -159,8 +159,12 @@ struct TranslateClipSheet: View {
         }
         .confirmationDialog("Replace the original clip with the translation?", isPresented: $confirmReplace) {
             Button("Replace", role: .destructive) {
-                sink.replaceClip(clipID, with: translated)
-                dismiss()
+                if sink.replaceClip(clipID, with: translated) {
+                    dismiss()
+                } else {
+                    status = nil
+                    saveError = "Could not replace the original clip."
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
