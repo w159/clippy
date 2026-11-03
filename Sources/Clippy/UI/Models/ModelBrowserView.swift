@@ -93,7 +93,8 @@ struct ModelBrowserView: View {
                        title: model.models.isEmpty ? "Provider returned no models" : "No models match",
                        message: model.models.isEmpty
                            ? "Refresh the catalog, or enter a custom model id below."
-                           : "Clear the filters, refresh the provider catalog, or enter a custom model id below.")
+                           : "Clear the filters, refresh the provider catalog, or enter a custom model id below.",
+                       actionTitle: "Refresh") { model.load(refresh: true) }
         } else {
             table
         }

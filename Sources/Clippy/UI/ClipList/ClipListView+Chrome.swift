@@ -30,12 +30,24 @@ extension ClipListView {
             case .category:
                 EmptyState(systemImage: "tray", title: "No clips in this category",
                            message: "Right-click a clip and choose Categories, or drag a card onto the category.")
-            case .onePassword:
-                EmptyState(systemImage: "key.fill", title: "No secrets shared to Clippy yet")
-            // .scripts, .assistant, and .aiActions route to their own views; unreachable here.
-            case .scripts, .assistant, .aiActions, .suggestions, .snippets, .pasteStack:
-                EmptyState(systemImage: "tray", title: "Nothing to show")
+            // These routes render their own panes in `paneContent`; the copy is a safety net.
+            case .onePassword, .scripts, .assistant, .aiActions, .suggestions, .snippets, .pasteStack:
+                EmptyState(systemImage: "tray", title: routeFallbackTitle)
             }
+        }
+    }
+
+    /// One-line copy per route that normally draws its own pane.
+    private var routeFallbackTitle: String {
+        switch selection {
+        case .onePassword: return "No 1Password items to show"
+        case .scripts: return "No scripts to show"
+        case .assistant: return "Assistant is not available here"
+        case .aiActions: return "No AI actions to show"
+        case .suggestions: return "No suggestions to show"
+        case .snippets: return "No snippets to show"
+        case .pasteStack: return "Paste stack is empty"
+        case .history, .category: return "No clips to show"
         }
     }
 

@@ -137,7 +137,8 @@ struct DescribeImageSheet: View {
             result = described
         } catch {
             guard !Task.isCancelled, analysisRequestID == requestID else { return }
-            errorMessage = "The image could not be read."
+            errorMessage = (error as? ImageDescriber.DescribeError)?.errorDescription
+                ?? "Analysis failed: \(error.localizedDescription) Try again, or close and reopen the image."
         }
     }
 }

@@ -147,6 +147,35 @@ extension PanelHarnessTests {
         }
     }
 
+    // MARK: - Empty and error states
+
+    /// Panel list with an unseeded store (no clips yet) and with a failed search.
+    func testEmptyAndErrorStateScreenshots() throws {
+        let snippetsURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clippy-harness-empty-snippets-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: snippetsURL) }
+        let emptySnippets = SnippetStore(fileURL: snippetsURL)
+        let size = NSSize(width: 820, height: 600)
+        for (appearance, suffix) in Self.appearances {
+            let empty = ClipStore(database: try makeTestDatabase(self),
+                                  pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
+            capture("40-empty-history-\(suffix)", emptyList(empty), size: size, appearance: appearance)
+
+            empty.searchError = "The search index could not be read."
+            capture("41-search-error-\(suffix)", emptyList(empty), size: size, appearance: appearance)
+
+            capture("42-snippets-empty-\(suffix)", SnippetsView(store: emptySnippets).clippyDesignSystem(),
+                    size: NSSize(width: 620, height: 600), appearance: appearance)
+        }
+    }
+
+    private func emptyList(_ store: ClipStore) -> some View {
+        ClipListView(
+            store: store, onPaste: { _, _ in }, onPasteMany: { _, _, _ in }, onPasteFile: { _, _ in },
+            onPrimary: { _ in }, onSendKeystrokes: { _ in }, onEdit: { _ in }, onClose: {}, onOpenSettings: {}
+        ).clippyDesignSystem()
+    }
+
     private static var paletteContext: PanelCommandContext {
         PanelCommandContext(
             hasSelectedClip: true, hasQuery: true, canExtractText: false, canFindSimilar: true, isPinned: false,

@@ -78,7 +78,7 @@ extension ScriptsView {
                         else { Text(displayName(script.name)) }
                     }
                 }
-                if store.scripts.isEmpty { Text("No scripts yet") }
+                if store.scripts.isEmpty { Text("No scripts yet. Use + to add one.") }
             } label: {
                 Text(editing.map { displayName($0.name) } ?? "Choose script")
                     .lineLimit(1)

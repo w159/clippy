@@ -46,10 +46,7 @@ struct SnippetsView: View {
                 }
                 .onDeleteCommand { if selection != nil { confirmDelete = true } }
                 .overlay {
-                    if visible.isEmpty {
-                        Text(snippets.isEmpty ? "No snippets yet. Press + to add one." : "No snippets match.")
-                            .font(.callout).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center).padding(tokens.metrics.space.three)
-                    }
+                    if visible.isEmpty { listEmptyState }
                 }
                 toolbar
                     .padding(.horizontal, tokens.metrics.space.three)
@@ -71,9 +68,25 @@ struct SnippetsView: View {
         } message: { Text(errorMessage ?? "") }
     }
 
+    @ViewBuilder private var listEmptyState: some View {
+        if snippets.isEmpty {
+            EmptyState(systemImage: "text.badge.plus", title: "No snippets yet",
+                       message: "Save text you type often and expand it with a short abbreviation.",
+                       actionTitle: "Add Snippet") { addSnippet() }
+        } else {
+            EmptyState(systemImage: "magnifyingglass", title: "No snippets match",
+                       message: "Clear the search or choose All folders.",
+                       actionTitle: "Clear Search") { query = ""; folderFilter = "" }
+        }
+    }
+
+    private func addSnippet() {
+        perform { let item = Snippet(title: "New snippet"); try store.add(item); selection = item.id }
+    }
+
     private var toolbar: some View {
         HStack(spacing: tokens.metrics.space.two) {
-            Button { perform { let item = Snippet(title: "New snippet"); try store.add(item); selection = item.id } } label: {
+            Button { addSnippet() } label: {
                 Image(systemName: "plus")
             }.accessibilityLabel("New snippet").help("New snippet")
             Button { if let id = selection { perform { selection = try store.duplicate(id: id)?.id } } } label: {

@@ -50,11 +50,13 @@ struct SuggestionsPaneScaffold<Content: View>: View {
                 systemImage: "sparkles", title: "Smart Suggestions are off",
                 message: "Turn them on in Settings, Intelligence.", actionTitle: "Open Settings", action: onOpenSettings)
         case .skipped(let message):
-            EmptyState(systemImage: "tortoise", title: "Context unavailable in this app", message: message)
+            EmptyState(systemImage: "tortoise", title: "Context unavailable in this app", message: message,
+                       actionTitle: "Try Again") { store.recaptureSuggestions() }
         case .empty, .list:
             EmptyState(
                 systemImage: "tray", title: "Nothing relevant yet",
-                message: "Copy a few things and try again.")
+                message: "Copy a few things and try again.",
+                actionTitle: "Refresh") { store.recaptureSuggestions() }
         }
     }
 

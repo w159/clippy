@@ -49,6 +49,7 @@ enum CLIInstaller {
                 return .success(Outcome(path: target, onPath: onPath, message: "Installed \(target). \(hint)"))
             } catch { lastError = error }
         }
-        return .failure(lastError ?? NSError(domain: "CLIInstaller", code: 3))
+        return .failure(lastError ?? NSError(domain: "CLIInstaller", code: 3, userInfo: [
+            NSLocalizedDescriptionKey: "No install location was available. Check write access to /usr/local/bin or ~/.local/bin."]))
     }
 }

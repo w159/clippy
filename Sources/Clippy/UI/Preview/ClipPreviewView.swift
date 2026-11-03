@@ -143,8 +143,28 @@ struct LinkPreviewCard: View {
     @Environment(\.clippyTokens) private var tokens
     let url: URL
     @State private var metadata: LinkPreviewMetadata?
+    @State private var status: String?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
+            card
+            if let status {
+                Text(status).font(.caption).foregroundStyle(tokens.textSecondary)
+            }
+        }
+        .task(id: url) { await load() }
+    }
+
+    /// Shows a quiet status only when fetching is enabled; opted-out previews stay silent.
+    private func load() async {
+        metadata = nil
+        let fetching = LinkPreviewPreferences.isEnabled
+        status = fetching ? "Loading preview" : nil
+        metadata = await LinkPreviewService.shared.metadata(for: url, sensitive: false)
+        status = fetching && metadata == nil ? "Preview unavailable" : nil
+    }
+
+    private var card: some View {
         HStack(spacing: tokens.metrics.space.two) {
             if let data = metadata?.iconPNG, let icon = NSImage(data: data) {
                 Image(nsImage: icon).resizable().frame(width: 32, height: 32)
@@ -156,6 +176,5 @@ struct LinkPreviewCard: View {
                 Text(url.absoluteString).font(.caption).foregroundStyle(tokens.textSecondary).lineLimit(2)
             }
         }
-        .task(id: url) { metadata = await LinkPreviewService.shared.metadata(for: url, sensitive: false) }
     }
 }

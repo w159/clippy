@@ -34,7 +34,15 @@ struct DescribeAvailability: Equatable {
 /// Describes an image file entirely on-device. Uses the multimodal Foundation
 /// Models path when available, else Vision classification + OCR.
 enum ImageDescriber {
-    enum DescribeError: Error { case unreadableImage }
+    enum DescribeError: Error, LocalizedError {
+        case unreadableImage
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadableImage: return "This image could not be read. The file may have moved or be in an unsupported format."
+            }
+        }
+    }
 
     /// `availability` defaults to a live probe.
     static func describe(imageURL: URL, availability: DescribeAvailability = .current()) async throws -> ImageDescription {
