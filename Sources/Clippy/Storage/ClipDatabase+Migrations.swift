@@ -286,17 +286,28 @@ extension ClipDatabase {
             // A per-row change counter. The panel's observation compares it to decode
             // only rows that changed since its last pulse, instead of every categorized
             // clip on every write (ClipWindowLoader). A trigger bumps it so every update
-            // path counts, including other writers (the MCP server). The WHEN guard
-            // keeps the trigger's own UPDATE from firing it again. Inserts start at 0;
-            // ids are AUTOINCREMENT, so a new row never repeats an old (id, version).
-            try connection.alter(table: "clips") { tableBuilder in
-                tableBuilder.add(column: "rowVersion", .integer).notNull().defaults(to: 0)
-            }
+            // path counts, including other writers (the MCP server). It lives in a side
+            // table: no trigger may write to clips, because a nested update re-runs the
+            // FTS sync triggers in an undefined order and corrupts the index. A row with
+            // no entry reads as version 0; ids are AUTOINCREMENT, so a new row never
+            // repeats an old (id, version).
             try connection.execute(sql: """
-                CREATE TRIGGER clips_row_version AFTER UPDATE ON clips
-                WHEN NEW.rowVersion = OLD.rowVersion
+                CREATE TABLE clip_version (
+                    clipID INTEGER PRIMARY KEY NOT NULL,
+                    version INTEGER NOT NULL
+                )
+                """)
+            try connection.execute(sql: """
+                CREATE TRIGGER clip_version_bump AFTER UPDATE ON clips
                 BEGIN
-                    UPDATE clips SET rowVersion = OLD.rowVersion + 1 WHERE id = NEW.id;
+                    INSERT INTO clip_version (clipID, version) VALUES (NEW.id, 1)
+                    ON CONFLICT(clipID) DO UPDATE SET version = version + 1;
+                END
+                """)
+            try connection.execute(sql: """
+                CREATE TRIGGER clip_version_drop AFTER DELETE ON clips
+                BEGIN
+                    DELETE FROM clip_version WHERE clipID = OLD.id;
                 END
                 """)
         }

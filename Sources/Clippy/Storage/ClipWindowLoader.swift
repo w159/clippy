@@ -8,9 +8,10 @@ import os
 /// Every write to `clips` re-runs the observation: each capture, each OCR result,
 /// each rename. Fetching the window with `SELECT *` decoded every categorized clip
 /// on every pulse, rich-text and HTML blobs included. The loader reads the window's
-/// `(id, rowVersion)` stamps first (the `clips_row_version` trigger bumps the
-/// version on every update, from any writer), then fetches full rows only for ids
-/// it has not seen or whose version moved. Unchanged rows are reused.
+/// `(id, rowVersion)` stamps first (the version lives in `clip_version`, bumped by
+/// the `clip_version_bump` trigger on every update, from any writer), then fetches
+/// full rows only for ids it has not seen or whose version moved. Unchanged rows
+/// are reused.
 ///
 /// Clip ids are never reused (AUTOINCREMENT), so an id and a version name one row
 /// state. A backup restore replaces the contents wholesale; `generation` (see
@@ -25,10 +26,11 @@ final class ClipWindowLoader: Sendable {
     /// The window's stamps, newest first. Same membership and order as the
     /// window the panel shows.
     static let stampsSQL = """
-        SELECT id, rowVersion FROM clips
-        WHERE id IN (SELECT clipID FROM clip_category)
-        OR id IN (SELECT id FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?)
-        ORDER BY createdAt DESC, id DESC
+        SELECT c.id, COALESCE(v.version, 0) AS rowVersion FROM clips c
+        LEFT JOIN clip_version v ON v.clipID = c.id
+        WHERE c.id IN (SELECT clipID FROM clip_category)
+        OR c.id IN (SELECT id FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?)
+        ORDER BY c.createdAt DESC, c.id DESC
         """
 
     /// Ids per `IN (...)` fetch, well under SQLite's bound-parameter limit.
@@ -62,7 +64,11 @@ final class ClipWindowLoader: Sendable {
                 let chunk = Array(stale[start..<min(start + Self.chunkSize, stale.count)])
                 let marks = Array(repeating: "?", count: chunk.count).joined(separator: ",")
                 let rows = try Row.fetchAll(
-                    db, sql: "SELECT * FROM clips WHERE id IN (\(marks))",
+                    db,
+                    sql: """
+                        SELECT c.*, COALESCE(v.version, 0) AS rowVersion FROM clips c
+                        LEFT JOIN clip_version v ON v.clipID = c.id WHERE c.id IN (\(marks))
+                        """,
                     arguments: StatementArguments(chunk))
                 for row in rows {
                     let clip = try Clip(row: row)
