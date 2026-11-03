@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes.
+
 ## v2.3.0 - 2026-11-03 - UI and UX overhaul
 
 Built and tested on macOS in CI ([run 41638763966](https://github.com/w159/clippy/actions/runs/41638763966), commit `1fc24b6`): `swift build`, 1388 XCTests (9 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of every Settings pane, every panel pane, the clip editor, every sheet, the palette, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).

@@ -5,9 +5,17 @@ import SwiftUI
 /// the window is compact. Each pane footer offers reset, export and import.
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
-    @StateObject private var model = SettingsShellModel()
+    @StateObject private var model: SettingsShellModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
+    @State private var hostWindow: NSWindow?
+    @State private var highlightedHit = 0
+    @State private var searchFocusToken = 0
+
+    /// `model` is injectable so tests can assert on selection and search state.
+    init(model: SettingsShellModel? = nil) {
+        _model = StateObject(wrappedValue: model ?? SettingsShellModel())
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -22,6 +30,12 @@ struct SettingsView: View {
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
+        .background(SettingsWindowReader { hostWindow = $0 })
+        .background(PaneShortcutButtons { paneSelection.wrappedValue = $0 })
+        // Inside the sidebar search field, Esc is handled by the field's delegate, which clears the
+        // query and then closes the window; `.onExitCommand` covers Esc from other focused controls.
+        .onExitCommand { closeOrClearSearch() }
+        .task { await focusSearchField() }
         .confirmationDialog("Reset \(model.selection.title) settings?", isPresented: $model.showResetConfirmation,
                             titleVisibility: .visible) {
             Button("Reset this pane", role: .destructive) { model.resetSelectedPane() }
@@ -72,17 +86,18 @@ struct SettingsView: View {
                         ForEach(SettingsPaneSection.all) { section in
                             Section(section.title) {
                                 ForEach(section.panes) { pane in
-                                    PaneRow(pane: pane, isSelected: pane == model.selection) { paneSelection.wrappedValue = pane }
-                                        .id(pane.id)
+                                    PaneRow(pane: pane, isSelected: pane == model.selection) {
+                                        paneSelection.wrappedValue = pane
+                                        searchFocusToken += 1
+                                    }
+                                    .id(pane.id)
                                 }
                             }
                         }
                     }
                     // No `selection:` binding: the system sidebar highlight is blue and ignores tint, so
-                    // rows draw `tokens.selection` themselves and arrows move the selection here.
-                    .focusable()
-                    .focusEffectDisabled()
-                    .onMoveCommand { moveSelection($0) }
+                    // rows draw `tokens.selection` themselves. The search field above owns the keyboard
+                    // and moves the selection (Up/Down) or the search highlight (Return opens it).
                     .onAppear { proxy.scrollTo(model.selection.id) }
                     .onChange(of: model.selection) { _, pane in proxy.scrollTo(pane.id) }
                 }
@@ -93,7 +108,47 @@ struct SettingsView: View {
         .listStyle(.sidebar)
         .environment(\.sidebarRowSize, .small)
         .controlSize(.small)
-        .searchable(text: $model.query, placement: .sidebar, prompt: "Search settings")
+        .safeAreaInset(edge: .top, spacing: 0) {
+            SettingsSearchField(text: $model.query, focusToken: searchFocusToken, onMove: handleMove,
+                                onSubmit: openHighlightedHit, onCancel: closeOrClearSearch)
+                .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
+        }
+        .onChange(of: model.query) { _, _ in highlightedHit = 0 }
+    }
+
+    private func closeOrClearSearch() {
+        if model.query.isEmpty { hostWindow?.close() } else { model.query = "" }
+    }
+
+    /// Puts keyboard focus on the search field once the window is up, so arrows move panes at once.
+    private func focusSearchField() async {
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        searchFocusToken += 1
+    }
+
+    /// Up/Down move the pane selection, or the highlighted hit while a search is active.
+    private func handleMove(_ direction: MoveCommandDirection) {
+        if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
+            moveSelection(direction)
+        } else {
+            moveHighlight(direction)
+        }
+    }
+
+    private func moveHighlight(_ direction: MoveCommandDirection) {
+        guard !model.query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let last = model.results.count - 1
+        switch direction {
+        case .up: highlightedHit = max(highlightedHit - 1, 0)
+        case .down: highlightedHit = min(highlightedHit + 1, max(last, 0))
+        default: break
+        }
+    }
+
+    private func openHighlightedHit() {
+        let hits = model.results
+        guard hits.indices.contains(highlightedHit) else { return }
+        model.jump(to: hits[highlightedHit])
     }
 
     private func moveSelection(_ direction: MoveCommandDirection) {
@@ -122,14 +177,7 @@ struct SettingsView: View {
             ContentUnavailableView.search(text: model.query)
         } else {
             List(hits) { hit in
-                Button { model.jump(to: hit) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(hit.entry.title)
-                        Text(SettingsPaneID(rawValue: hit.entry.pane)?.title ?? hit.entry.pane)
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
+                SearchHitRow(hit: hit, isHighlighted: hit.id == hits[safe: highlightedHit]?.id) { model.jump(to: hit) }
             }
         }
     }
@@ -168,13 +216,15 @@ struct SettingsView: View {
     }
 
     /// A pane's first text field would otherwise grab focus with its text selected when the pane
-    /// opens. Drops that initial first responder once the pane has laid out (only when a text
-    /// editor holds it and the sidebar search is idle), so focus follows the user's own click.
+    /// opens. Once the pane has laid out, focus moves back to the sidebar search field, unless the
+    /// search field already holds focus.
     @MainActor
     private func clearInitialTextFocus() async {
         try? await Task.sleep(for: .milliseconds(60))
         guard model.query.isEmpty, let window = NSApp.keyWindow, window.firstResponder is NSText else { return }
-        window.makeFirstResponder(nil)
+        if let editor = window.firstResponder as? NSTextView,
+           (editor.delegate as? NSView)?.identifier == SettingsSearchField.identifier { return }
+        searchFocusToken += 1
     }
 
     private var footer: some View {
@@ -192,6 +242,62 @@ struct SettingsView: View {
         .lineLimit(1)
         .padding(.horizontal, 22).padding(.vertical, 8)
     }
+}
+
+/// One search result: opens its pane; the keyboard-highlighted row is tinted.
+private struct SearchHitRow: View {
+    @Environment(\.clippyTokens) private var tokens
+    let hit: SettingsSearchHit
+    let isHighlighted: Bool
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(hit.entry.title)
+                Text(SettingsPaneID(rawValue: hit.entry.pane)?.title ?? hit.entry.pane)
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+            .background(isHighlighted ? tokens.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(FocusRingButtonStyle())
+    }
+}
+
+/// Hidden buttons that give Cmd-1 through Cmd-9 to the first nine panes, in sidebar order.
+private struct PaneShortcutButtons: View {
+    let select: (SettingsPaneID) -> Void
+
+    var body: some View {
+        let panes = Array(SettingsPaneSection.all.flatMap(\.panes).prefix(9))
+        ZStack {
+            ForEach(Array(panes.enumerated()), id: \.offset) { index, pane in
+                Button(pane.title) { select(pane) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Hands the hosting window to `onWindow` (used to close it on Esc).
+private struct SettingsWindowReader: NSViewRepresentable {
+    let onWindow: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        Task { @MainActor in onWindow(view.window) }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 /// Sidebar row: title in the primary text token so labels stay legible (>= 4.5:1) on every

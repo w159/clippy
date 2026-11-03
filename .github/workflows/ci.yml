@@ -73,7 +73,7 @@ jobs:
                   node-version: "22"
 
             # Drives the real panel in a real window with real key and mouse
-            # events (PanelHarnessTests): search, Return mid-typing, typing from
+            # events (PanelHarnessTests, SettingsKeyboardHarnessTests): search, Return mid-typing, typing from
             # the list, no results; and saves light and dark screenshots of the
             # panel, Settings and onboarding.
             - name: UI harness
@@ -83,7 +83,7 @@ jobs:
               run: |
                   set -o pipefail
                   status=0
-                  swift test --filter PanelHarnessTests 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
+                  swift test --filter 'PanelHarnessTests|SettingsKeyboardHarnessTests' 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
                   grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/harness.log" | tail -1 || true
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -100 || true
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
