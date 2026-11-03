@@ -334,7 +334,12 @@ final class PanelHarnessTests: XCTestCase {
 
         // Cmd-R opens the inline rename for the same clip; typing and Return commit it.
         pressCommand("r")
-        pump(until: "Cmd-R put focus in the rename field") { self.focusIsInTextField }
+        pump(until: "Cmd-R put focus in the rename field") {
+            (self.window.firstResponder as? NSTextView)?.delegate is FocusSelectTextField
+        }
+        pump(seconds: 0.3)
+        XCTAssertTrue((window.firstResponder as? NSTextView)?.delegate is FocusSelectTextField,
+                      "the rename field keeps focus instead of the list taking it back")
         typeText("kw")
         pressReturn()
         pump(until: "Return saved the typed title") {
