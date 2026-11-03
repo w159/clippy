@@ -4,6 +4,7 @@ import SwiftUI
 struct IconButton: View {
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
     @State private var hovered = false
     @FocusState private var focused: Bool
     let systemImage: String
@@ -23,6 +24,9 @@ struct IconButton: View {
         self.action = action
     }
 
+    /// Dims for both the explicit state and an enclosing `.disabled(...)`.
+    private var dimmed: Bool { state == .disabled || !isEnabled }
+
     @ViewBuilder
     var body: some View {
         if glass {
@@ -37,10 +41,10 @@ struct IconButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: 14, weight: .medium))
                 .frame(minWidth: 28, minHeight: 28)
-                .foregroundStyle(state == .disabled ? tokens.textSecondary : tokens.textPrimary)
+                .foregroundStyle(dimmed ? tokens.textSecondary : tokens.textPrimary)
                 .background((hovered || state == .pressed || state == .selected) ? tokens.surfaceInset : .clear, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
                 .overlay { if focused || state == .focused { RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.focusRing, lineWidth: 2).padding(-2) } }
-                .opacity(state == .disabled ? 0.65 : 1)
+                .opacity(dimmed ? 0.65 : 1)
                 .contentShape(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
         }
         .focused($focused)

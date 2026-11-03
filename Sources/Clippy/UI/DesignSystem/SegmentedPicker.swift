@@ -61,6 +61,7 @@ struct ClippySegmentedPicker<Value: Hashable>: View {
             .font(.system(size: small ? 11 : 13, weight: isSelected ? .semibold : .regular))
             .foregroundStyle(isSelected ? tokens.onAccent : tokens.textSecondary)
             .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, small ? 8 : 10)
             .padding(.vertical, small ? 2 : 4)

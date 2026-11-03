@@ -22,7 +22,6 @@ struct OCRSettingsPane: View {
                         SegmentOption(value: OCRPreferences.Level.fast, title: "Fast"),
                         SegmentOption(value: OCRPreferences.Level.accurate, title: "Accurate"),
                     ])
-                    .frame(minWidth: 120, maxWidth: 180)
                     .onChange(of: level) { _, value in OCRPreferences.level = value }
                 }
                 Divider()

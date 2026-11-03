@@ -57,7 +57,7 @@ struct AIProviderDetailSection: View {
                 SettingsNote(AIProviderSettingsLogic.effectiveURLText(descriptor: descriptor, instance: effectiveDraft)).padding(.vertical, 6)
             }
             if let url = URL(string: descriptor.docsURL), !descriptor.docsURL.isEmpty {
-                Button("Open provider docs") { openURL(url) }.buttonStyle(.link).padding(.vertical, 6)
+                Button("Open provider docs") { openURL(url) }.buttonStyle(.plain).foregroundStyle(tokens.accentText).padding(.vertical, 6)
             }
             if let notes = descriptor.userFacingNotes { SettingsNote(notes).padding(.vertical, 8) }
         }

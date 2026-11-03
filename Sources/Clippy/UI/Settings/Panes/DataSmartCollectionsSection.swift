@@ -75,7 +75,7 @@ struct SmartCollectionEditorSheet: View {
                             Toggle(token.rawValue.capitalized, isOn: Binding(
                                 get: { draft.kinds.contains(token) },
                                 set: { if $0 { draft.kinds.insert(token) } else { draft.kinds.remove(token) } }))
-                                .toggleStyle(.checkbox)
+                                .toggleStyle(AccentToggleStyle()).toggleStyle(.checkbox)
                         }
                     }
                 }

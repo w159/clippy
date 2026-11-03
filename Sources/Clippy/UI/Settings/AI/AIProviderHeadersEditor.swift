@@ -37,7 +37,7 @@ struct AIProviderHeadersEditor: View {
                             }
                             header.isSecret = secret
                         }))
-                        .toggleStyle(.checkbox).fixedSize()
+                        .toggleStyle(AccentToggleStyle()).toggleStyle(.checkbox).fixedSize()
                         Button {
                             draft.headers.removeAll { $0.id == header.id }
                         } label: { Image(systemName: "minus.circle") }
