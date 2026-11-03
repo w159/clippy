@@ -27,7 +27,7 @@ final class ClipWindowLoader: Sendable {
     /// window the panel shows. The INDEXED BY hint is required: without it the
     /// planner sorts in a temp b-tree and reads createdAt from every row.
     static let stampsSQL = """
-        SELECT c.id, COALESCE(v.version, 0) AS rowVersion FROM clips c INDEXED BY clips_on_createdAt
+        SELECT c.id, COALESCE(v.version, 0) AS rowVersion FROM clips c INDEXED BY index_clips_on_createdAt
         LEFT JOIN clip_version v ON v.clipID = c.id
         WHERE c.id IN (SELECT clipID FROM clip_category
                        UNION SELECT id FROM (SELECT id FROM clips ORDER BY createdAt DESC, id DESC LIMIT ?))

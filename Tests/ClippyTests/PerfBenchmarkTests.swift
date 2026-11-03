@@ -60,6 +60,30 @@ final class PerfBenchmarkTests: XCTestCase {
         return best
     }
 
+    /// Prints each search tier's query plan and its own best-of-5 time, so a CI run shows what the
+    /// local SQLite chose for each statement.
+    private func printTierPlans(_ db: ClipDatabase, queries: [String]) throws {
+        for query in queries {
+            let tiers = try db.dbQueue.read { conn -> [ClipDatabase.SearchStatement] in
+                var warnings: [QueryWarning] = []
+                let parsed = ClipQueryParser.parse(query, now: Date(), calendar: .current)
+                return try ClipDatabase.plan(parsed, db: conn, warnings: &warnings).tiers
+            }
+            for (index, tier) in tiers.enumerated() {
+                let sql = tier.sql + " LIMIT ? OFFSET ?"
+                let args = StatementArguments(tier.arguments + [300 as DatabaseValueConvertible, 0])
+                let detail = try db.dbQueue.read { conn in
+                    try Row.fetchAll(conn, sql: "EXPLAIN QUERY PLAN " + sql, arguments: args)
+                        .map { $0["detail"] as String }.joined(separator: " | ")
+                }
+                print("PERF plan \(query) tier \(index + 1): \(detail)")
+                _ = try ms("tier \(index + 1) alone '\(query)'") {
+                    _ = try db.dbQueue.read { try Int64.fetchAll($0, sql: sql, arguments: args) }
+                }
+            }
+        }
+    }
+
     /// Search over rich-text rows: a plain word with plenty of whole-word matches must not pay for the
     /// fragment scan, and a rare fragment (full LIKE scan) must stay interactive.
     func testSearchBenchmarksOn10kRichTextClips() throws {
@@ -248,6 +272,8 @@ extension PerfBenchmarkTests {
         let word = try ms("rich 50k: plain word 'invoice'") { XCTAssertEqual(try db.search(matching: "invoice", limit: 300).hits.count, 300) }
         let fragment = try ms("rich 50k: common fragment 'nvoic'") { XCTAssertEqual(try db.search(matching: "nvoic", limit: 300).hits.count, 300) }
         let miss = try ms("rich 50k: no match 'zqxjv'") { XCTAssertEqual(try db.search(matching: "zqxjv", limit: 300).hits.count, 0) }
+
+        try printTierPlans(db, queries: ["invoice", "zqxjv"])
 
         XCTAssertLessThan(word, 500 * Self.ciSlack, "50k rich-text plain word budget")
         XCTAssertLessThan(fragment, 500 * Self.ciSlack, "50k rich-text common fragment budget")
