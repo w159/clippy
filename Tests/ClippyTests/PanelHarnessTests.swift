@@ -224,10 +224,10 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Screenshots and diagnostics
 
-    private func screenshot(_ name: String) {
+    private func screenshot(_ name: String, compositedOnly: Bool = false) {
         guard let view = window.contentView else { return }
         pump(seconds: 0.3)
-        if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+        if !compositedOnly, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: rep)
             if let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: shotDirectory.appendingPathComponent("\(name).png"))
@@ -334,7 +334,8 @@ final class PanelHarnessTests: XCTestCase {
         for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
             show(SettingsView(), size: NSSize(width: 1000, height: 700), appearance: appearance)
             pump(seconds: 0.8)
-            screenshot("07-settings-\(suffix)")
+            // cacheDisplay cannot draw the split view's sidebar material.
+            screenshot("07-settings-\(suffix)", compositedOnly: true)
             window.orderOut(nil)
 
             let defaults = try XCTUnwrap(UserDefaults(suiteName: "clippy.harness.onboarding.\(UUID())"))

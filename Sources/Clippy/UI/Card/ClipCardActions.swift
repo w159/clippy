@@ -40,16 +40,9 @@ extension ClipCardView {
                 Button("Delete", role: .destructive, action: onDelete)
             }
         } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: iconSize, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .frame(width: 28, height: 24)
-                .contentShape(Rectangle())
+            RowOverflowLabel(font: .system(size: iconSize, weight: .medium), width: 28)
         }
-        .menuStyle(.button)
-        .buttonStyle(.borderless)
-        .menuIndicator(.hidden)
-        .foregroundStyle(tokens.textSecondary)
+        .chromeMenuStyle()
         .help("More actions")
         .accessibilityLabel("More Actions")
     }
@@ -73,9 +66,7 @@ extension ClipCardView {
                             .frame(width: 28, height: 24)
                             .contentShape(Rectangle())
                     }
-                    .menuStyle(.button)
-                    .buttonStyle(.borderless)
-                    .menuIndicator(.hidden)
+                    .chromeMenuStyle()
                     .foregroundStyle(tokens.textSecondary)
                     .help("AI actions")
                     .accessibilityLabel("AI Actions")
@@ -91,17 +82,7 @@ extension ClipCardView {
     }
 
     func cardActionButton(_ symbol: String, help: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
-        Button(role: role, action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: iconSize, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-                .frame(width: 28, height: 24)
-                .contentShape(Rectangle())
-                .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(role == .destructive ? tokens.danger : tokens.textSecondary)
-        .help(help)
-        .accessibilityLabel(help)
+        RowActionButton(systemImage: symbol, help: help, isDestructive: role == .destructive,
+                        font: .system(size: iconSize, weight: .medium), width: 28, action: action)
     }
 }

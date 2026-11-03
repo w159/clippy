@@ -12,7 +12,7 @@ struct OnboardingView: View {
                 header
                 Divider()
                 HStack(spacing: 0) {
-                    stepList.frame(width: 190)
+                    stepList.frame(width: 212)
                     Divider()
                     OnboardingStepContent(viewModel: viewModel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -45,6 +45,7 @@ struct OnboardingView: View {
                     Image(systemName: icon(for: step)).frame(width: 18)
                         .foregroundStyle(step == viewModel.model.current ? tokens.accentText : tokens.textSecondary)
                     Text(step.title)
+                        .lineLimit(1)
                         .fontWeight(step == viewModel.model.current ? .semibold : .regular)
                         .foregroundStyle(step == viewModel.model.current ? tokens.textPrimary : tokens.textSecondary)
                     Spacer(minLength: 0)

@@ -18,6 +18,7 @@ struct PanelHeaderView: View {
     @ObservedObject private var grid = GridPreferences.shared
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var overflowHovered = false
 
     private let settings = AppSettings.shared
 
@@ -90,9 +91,13 @@ struct PanelHeaderView: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 14, weight: .medium))
                 .frame(minWidth: 28, minHeight: 28)
+                .foregroundStyle(tokens.textPrimary)
+                .background(overflowHovered ? tokens.surfaceInset : .clear,
+                            in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+                .contentShape(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+                .onHover { overflowHovered = $0 }
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .chromeMenuStyle()
         .fixedSize()
         .help("Density, columns and settings")
         .accessibilityLabel("More")

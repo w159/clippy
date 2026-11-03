@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @StateObject private var model = SettingsShellModel()
+    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
 
     var body: some View {
         GeometryReader { proxy in
@@ -95,6 +96,7 @@ struct SettingsView: View {
             guard let newValue else { return }
             model.selection = newValue
             model.compactShowsPane = true
+            seenPanes = SettingsSeenPanes.marking(newValue, in: seenPanes)
         })
     }
 
@@ -170,13 +172,14 @@ struct SettingsView: View {
 /// theme preset instead of the dimmed system sidebar secondary style.
 private struct PaneRow: View {
     @Environment(\.clippyTokens) private var tokens
+    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     let pane: SettingsPaneID
 
     var body: some View {
         Label {
             HStack(spacing: tokens.metrics.space.two) {
                 Text(pane.title).foregroundStyle(tokens.textPrimary)
-                if pane.isNew { NewPill() }
+                if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
             }
         } icon: {
             Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
