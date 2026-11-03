@@ -91,7 +91,8 @@ struct SettingsRow<Control: View>: View {
                 HStack(spacing: tokens.metrics.space.two) { control }
                 VStack(alignment: .leading, spacing: tokens.metrics.space.two) { control }
             }
-            .toggleStyle(.switch)
+            // The accent style sits closest to the toggle and falls through to the switch style.
+            .toggleStyle(AccentToggleStyle()).toggleStyle(.switch)
             .lineLimit(1)
         }
         .padding(.vertical, tokens.metrics.space.three)

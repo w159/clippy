@@ -2,7 +2,7 @@
 
 ## Unreleased - UI and UX overhaul (branch `claude/ui-ux-overhaul`)
 
-Built and tested on macOS in CI ([run 41558298133](https://github.com/w159/clippy/actions/runs/41558298133), commit `c008fba`): `swift build`, 1340 XCTests (4 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of the panel, Settings, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).
+Built and tested on macOS in CI ([run 41568738501](https://github.com/w159/clippy/actions/runs/41568738501), commit `03d54ee`): `swift build`, 1349 XCTests (7 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of every Settings pane, every panel pane, the clip editor, every sheet, the palette, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run). The Settings toggle fix listed last below landed in the commit after that run and has its own CI run.
 
 ### Search
 
@@ -26,6 +26,25 @@ Search was broken in six ways. The first CI run on the old code with the new tes
 - White text on the gold accent measured about 2.2:1. Accent buttons (Clear Search, Continue, Back Up Now, Run, Select and the AI and 1Password actions) now use `AccentButtonStyle`, which picks a black or white label by WCAG contrast for every theme and custom accent (at least 4.5:1, tested for every preset and accent theme) and stays filled when the window is inactive, so Continue no longer reads as disabled on first launch.
 - Onboarding: the welcome step introduces the app (what it finds, keeps and pastes) under a hero icon. The footer has one filled action: Skip for now is a text button and the welcome step drops Skip this step, which meant the same as Continue. Step names no longer wrap.
 - Settings: the New pill on a pane clears once that pane has been opened. The search field's App chip uses a window symbol, and the sidebar divider uses the system separator color.
+
+### Every screen, reviewed on macOS
+
+The CI harness now renders every Settings pane, every panel pane (Assistant, AI Actions, 1Password, Paste Stack, Scripts, Snippets), the clip editor, the category, smart collection, snippet and AI action sheets, the command palette and the AI actions manager, in light and dark. Two reviews of those screenshots ([run 41561854977](https://github.com/w159/clippy/actions/runs/41561854977) and [run 41565269109](https://github.com/w159/clippy/actions/runs/41565269109)) found the defects fixed here. The clip editor shot uses an injected in-memory store; the harness no longer touches the on-disk history.
+
+- Settings tinted the whole window with the gold accent, so text buttons and links (About links, Copy diagnostics, Test connection, Export, Import, Reveal in Finder, Clear cache, Refresh) read at about 2:1 on the light surface. The window now uses `accentInk`, a darker accent that meets 4.5:1 on every surface for every preset and accent theme (tested). Toggles and sliders keep the bright accent so they match the panel and sheets.
+- Segmented pickers drew white on gold. They are now drawn from tokens (`ClippySegmentedPicker`) with a contrast-picked label, and no segment truncates ("Accurate" in OCR read "Acc...").
+- Sheets and editors used system blue for primary buttons, toggles, segmented controls and sliders. Save, Create and the other default actions use the accent button style; the controls use the accent.
+- The Settings sidebar showed the selected pane in system blue. Selection is a token fill, with the selected state exposed to VoiceOver and arrow keys still moving between panes.
+- Smart collection sheet: the title and labels were clipped and the kind checkboxes truncated ("T...", "Im..."). The kinds wrap in a flow layout.
+- Clip editor: the line-number gutter rule ran the full window height, through the title field and footer.
+- Snippets panel: footer buttons truncated and the search field sat on the window edge. Import and export are one menu.
+- Assistant with AI off showed the header, a provider banner, the AI-off message and an active composer at once. It now shows one empty state with Open Settings. The Scripts panel empty state had near-white text on white.
+- AI Actions: every built-in offered Restore, including unmodified ones. Restore appears only on a changed action (`AIAction.isModifiedFromDefault`, tested). A new action no longer shows "The prompt template is empty" in red before any input.
+- Settings no longer opens a pane with its first text field focused and selected.
+- Capture: "Store file contents up to" showed no value when the stored size was not a menu option; 50 MB is an option and the picker always shows the value. Preview cache reads "0 bytes", not "Zero KB". Snippets: "Granted" no longer truncates. Scripts settings showed its empty state twice.
+- Paste stack export and clear look disabled while the stack is empty, and 1Password's add button is disabled while the CLI is missing or signed out, so no control looks usable when it does nothing. Icon buttons dim whenever they are disabled.
+- AI provider "Open provider docs" used the system link blue; it uses the accent text color.
+- Settings rows forced the plain switch style, so their toggles kept the dark `accentInk` tint and looked brown in light mode while every other toggle was gold. Rows now apply the accent toggle style before the switch style.
 
 ### Design system
 
