@@ -29,11 +29,14 @@ final class QuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPa
     private let temp = QuickLookTempFiles()
     private var items: [ClipQuickLookItem] = []
     private var textWindow: NSWindow?
+    /// The window that was key when the preview opened; key goes back to it on close.
+    private weak var returnWindow: NSWindow?
 
     /// Opens the preview for the clip, or closes it when already open.
     func toggle(for clip: Clip) {
         if isVisible { close(); return }
         guard !CardSensitivity.isSensitive(clip) else { return }
+        returnWindow = NSApp.keyWindow
         switch clip.contentKind {
         case .image, .file: openPanel(for: clip)
         case .text: openTextSheet(for: clip)
@@ -49,6 +52,8 @@ final class QuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPa
         textWindow?.close()
         textWindow = nil
         release()
+        if let returnWindow, returnWindow.isVisible { returnWindow.makeKey() }
+        returnWindow = nil
         PanelFocusRequest.shared.requestList()
     }
 
