@@ -74,6 +74,7 @@ extension CategorySidePane {
 
     var historyRow: some View {
         let count = historyCount ?? SidebarCounts.displayedHistoryCount(store: store)
+        let activate = { focus = .history; selection = .history }
         return SidebarRow(
             rowID: .history, focus: $focus, title: "History", tint: settings.accentColor, count: count,
             isSelected: selection == .history, help: "All history (\u{2318}1)",
@@ -81,7 +82,8 @@ extension CategorySidePane {
         ) {
             Image(systemName: "clock").font(.system(size: 12, weight: .semibold))
         }
-        .onTapGesture { focus = .history; selection = .history }
+        .onTapGesture(perform: activate)
+        .accessibilityAction(.default, activate)
         .sidebarDrop(row: .history, hover: $hoverRow, perform: performDrop)
     }
 
@@ -89,6 +91,10 @@ extension CategorySidePane {
         let categoryID = category.id ?? -1
         let count = SidebarCounts.displayedCategoryCount(store: store, categoryID: categoryID)
         let renaming = renamingID == categoryID
+        let activate = {
+            focus = .category(categoryID)
+            selection = selection == .category(categoryID) ? .history : .category(categoryID)
+        }
         return SidebarRow(
             rowID: .category(categoryID), focus: $focus, title: category.name, tint: Color(hexString: category.colorHex),
             count: count, isSelected: selection == .category(categoryID), help: category.name,
@@ -101,10 +107,8 @@ extension CategorySidePane {
             categoryIcon(category)
         }
         .onTapGesture(count: 2) { beginRename(category) }
-        .onTapGesture {
-            focus = .category(categoryID)
-            selection = selection == .category(categoryID) ? .history : .category(categoryID)
-        }
+        .onTapGesture(perform: activate)
+        .accessibilityAction(.default, activate)
         .onDrag {
             dragState.begin(categoryID)
             return NSItemProvider(object: SidebarDragState.token(forCategory: categoryID) as NSString)
@@ -136,13 +140,15 @@ extension CategorySidePane {
         if tool == .scripts { count = scriptStore.scripts.count }
         if tool == .suggestions, !store.suggestions.isEmpty { count = store.suggestions.count }
         if tool == .pasteStack, PasteStack.shared.count > 0 { count = PasteStack.shared.count }
+        let activate = { focus = tool.rowID; selection = selection == tool.selection ? .history : tool.selection }
         return SidebarRow(
             rowID: tool.rowID, focus: $focus, title: tool.title, tint: tool.tint, count: count,
             isSelected: selection == tool.selection, help: tool.help, accessibilityText: tool.accessibilityText
         ) {
             Image(systemName: tool.symbol).font(.system(size: 12, weight: .semibold))
         }
-        .onTapGesture { focus = tool.rowID; selection = selection == tool.selection ? .history : tool.selection }
+        .onTapGesture(perform: activate)
+        .accessibilityAction(.default, activate)
     }
 
     var newCategoryRow: some View {
@@ -153,6 +159,7 @@ extension CategorySidePane {
             Image(systemName: "plus").font(.system(size: 12, weight: .semibold))
         }
         .onTapGesture { isCreating = true }
+        .accessibilityAction(.default) { isCreating = true }
     }
 
     /// Zone after the last category: dropping a dragged category here moves it to the end.

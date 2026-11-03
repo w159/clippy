@@ -45,6 +45,7 @@ extension ClipCardView {
                 .font(.system(size: iconSize - 1, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(kindHue)
+                .accessibilityHidden(true)
                 .help(kind.label)
             if variant.kept.contains(.appIcon) { sourceIcon }
             if variant.kept.contains(.appName), let name = clip.sourceAppName {
@@ -59,15 +60,27 @@ extension ClipCardView {
                 Image(systemName: "textformat")
                     .font(.system(size: iconSize - 1))
                     .foregroundStyle(cardSecondaryText)
+                    .accessibilityHidden(true)
                     .help("Has rich formatting")
             }
-            if model.isSensitive { Image(systemName: "lock.fill").font(.system(size: iconSize - 2)).foregroundStyle(cardSecondaryText) }
+            if model.isSensitive { lockGlyph }
             if model.matchedInOCR { ClippyBadge("OCR match") }
             Spacer(minLength: 4)
-            if isPinned { Image(systemName: "pin.fill").font(.system(size: iconSize - 1)).foregroundStyle(tokens.accentText) }
+            if isPinned { pinGlyph }
             if let digit = model.quickPasteDigit { KeyCap("\u{2325}\u{2318}\(digit)") }
             timestampText
         }
+    }
+
+    /// Decorative: the card label and value already announce sensitive and pinned state.
+    var lockGlyph: some View {
+        Image(systemName: "lock.fill").font(.system(size: iconSize - 2)).foregroundStyle(cardSecondaryText)
+            .accessibilityHidden(true)
+    }
+
+    var pinGlyph: some View {
+        Image(systemName: "pin.fill").font(.system(size: iconSize - 1)).foregroundStyle(tokens.accentText)
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder

@@ -156,7 +156,7 @@ struct ReorderDropDestinationModifier<ID: LosslessStringConvertible & Equatable>
                         .fill(Color.accentColor)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
-                        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: draggingOver)
+                        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: draggingOver)
                 }
             }
             .dropDestination(for: String.self) { items, _ in
@@ -166,7 +166,7 @@ struct ReorderDropDestinationModifier<ID: LosslessStringConvertible & Equatable>
                       let draggedID = ID(raw),
                       draggedID != id
                 else { return false }
-                withAnimation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false)) {
+                withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) {
                     onMove(draggedID, id)
                 }
                 return true
@@ -220,7 +220,7 @@ struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Eq
                         .fill(Color.accentColor)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
-                        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: isTargeted)
+                        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: isTargeted)
                 }
             }
             .dropDestination(for: String.self) { items, _ in
@@ -229,7 +229,7 @@ struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Eq
                       let raw = parseReorderToken(token, expectedKind: kind),
                       let draggedID = ID(raw)
                 else { return false }
-                withAnimation(reduceMotion ? nil : ClippyMotion.animation(.standard, reduce: false)) {
+                withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) {
                     onMove(draggedID)
                 }
                 return true

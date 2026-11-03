@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @StateObject private var model: SettingsShellModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     @FocusState private var paneListFocused: Bool
     @State private var hostWindow: NSWindow?
@@ -196,7 +197,7 @@ struct SettingsView: View {
                     .frame(maxWidth: model.selection.usesFormColumn ? SettingsPaneID.columnMaxWidth : .infinity, maxHeight: .infinity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onChange(of: model.jumpToken) { _, _ in
-                        if let target = model.flashRow { withAnimation { proxy.scrollTo(target, anchor: .center) } }
+                        if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
                     }
             }
             Divider()

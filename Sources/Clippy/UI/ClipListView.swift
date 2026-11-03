@@ -204,7 +204,7 @@ struct ClipListView: View {
         .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
-                .strokeBorder(tokens.cardBorder, lineWidth: 1)
+                .strokeBorder(designTokens.stroke, lineWidth: 1)
         )
         .tint(tokens.accent)
         .overlay { paletteOverlay }
