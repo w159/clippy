@@ -99,11 +99,10 @@ extension TextClipEditor {
                 Text("No actions configured.")
             }
         } label: {
-            Label("AI", systemImage: "sparkles")
+            ChromeMenuLabel("AI", systemImage: "sparkles")
         }
-        // Native bordered pull-down so the menu reads as a control in a titled
-        // editor rather than a borderless web-style affordance.
-        .menuStyle(.button)
+        .chromeMenuStyle()
         .fixedSize()
+        .accessibilityLabel("AI actions")
     }
 }

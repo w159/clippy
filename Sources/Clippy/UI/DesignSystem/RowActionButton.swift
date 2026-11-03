@@ -62,3 +62,43 @@ struct RowOverflowLabel: View {
             .onHover { hovered = $0 }
     }
 }
+
+/// Label for a `Menu` drawn with `chromeMenuStyle()`: an icon alone (secondary at rest,
+/// primary on hover) or a neutral bordered chip with a title, optional glyph and chevron.
+struct ChromeMenuLabel: View {
+    @Environment(\.clippyTokens) private var tokens
+    @State private var hovered = false
+    var title: String?
+    var systemImage: String?
+    var font: Font = .system(size: 14, weight: .medium)
+
+    init(_ title: String? = nil, systemImage: String? = nil, font: Font = .system(size: 14, weight: .medium)) {
+        self.title = title
+        self.systemImage = systemImage
+        self.font = font
+    }
+
+    var body: some View {
+        if let title {
+            HStack(spacing: tokens.metrics.space.one) {
+                if let systemImage { Image(systemName: systemImage).imageScale(.small) }
+                Text(title).lineLimit(1)
+                Image(systemName: "chevron.down").imageScale(.small).foregroundStyle(tokens.textSecondary)
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(tokens.textPrimary)
+            .padding(.horizontal, tokens.metrics.space.two)
+            .padding(.vertical, tokens.metrics.space.one)
+            .background(tokens.surfaceElevated.opacity(0.72), in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+            .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.stroke, lineWidth: 0.75))
+            .contentShape(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+        } else if let systemImage {
+            Image(systemName: systemImage)
+                .font(font)
+                .frame(minWidth: 24, minHeight: 24)
+                .contentShape(Rectangle())
+                .foregroundStyle(hovered ? tokens.textPrimary : tokens.textSecondary)
+                .onHover { hovered = $0 }
+        }
+    }
+}

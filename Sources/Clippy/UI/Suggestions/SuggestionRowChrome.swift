@@ -69,10 +69,9 @@ struct SuggestionRowChrome<Card: View>: View {
                 Button("Find Similar Clips", action: onFindSimilar)
             }
         } label: {
-            Image(systemName: "ellipsis.circle").frame(minWidth: 24, minHeight: 24)
+            ChromeMenuLabel(systemImage: "ellipsis.circle", font: .body)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .chromeMenuStyle()
         .fixedSize()
         .opacity(hovered || isTop ? 1 : 0.55)
         .help("Suggestion actions")
