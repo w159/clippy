@@ -45,7 +45,6 @@ struct ClipRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Capsule().fill(hue).frame(width: 3).padding(.vertical, 6).accessibilityHidden(true)
             leadingGlyph
             VStack(alignment: .leading, spacing: 2) {
                 if isRenaming { renameField } else { contentLine }
@@ -54,13 +53,15 @@ struct ClipRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             trailingSlot
         }
+        .padding(.leading, 6)
         .padding(.trailing, 8)
         .frame(minHeight: comfortable ? 48 : GridMetrics.compactRowHeight)
         .background(rowBackground)
         .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
-                .strokeBorder(tokens.accent, lineWidth: model.isSelected ? 2 : 0)
+                // A hairline that sharpens the selection fill's edge; the fill carries the state.
+                .strokeBorder(tokens.accent.opacity(0.45), lineWidth: model.isSelected ? 1 : 0)
         )
         .contentShape(Rectangle())
         .onHover { hovering in
@@ -217,10 +218,9 @@ struct ClipRowView: View {
                 if let extract = actions.extractText { Button("Extract Text", action: extract) }
                 if let similar = actions.findSimilar { Button("Find Similar", action: similar) }
             } label: {
-                Image(systemName: "ellipsis.circle").frame(width: 24, height: 24).contentShape(Rectangle())
+                RowOverflowLabel()
             }
-            .menuStyle(.button).buttonStyle(.borderless).menuIndicator(.hidden)
-            .foregroundStyle(tokens.textSecondary)
+            .chromeMenuStyle()
             .help("More actions")
             .accessibilityLabel("More Actions")
             rowButton("trash", "Delete", actions.delete, destructive: true)
@@ -228,12 +228,6 @@ struct ClipRowView: View {
     }
 
     private func rowButton(_ symbol: String, _ help: String, _ action: @escaping () -> Void, destructive: Bool = false) -> some View {
-        Button(role: destructive ? .destructive : nil, action: action) {
-            Image(systemName: symbol).frame(width: 24, height: 24).contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(destructive ? tokens.danger : tokens.textSecondary)
-        .help(help)
-        .accessibilityLabel(help)
+        RowActionButton(systemImage: symbol, help: help, isDestructive: destructive, action: action)
     }
 }

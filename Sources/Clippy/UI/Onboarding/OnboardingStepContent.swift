@@ -57,9 +57,39 @@ struct OnboardingStepContent: View {
     }
 
     private var welcome: some View {
-        heading("Your clipboard, remembered",
-                "Clippy keeps what you copy so you can paste it again. This short tour sets up permissions, optional features and your shortcut. " +
-                    "Every step can be skipped and changed later in Settings.")
+        VStack(alignment: .leading, spacing: 20) {
+            Image(nsImage: StatusBarIcon.image())
+                .renderingMode(.template)
+                .resizable()
+                .frame(width: 30, height: 30)
+                .foregroundStyle(tokens.accent)
+                .frame(width: 60, height: 60)
+                .background(tokens.selection, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityHidden(true)
+            heading("Your clipboard, remembered",
+                    "Clippy keeps what you copy so you can paste it again. This short tour sets up permissions, optional features and your shortcut. " +
+                        "Every step can be skipped and changed later in Settings.")
+            VStack(alignment: .leading, spacing: 12) {
+                welcomeFeature("magnifyingglass", "Find anything you copied", "Search text, links, files and the words inside images.")
+                welcomeFeature("folder", "Keep what matters", "File clips into categories so they stay out of the way of history.")
+                welcomeFeature("keyboard", "Paste without leaving the keyboard", "Open the panel with your shortcut, pick a clip, press Return.")
+            }
+        }
+    }
+
+    private func welcomeFeature(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.body.weight(.medium))
+                .foregroundStyle(tokens.accentText)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body.weight(.semibold)).foregroundStyle(tokens.textPrimary)
+                Text(detail).font(.callout).foregroundStyle(tokens.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var accessibility: some View {

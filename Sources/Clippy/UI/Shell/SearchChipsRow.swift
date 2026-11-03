@@ -78,7 +78,7 @@ struct SearchChipsRow: View {
 
     private var appMenu: some View {
         let selected = filter.apps
-        return menuChip(title: selected.first ?? "App", symbol: "app", active: !selected.isEmpty, count: selected.count > 1 ? selected.count : nil) {
+        return menuChip(title: selected.first ?? "App", symbol: "macwindow", active: !selected.isEmpty, count: selected.count > 1 ? selected.count : nil) {
             ForEach(appNames, id: \.self) { name in
                 Button {
                     query = editor.toggling(app: name, in: query)
@@ -126,9 +126,9 @@ struct SearchChipsRow: View {
             .padding(.vertical, tokens.metrics.space.one)
             .background(active ? tokens.selection : tokens.surfaceElevated.opacity(0.72), in: Capsule())
             .overlay(Capsule().strokeBorder(active ? tokens.accentText : tokens.stroke, lineWidth: active ? 1.5 : 0.75))
+            .contentShape(Capsule())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .chromeMenuStyle()
         .fixedSize()
         .accessibilityLabel(title)
         .accessibilityValue(active ? "Active" : "Off")
