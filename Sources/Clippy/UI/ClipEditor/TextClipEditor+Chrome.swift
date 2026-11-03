@@ -37,6 +37,7 @@ extension TextClipEditor {
             .keyboardShortcut(.cancelAction)
             .fixedSize()
             Button("Save") { if save() { onClose() } }
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
                 .fixedSize()
                 .disabled(!isDirty || clipDeleted)

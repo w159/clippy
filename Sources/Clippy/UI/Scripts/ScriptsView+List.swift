@@ -119,8 +119,9 @@ extension ScriptsView {
     var scriptRows: some View {
         ScrollView {
             LazyVStack(spacing: 2) {
-                if filteredScripts.isEmpty && !isDraft {
-                    Text(searchQuery.isEmpty ? "No scripts yet. Click + to create one." : "No scripts match")
+                if filteredScripts.isEmpty && !isDraft && !(searchQuery.isEmpty && store.scripts.isEmpty) {
+                    // With no scripts at all the detail pane already shows the empty state.
+                    Text("No scripts match")
                         .font(.caption)
                         .foregroundStyle(tokens.textSecondary)
                         .padding(.vertical, 16)

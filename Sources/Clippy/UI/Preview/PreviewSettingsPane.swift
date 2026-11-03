@@ -40,7 +40,7 @@ struct PreviewSettingsPane: View {
                 Text("Comma separated. Leave the first empty to allow every site not in the second list.")
                     .font(.caption).foregroundStyle(tokens.textSecondary)
                 HStack {
-                    Text("Cache: \(ByteCountFormatter.string(fromByteCount: Int64(cacheBytes), countStyle: .file))")
+                    Text("Cache: \(Self.cacheLabel(cacheBytes))")
                     Spacer()
                     Button("Clear cache") {
                         LinkPreviewService.shared.clearCache()
@@ -54,6 +54,14 @@ struct PreviewSettingsPane: View {
             LinkPreviewPreferences.allowHosts = Self.hosts(allowText)
             LinkPreviewPreferences.denyHosts = Self.hosts(denyText)
         }
+    }
+
+    /// Cache size as "0 KB" rather than the formatter's default "Zero KB".
+    private static func cacheLabel(_ bytes: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowsNonnumericFormatting = false
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 
     private static func hosts(_ text: String) -> [String] { text.split(separator: ",").map(String.init) }

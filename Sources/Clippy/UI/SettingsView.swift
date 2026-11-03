@@ -16,7 +16,7 @@ struct SettingsView: View {
         }
         .frame(minWidth: 640, minHeight: 480)
         .clippyDesignSystem()
-        .tint(settings.theme.accent)
+        .tint(ClippyTokens.resolve(from: settings.theme).accentInk)
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
@@ -135,6 +135,7 @@ struct SettingsView: View {
             ScrollViewReader { proxy in
                 SettingsPaneRegistry.view(for: model.selection)
                     .buttonStyle(.bordered)
+                    .task(id: model.selection) { await clearInitialTextFocus() }
                     .scrollContentBackground(.hidden)
                     .frame(maxWidth: model.selection.usesFormColumn ? SettingsPaneID.columnMaxWidth : .infinity, maxHeight: .infinity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -149,6 +150,16 @@ struct SettingsView: View {
         // The pane title lives in the window's title bar instead of a second header row, which
         // gives the content the vertical space the old row and dead title-bar band wasted.
         .navigationTitle(model.selection.title)
+    }
+
+    /// A pane's first text field would otherwise grab focus with its text selected when the pane
+    /// opens. Drops that initial first responder once the pane has laid out (only when a text
+    /// editor holds it and the sidebar search is idle), so focus follows the user's own click.
+    @MainActor
+    private func clearInitialTextFocus() async {
+        try? await Task.sleep(for: .milliseconds(60))
+        guard model.query.isEmpty, let window = NSApp.keyWindow, window.firstResponder is NSText else { return }
+        window.makeFirstResponder(nil)
     }
 
     private var footer: some View {
@@ -231,7 +242,7 @@ private struct ImportSummarySheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
-                Button("Apply", action: onApply).keyboardShortcut(.defaultAction)
+                Button("Apply", action: onApply).buttonStyle(.accent).keyboardShortcut(.defaultAction)
                     .disabled(pending.plan.changes.isEmpty && confirmed.isEmpty)
             }
         }

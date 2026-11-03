@@ -41,25 +41,12 @@ struct ScriptsPanelView: View {
 
     // MARK: - Empty state
 
+    /// Shared empty state: reads the environment tokens (which follow the view's color scheme),
+    /// not `settings.theme`, so the title stays legible in light and dark.
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "terminal")
-                .font(.system(size: 36, weight: .light))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tokens.textSecondary)
-            Text("No scripts yet")
-                .font(PanelTypography.body(settings).weight(.semibold))
-                .foregroundStyle(tokens.textPrimary)
-            Text("Add scripts in Settings to run them from here.")
-                .font(PanelTypography.metadata(settings))
-                .foregroundStyle(tokens.textSecondary)
-                .multilineTextAlignment(.center)
-            Button("Open Settings") { onOpenSettings() }
-                .controlSize(.small)
-                .buttonStyle(.bordered)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyState(systemImage: "terminal", title: "No scripts yet",
+                   message: "Add scripts in Settings to run them from here.",
+                   actionTitle: "Open Settings", action: onOpenSettings)
     }
 
     // MARK: - Script list

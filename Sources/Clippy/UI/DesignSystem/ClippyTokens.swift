@@ -28,6 +28,10 @@ struct ClippyTokens {
     let accent: Color
     /// Accessible accent foreground/link color.
     let accentText: Color
+    /// Accent darkened (light) or lightened (dark) until it reads at AA as text on every surface AND on
+    /// those surfaces under a tint-colored button fill. Used as the window `.tint` so system bordered and
+    /// tinted text buttons stay legible. Fills that carry `onAccent` still use `accent`.
+    let accentInk: Color
     /// Foreground with AA contrast on `accent`.
     let onAccent: Color
     /// Selected control surface, independent of focus.
@@ -79,6 +83,10 @@ struct ClippyTokens {
         let safePrimary = ContrastAudit.adjust(primary, against: allSurfaces, minimum: strongerMinimum)
         let safeSecondary = ContrastAudit.adjust(secondary, against: allSurfaces, minimum: strongerMinimum)
         let safeAccentText = ContrastAudit.adjust(accent, against: allSurfaces, minimum: strongerMinimum)
+        // Bordered/tinted controls draw their label in the tint over a faint tint-colored fill, so the ink
+        // must also clear AA on each surface mixed 25% toward the accent.
+        let tintedFills = allSurfaces.map { $0.mixed(with: accent, 0.25) }
+        let safeAccentInk = ContrastAudit.adjust(accent, against: allSurfaces + tintedFills, minimum: strongerMinimum)
         let maxContrastForeground = ContrastAudit.ratio(.black, on: accent) >= ContrastAudit.ratio(.white, on: accent) ? RGBA.black : RGBA.white
         let selection = ContrastAudit.adjust(selectionBase, against: [backgrounds[0]], minimum: 1.0)
         let strokeMinimum = contrast == .increased ? 4.5 : ContrastAudit.nonTextMinimum
@@ -113,6 +121,7 @@ struct ClippyTokens {
             textTertiary: safeSecondary.color,
             accent: tokens.accent,
             accentText: safeAccentText.color,
+            accentInk: safeAccentInk.color,
             onAccent: maxContrastForeground.color,
             selection: selectionColor,
             success: safeSuccess.color,

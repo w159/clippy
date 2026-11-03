@@ -106,6 +106,7 @@ struct OCRResultView: View {
                 onPaste(result.text)
                 onDismiss()
             }
+            .buttonStyle(.accent)
             .keyboardShortcut(.defaultAction)
             .disabled(!hasText)
         }

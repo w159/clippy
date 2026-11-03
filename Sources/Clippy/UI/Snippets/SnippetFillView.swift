@@ -21,7 +21,7 @@ struct SnippetFillView: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { onFinish(nil) }.keyboardShortcut(.cancelAction)
-                Button("Insert") { onFinish(values) }.keyboardShortcut(.defaultAction)
+                Button("Insert") { onFinish(values) }.buttonStyle(.accent).keyboardShortcut(.defaultAction)
             }
         }
         .frame(minWidth: 380)

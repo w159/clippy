@@ -15,14 +15,17 @@ struct ClipEditorView: View {
     var dirtyBridge: EditorDirtyStateBridge? = nil
     /// A recovered draft to restore into a text editor (EDT-01).
     var draft: EditorDraft? = nil
+    /// Database access for the editors; tests inject one backed by their own database.
+    var persistence: ClipEditorPersistence = .live
     let onClose: () -> Void
 
     var body: some View {
         Group {
             if clip.contentKind == .image {
-                ImageClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, onClose: onClose)
+                ImageClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, persistence: persistence, onClose: onClose)
             } else {
-                TextClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, draft: draft, onClose: onClose)
+                TextClipEditor(clip: clip, store: store, dirtyBridge: dirtyBridge, draft: draft,
+                               persistence: persistence, onClose: onClose)
             }
         }
         .clippyDesignSystem()

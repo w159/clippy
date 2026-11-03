@@ -10,9 +10,9 @@ import SwiftUI
 final class ClipObservationHolder: ObservableObject {
     private var token: AnyDatabaseCancellable?
 
-    func start(id: Int64?, onChange: @escaping (Clip?) -> Void) {
+    func start(id: Int64?, persistence: ClipEditorPersistence, onChange: @escaping (Clip?) -> Void) {
         guard token == nil, let id else { return }
-        token = ClipEditorPersistence.live.observe(id: id, onChange: onChange)
+        token = persistence.observe(id: id, onChange: onChange)
     }
 }
 
@@ -91,13 +91,14 @@ struct TextClipEditor: View {
     @State var richEdited = false
     @FocusState var richFocused: Bool
 
-    let persistence = ClipEditorPersistence.live
+    let persistence: ClipEditorPersistence
 
     var tokens: ThemeTokens { settings.theme }
 
     init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?, draft: EditorDraft?,
-         onClose: @escaping () -> Void) {
+         persistence: ClipEditorPersistence = .live, onClose: @escaping () -> Void) {
         self.clip = clip
+        self.persistence = persistence
         self.store = store
         self.dirtyBridge = dirtyBridge
         self.onClose = onClose
@@ -205,7 +206,7 @@ struct TextClipEditor: View {
             dirtyBridge?.isDirty = { isDirty }
             dirtyBridge?.save = { completion in completion(save()) }
             dirtyBridge?.draft = { currentDraft }
-            observation.start(id: clip.id) { stored in handleStored(stored) }
+            observation.start(id: clip.id, persistence: persistence) { stored in handleStored(stored) }
         }
         .confirmationDialog(
             "Save changes to this clip?",

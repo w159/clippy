@@ -18,11 +18,11 @@ struct OCRSettingsPane: View {
         PaneScroll(title: "OCR", notice: $notice) {
             PaneSection("Recognition", footer: "Accurate is slower but reads small or stylized text better. Everything runs on this Mac.") {
                 SettingsRow(title: "Quality") {
-                    Picker("Quality", selection: $level) {
-                        Text("Fast").tag(OCRPreferences.Level.fast)
-                        Text("Accurate").tag(OCRPreferences.Level.accurate)
-                    }
-                    .pickerStyle(.segmented).labelsHidden().frame(minWidth: 120, maxWidth: 180)
+                    ClippySegmentedPicker("Quality", selection: $level, options: [
+                        SegmentOption(value: OCRPreferences.Level.fast, title: "Fast"),
+                        SegmentOption(value: OCRPreferences.Level.accurate, title: "Accurate"),
+                    ])
+                    .frame(minWidth: 120, maxWidth: 180)
                     .onChange(of: level) { _, value in OCRPreferences.level = value }
                 }
                 Divider()

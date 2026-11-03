@@ -49,6 +49,35 @@ final class AccentContrastTests: XCTestCase {
         }
     }
 
+    /// `accentInk` is the window tint, so tinted/bordered text buttons draw it on every surface.
+    /// Seeded fault: returning the raw accent fails here (gold #E0A23C on a light surface is about 2.2:1).
+    func testAccentInkMeetsAAOnEverySurfaceForEveryPresetAndAccent() {
+        func check(_ tokens: ClippyTokens, _ name: String) {
+            let dark = tokens.scheme == .dark
+            let ink = RGBA(color: tokens.accentInk, isDark: dark)!
+            let surfaces = [("surface", tokens.surface), ("surfaceElevated", tokens.surfaceElevated),
+                            ("surfaceInset", tokens.surfaceInset), ("surfaceSidebar", tokens.surfaceSidebar)]
+            for (surfaceName, surface) in surfaces {
+                let ratio = ContrastAudit.ratio(ink, on: RGBA(color: surface, isDark: dark)!)
+                XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(name) \(dark ? "dark" : "light") accentInk on \(surfaceName)")
+            }
+        }
+        for preset in ThemePreset.selectable {
+            let source = preset.fixedTokens ?? Theme.customSeed
+            for dark in [false, true] {
+                var tokens = source
+                tokens.isDark = dark
+                check(ClippyTokens.resolve(from: tokens), preset.rawValue)
+            }
+        }
+        for accent in AccentTheme.allCases {
+            for dark in [false, true] {
+                let base = (dark ? ThemePreset.githubDark : ThemePreset.cleanLight).fixedTokens!
+                check(resolved(accent: accent.color, base: base, dark: dark), accent.rawValue)
+            }
+        }
+    }
+
     func testDefaultGoldAccentGetsDarkLabel() {
         let tokens = resolved(accent: AccentTheme.clippyAmber.color)
         XCTAssertTrue(isDarkLabel(tokens), "gold accent must not get a white label")

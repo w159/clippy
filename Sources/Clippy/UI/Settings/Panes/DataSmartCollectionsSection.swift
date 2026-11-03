@@ -67,35 +67,52 @@ struct SmartCollectionEditorSheet: View {
 
     var body: some View {
         ClippySheet(title: collection == nil ? "New smart collection" : "Edit smart collection") {
-            Form {
-                TextField("Name", text: $draft.name)
-                HStack {
-                    ForEach(ClipKindToken.allCases, id: \.self) { token in
-                        Toggle(token.rawValue.capitalized, isOn: Binding(
-                            get: { draft.kinds.contains(token) },
-                            set: { if $0 { draft.kinds.insert(token) } else { draft.kinds.remove(token) } }))
-                            .toggleStyle(.checkbox)
+            VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
+                field("Name") { TextField("", text: $draft.name).labelsHidden() }
+                field("Clip types") {
+                    SmartCollectionFlowLayout(spacing: tokens.metrics.space.two) {
+                        ForEach(ClipKindToken.allCases, id: \.self) { token in
+                            Toggle(token.rawValue.capitalized, isOn: Binding(
+                                get: { draft.kinds.contains(token) },
+                                set: { if $0 { draft.kinds.insert(token) } else { draft.kinds.remove(token) } }))
+                                .toggleStyle(.checkbox)
+                        }
                     }
                 }
-                TextField("Source app bundle id", text: $draft.sourceApp)
-                TextField("Text pattern (regular expression)", text: $draft.textPattern)
-                TextField("Older than (days)", text: $draft.olderThanDays)
-                TextField("Newer than (days)", text: $draft.newerThanDays)
-                Picker("Sensitive", selection: $draft.sensitive) {
-                    Text("Either").tag(Bool?.none)
-                    Text("Only sensitive").tag(Bool?.some(true))
-                    Text("Not sensitive").tag(Bool?.some(false))
+                field("Source app bundle id") { TextField("", text: $draft.sourceApp).labelsHidden() }
+                field("Text pattern (regular expression)") { TextField("", text: $draft.textPattern).labelsHidden() }
+                HStack(alignment: .top, spacing: tokens.metrics.space.three) {
+                    field("Older than (days)") { TextField("", text: $draft.olderThanDays).labelsHidden() }
+                    field("Newer than (days)") { TextField("", text: $draft.newerThanDays).labelsHidden() }
+                }
+                field("Sensitive") {
+                    Picker("", selection: $draft.sensitive) {
+                        Text("Either").tag(Bool?.none)
+                        Text("Only sensitive").tag(Bool?.some(true))
+                        Text("Not sensitive").tag(Bool?.some(false))
+                    }
+                    .labelsHidden()
+                    .fixedSize()
                 }
             }
             if let errorText { Text(errorText).font(.caption).foregroundStyle(tokens.danger) }
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save", action: save).keyboardShortcut(.defaultAction)
+                Button("Save", action: save).buttonStyle(.accent).keyboardShortcut(.defaultAction)
             }
         }
-        .frame(minWidth: 460)
+        .frame(width: 520)
         .onAppear { if let collection { draft = SmartCollectionDraft(collection: collection) } }
+    }
+
+    /// Label-above-control row so long labels are never clipped by a trailing column.
+    private func field<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
+            Text(title).font(.caption).foregroundStyle(tokens.textSecondary)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func save() {
@@ -111,5 +128,35 @@ struct SmartCollectionEditorSheet: View {
         } catch {
             errorText = SmartCollectionDraft.message(for: error)
         }
+    }
+}
+
+/// Left-to-right layout that wraps children onto new lines when they exceed the proposed width.
+private struct SmartCollectionFlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(width: proposal.width ?? .infinity, subviews: subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(width: bounds.width, subviews: subviews)
+        for (index, origin) in result.origins.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            maxX = max(maxX, x - spacing)
+        }
+        return (CGSize(width: maxX, height: y + rowHeight), origins)
     }
 }

@@ -21,6 +21,7 @@ struct LockView: View {
             }
             HStack {
                 Button("Unlock") { lock.unlock() }
+                    .buttonStyle(.accent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(lock.isAuthenticating)
                 Button("Close", action: onClose)

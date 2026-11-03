@@ -5,7 +5,7 @@ import Foundation
 /// Discrete MB steps offered instead of a free stepper.
 enum FileSizePresets {
     /// Steps in MB, ascending.
-    static let stepsMB: [Int] = [1, 5, 25, 100, 250, 500]
+    static let stepsMB: [Int] = [1, 5, 25, 50, 100, 250, 500]
 
     /// Display label such as "25 MB".
     static func label(forMB value: Int) -> String { "\(value) MB" }

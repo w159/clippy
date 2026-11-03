@@ -122,6 +122,16 @@ extension AIAction {
 // MARK: - Built-in defaults
 
 extension AIAction {
+    /// True when this is a built-in whose editable content differs from its shipped definition.
+    /// `sortOrder` is ignored (reordering is not a modification). Custom actions and built-ins
+    /// without a shipped counterpart return false, so "Restore" only shows when it would change something.
+    var isModifiedFromDefault: Bool {
+        guard isBuiltIn, let shipped = Self.builtIns.first(where: { $0.id == id }) else { return false }
+        return name != shipped.name || iconKind != shipped.iconKind || symbolName != shipped.symbolName
+            || promptTemplate != shipped.promptTemplate || temperature != shipped.temperature
+            || maxTokens != shipped.maxTokens || outputDisposition != shipped.outputDisposition
+    }
+
     /// The seed set shipped with Clippy. Stored under stable UUIDs so they
     /// survive re-seeding without creating duplicates.
     static let builtIns: [AIAction] = [
