@@ -200,7 +200,7 @@ final class ClipStore: ObservableObject {
         let clipObservation = ValueObservation.tracking(
             // Explicit: a pulse with no changed rows reads only id and rowVersion,
             // and a region inferred from that read would be narrower than the window.
-            region: Table("clips"), Table("clip_category"),
+            region: Table("clips"), Table("clip_category"), Table("clip_version"),
             fetch: { db in try loader.load(db, limit: limit, generation: database.contentGeneration) }
         )
         // Identical windows (a write that touched nothing the list shows) are dropped

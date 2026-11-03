@@ -109,19 +109,48 @@ final class ClipWindowLoaderTests: XCTestCase {
         try db.saveCapturedClip(&clip, cap: 100)
         let id = try XCTUnwrap(clip.id)
         func version() throws -> Int64 {
-            try db.dbQueue.read { try Int64.fetchOne($0, sql: "SELECT rowVersion FROM clips WHERE id = ?", arguments: [id]) ?? -1 }
+            try db.dbQueue.read { try Int64.fetchOne($0, sql: "SELECT COALESCE((SELECT version FROM clip_version WHERE clipID = ?), 0)", arguments: [id]) ?? -1 }
         }
         XCTAssertEqual(try version(), 0)
         try db.updateClipTitle(id: id, userTitle: "One")
         XCTAssertEqual(try version(), 1)
         try db.setOCRText(id: id, text: "two")
         XCTAssertEqual(try version(), 2)
+
+        try db.deleteClip(id: id)
+        let leftover = try db.dbQueue.read {
+            try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM clip_version WHERE clipID = ?", arguments: [id])
+        }
+        XCTAssertEqual(leftover, 0, "deleting a clip drops its version row")
+    }
+
+    /// Edits of every kind must leave the full-text index consistent. Seeded fault:
+    /// the old self-updating row-version trigger, which fails here with SQLite error 11
+    /// (database disk image is malformed) because its nested UPDATE re-ran the FTS sync
+    /// triggers in an undefined order.
+    func testEditsKeepTheSearchIndexIntact() throws {
+        let db = try makeTestDatabase(self)
+        var clip = makeTextClip("alpha words")
+        try db.saveCapturedClip(&clip, cap: 100)
+        let id = try XCTUnwrap(clip.id)
+
+        XCTAssertNoThrow(try db.updateClipTitle(id: id, userTitle: "Renamed title"))
+        XCTAssertNoThrow(try db.setOCRText(id: id, text: "beta words"))
+        XCTAssertNoThrow(try db.dbQueue.write {
+            try $0.execute(sql: "UPDATE clips SET contentText = 'gamma words' WHERE id = ?", arguments: [id])
+        })
+
+        try db.dbQueue.write { conn in
+            XCTAssertEqual(try String.fetchOne(conn, sql: "PRAGMA integrity_check"), "ok")
+            XCTAssertNoThrow(try conn.execute(sql: "INSERT INTO clips_fts(clips_fts) VALUES('integrity-check')"))
+        }
     }
 
     /// A backup restore reuses ids and versions from another file, so the cache must
     /// start over: the restored contents are what the window shows. Seeded fault:
     /// the edited row and the restored row carry the same (id, version), as rows of a
-    /// backup made before row versions existed do, so only the generation tells them apart.
+    /// backup made before row versions existed do (no clip_version entry reads as 0), so
+    /// only the generation tells them apart.
     func testRestoreDropsTheCache() throws {
         let db = try makeTestDatabase(self)
         var clip = makeTextClip("before backup")
@@ -129,7 +158,7 @@ final class ClipWindowLoaderTests: XCTestCase {
         let id = try XCTUnwrap(clip.id)
         let snapshot = try db.createBackup()
         try db.updateClipTitle(id: id, userTitle: "edited after backup")
-        try db.dbQueue.write { try $0.execute(sql: "UPDATE clips SET rowVersion = 0 WHERE id = ?", arguments: [id]) }
+        try db.dbQueue.write { try $0.execute(sql: "DELETE FROM clip_version WHERE clipID = ?", arguments: [id]) }
 
         let loader = ClipWindowLoader()
         XCTAssertEqual(try load(loader, db).clips.first { $0.id == id }?.userTitle, "edited after backup")
