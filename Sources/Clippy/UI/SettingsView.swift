@@ -17,6 +17,7 @@ struct SettingsView: View {
         .frame(minWidth: 640, minHeight: 480)
         .clippyDesignSystem()
         .tint(ClippyTokens.resolve(from: settings.theme).accentInk)
+        .toggleStyle(AccentToggleStyle())
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
@@ -66,18 +67,21 @@ struct SettingsView: View {
         Group {
             if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
                 ScrollViewReader { proxy in
-                    List(selection: paneSelection) {
+                    List {
                         ForEach(SettingsPaneSection.all) { section in
                             Section(section.title) {
                                 ForEach(section.panes) { pane in
-                                    PaneRow(pane: pane)
-                                        .tag(pane)
+                                    PaneRow(pane: pane, isSelected: pane == model.selection) { paneSelection.wrappedValue = pane }
                                         .id(pane.id)
-                                        .accessibilityLabel(pane.title)
                                 }
                             }
                         }
                     }
+                    // No `selection:` binding: the system sidebar highlight is blue and ignores tint, so
+                    // rows draw `tokens.selection` themselves and arrows move the selection here.
+                    .focusable()
+                    .focusEffectDisabled()
+                    .onMoveCommand { moveSelection($0) }
                     .onAppear { proxy.scrollTo(model.selection.id) }
                     .onChange(of: model.selection) { _, pane in proxy.scrollTo(pane.id) }
                 }
@@ -89,6 +93,16 @@ struct SettingsView: View {
         .environment(\.sidebarRowSize, .small)
         .controlSize(.small)
         .searchable(text: $model.query, placement: .sidebar, prompt: "Search settings")
+    }
+
+    private func moveSelection(_ direction: MoveCommandDirection) {
+        let panes = SettingsPaneSection.all.flatMap(\.panes)
+        guard let index = panes.firstIndex(of: model.selection) else { return }
+        switch direction {
+        case .up where index > 0: paneSelection.wrappedValue = panes[index - 1]
+        case .down where index < panes.count - 1: paneSelection.wrappedValue = panes[index + 1]
+        default: break
+        }
     }
 
     private var paneSelection: Binding<SettingsPaneID?> {
@@ -185,16 +199,30 @@ private struct PaneRow: View {
     @Environment(\.clippyTokens) private var tokens
     @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     let pane: SettingsPaneID
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        Label {
-            HStack(spacing: tokens.metrics.space.two) {
-                Text(pane.title).foregroundStyle(tokens.textPrimary)
-                if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
+        Button(action: action) {
+            Label {
+                HStack(spacing: tokens.metrics.space.two) {
+                    Text(pane.title).foregroundStyle(tokens.textPrimary)
+                    if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
+                }
+            } icon: {
+                Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
             }
-        } icon: {
-            Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous)
+                .fill(isSelected ? tokens.selection : Color.clear)
+                .padding(.horizontal, 6)
+        )
+        .accessibilityLabel(pane.title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

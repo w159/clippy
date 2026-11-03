@@ -56,7 +56,7 @@ struct AppearanceSettingsTab: View {
             // MARK: Transparency
             Section("Transparency") {
                 LabeledContent("Opacity: \(Int(settings.panelOpacity * 100))") {
-                    Slider(value: $settings.panelOpacity, in: 0.3...1.0, step: 0.05)
+                    Slider(value: $settings.panelOpacity, in: 0.3...1.0, step: 0.05).accentTint()
                 }
                 .settingsRow("appearance.opacity")
                 Text("100% is fully solid. Lower values let the desktop show through a blur behind the panel.")
@@ -125,6 +125,7 @@ struct AppearanceSettingsTab: View {
                             in: 0...20,
                             step: 1
                         )
+                        .accentTint()
                     }
                 }
 
@@ -158,6 +159,7 @@ struct AppearanceSettingsTab: View {
                         in: 11...16,
                         step: 1
                     )
+                    .accentTint()
                 }
                 .settingsRow("appearance.fontSize")
                 Text("Applies to clip titles, preview text, and sidebar labels. The settings window uses the system font.")
@@ -174,10 +176,10 @@ struct AppearanceSettingsTab: View {
                 }
                 .settingsRow("appearance.position")
                 LabeledContent("Width: \(Int(settings.panelWidth)) pt") {
-                    Slider(value: $settings.panelWidth, in: 300...800, step: 20)
+                    Slider(value: $settings.panelWidth, in: 300...800, step: 20).accentTint()
                 }
                 LabeledContent("Height: \(Int(settings.panelHeight)) pt") {
-                    Slider(value: $settings.panelHeight, in: 280...900, step: 20)
+                    Slider(value: $settings.panelHeight, in: 280...900, step: 20).accentTint()
                 }
                 Toggle("Remember last panel size", isOn: $settings.rememberPanelSize)
                     .settingsRow("appearance.size")

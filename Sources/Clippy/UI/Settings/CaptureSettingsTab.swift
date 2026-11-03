@@ -36,7 +36,7 @@ struct CaptureSettingsTab: View {
             CapturePolicySections()
             SettingsAdvanced(anchors: ["capture.polling"]) {
                 LabeledContent("Polling interval: \(Int(settings.pollingIntervalMs)) ms") {
-                    Slider(value: $settings.pollingIntervalMs, in: 100...1000, step: 50)
+                    Slider(value: $settings.pollingIntervalMs, in: 100...1000, step: 50).accentTint()
                 }
                 .settingsRow("capture.polling")
                 SettingsNote("Lower is more responsive; higher uses less idle CPU.")
@@ -95,6 +95,7 @@ struct CaptureSettingsTab: View {
                     settings.captureSoundVolume = Int(soundVolumeSlider)
                     SoundPlayer.play(id: settings.captureSoundID, volume: SoundPlayer.sliderToVolume(settings.captureSoundVolume))
                 })
+                .accentTint()
             }
             .disabled(!settings.captureSoundEnabled)
         }

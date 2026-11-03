@@ -123,7 +123,7 @@ struct AssistantPanelBody: View {
     }
 
     private func notConfigured(title: String, message: String) -> some View {
-        EmptyState(systemImage: "sparkles.slash", title: title, message: message,
+        EmptyState(systemImage: "sparkles", title: title, message: message,
                    actionTitle: "Open Settings", action: onOpenSettings)
             .background(tokens.surface)
     }

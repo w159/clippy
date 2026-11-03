@@ -60,6 +60,13 @@ struct OnePasswordView: View {
         .clippyDesignSystem()
     }
 
+    /// CLI missing or not signed in: the same states that show the full-pane recovery panel.
+    private var cliUnavailable: Bool {
+        switch model.state {
+        case .notInstalled, .needsSignIn: return true
+        default: return false
+        }
+    }
     private var loading: Bool { model.state == .loading }
     private var expandedItemID: String? { model.expandedItemID }
 
@@ -86,6 +93,7 @@ struct OnePasswordView: View {
                 .focused($searchFocused)
                 .disabled(model.state != .ready)
             IconButton("plus", label: "New secret", state: creating ? .selected : .rest) { creating.toggle() }
+                .disabled(cliUnavailable)
             IconButton("arrow.clockwise", label: "Refresh", state: loading ? .disabled : .rest) { model.reload() }
                 .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
         }
