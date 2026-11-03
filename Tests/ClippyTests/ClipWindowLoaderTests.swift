@@ -218,7 +218,7 @@ final class ClipWindowLoaderTests: XCTestCase {
             incremental = min(incremental, millis(try clock.measure { _ = try load(loader, db) }))
             XCTAssertEqual(loader.lastDecodedRowCount, 1)
         }
-        print(String(format: "PERF window pulse after one edit, 3000 filed rich clips: full reload %.2f ms (%d rows decoded) -> incremental %.2f ms (%d row decoded) (best of 5)",
+        print(String(format: "PERF window pulse after one edit, 3000 filed rich clips: old SELECT * reload %.2f ms (%d rows decoded) -> incremental loader %.2f ms (%d row decoded) (best of 5)",
                      full, fullRows, incremental, loader.lastDecodedRowCount))
         XCTAssertEqual(fullRows, 3_000)
         XCTAssertLessThan(incremental, full, "decoding one row must beat decoding the whole window")
@@ -281,7 +281,7 @@ final class ClipWindowLoaderTests: XCTestCase {
         }
         print(String(format: "PERF reload split stamps query: %.2f ms", stamps))
         print(String(format: "PERF reload split fresh-row fetchAll, no decode: %.2f ms", fetchOnly))
-        print(String(format: "PERF reload split fresh-row fetchAll + Clip.light: %.2f ms (%d rows)", fetchDecode, decoded))
+        print(String(format: "PERF reload split fresh-row fetchAll + Clip.light: %.2f ms (%d rows in the last chunk)", fetchDecode, decoded))
         print(String(format: "PERF reload split fresh-row cursor + Clip.light: %.2f ms", cursorDecode))
         print(String(format: "PERF reload split whole loader.load on a fresh loader: %.2f ms (%d clips)", whole, loaded))
         XCTAssertEqual(loaded, 3_300)
