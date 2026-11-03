@@ -83,6 +83,13 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.01))
     }
 
+    private func stateSummary() -> String {
+        let field = Self.searchField(in: window.contentView)
+        return "firstResponder=\(String(describing: window.firstResponder)) isKey=\(window.isKeyWindow) "
+            + "appActive=\(NSApp.isActive) toolbar=\(String(describing: window.toolbar)) "
+            + "searchFieldFound=\(field != nil)"
+    }
+
     private func pump(seconds: TimeInterval) {
         let end = Date().addingTimeInterval(seconds)
         while Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
@@ -92,6 +99,8 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
                       file: StaticString = #filePath, line: UInt = #line) {
         let end = Date().addingTimeInterval(timeout)
         while !condition(), Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
-        if !condition() { XCTFail("Timed out waiting for \(description)", file: file, line: line) }
+        if !condition() {
+            XCTFail("Timed out waiting for \(description). \(stateSummary())", file: file, line: line)
+        }
     }
 }
