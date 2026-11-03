@@ -208,7 +208,7 @@ struct AppearanceSettingsTab: View {
                     }
                 }
         }
-        .buttonStyle(FocusRingButtonStyle(shape: AnyShape(Circle())))
+        .buttonStyle(.plain)
         .help(theme.label)
         .accessibilityLabel("\(theme.label) accent")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
