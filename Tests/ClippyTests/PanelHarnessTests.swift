@@ -355,6 +355,7 @@ final class PanelHarnessTests: XCTestCase {
         pump(until: "Escape closed the preview") { !QuickLookController.shared.isVisible }
         pump(until: "the panel is key again after the preview closed") { self.window.isKeyWindow }
         pump(until: "list focus after the preview closed") { !self.focusIsInTextField }
+        pump(seconds: 0.5)  // SwiftUI restores list focus on the next turns; a key sent sooner is dropped
         XCTAssertFalse(focusIsInTextField, "closing the preview leaves keyboard focus on the list, not the search field")
 
         // Shift-Down selects two clips; Cmd-Return takes the cursor row back out.
