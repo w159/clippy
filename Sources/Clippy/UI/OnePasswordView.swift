@@ -160,6 +160,7 @@ struct OnePasswordView: View {
                     .keyboardShortcut(.cancelAction)
                     .disabled(isCreating)
                 Button("Create") { create() }
+                    .buttonStyle(.accent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(newTitle.isEmpty || newValue.isEmpty || isCreating)
             }

@@ -32,6 +32,9 @@ struct AssistantPanelBody: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
+                if !settings.aiEnabled {
+                    aiOffHeader
+                } else {
                 AssistantHeaderView(
                     viewModel: viewModel,
                     capabilities: AssistantCapabilities(codeExecution: settings.aiAgentAllowCodeExecution,
@@ -39,8 +42,9 @@ struct AssistantPanelBody: View {
                                                         webSearch: settings.aiAgentAllowWebSearch),
                     onOpenSettings: onOpenSettings)
                 if !viewModel.toolsSupported { AssistantNoToolsBanner(providerName: viewModel.env.providerName()) }
+                }
                 content
-                if let confirmation = viewModel.pendingConfirmation {
+                if settings.aiEnabled, let confirmation = viewModel.pendingConfirmation {
                     AssistantConfirmationCard(
                         toolName: confirmation.toolName, prompt: confirmation.detail,
                         onChoose: { choice in
@@ -57,8 +61,11 @@ struct AssistantPanelBody: View {
                         .padding(.bottom, tokens.metrics.space.two)
                         .transition(.opacity)
                 }
-                Divider().overlay(tokens.stroke)
-                inputBar
+                // AI off: only the off state; no context pill or composer.
+                if settings.aiEnabled {
+                    Divider().overlay(tokens.stroke)
+                    inputBar
+                }
             }
             .background(tokens.surface)
             // Closing the panel cancels the turn and denies any pending confirmation (AI-08).
@@ -97,6 +104,22 @@ struct AssistantPanelBody: View {
         } else {
             messageThread
         }
+    }
+
+    /// Title-only header shown while AI features are off (no provider chip, tools or clear buttons).
+    private var aiOffHeader: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: tokens.metrics.space.two) {
+                Image(systemName: "sparkles").font(.system(size: 14, weight: .semibold)).symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(tokens.textSecondary).accessibilityHidden(true)
+                Text("AI Assistant").font(.headline).foregroundStyle(tokens.textPrimary).lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, tokens.metrics.space.three)
+            .padding(.vertical, tokens.metrics.space.two)
+            Divider().overlay(tokens.stroke)
+        }
+        .background(tokens.surface)
     }
 
     private func notConfigured(title: String, message: String) -> some View {

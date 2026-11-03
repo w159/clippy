@@ -59,7 +59,7 @@ struct AISettingsTab: View {
                 HStack {
                     Text("AI actions").font(.headline)
                     Spacer()
-                    Button("Done") { showActions = false }.keyboardShortcut(.defaultAction)
+                    Button("Done") { showActions = false }.buttonStyle(.accent).keyboardShortcut(.defaultAction)
                 }.padding(12)
                 Divider()
                 AIActionsManagerView()

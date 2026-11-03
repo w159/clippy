@@ -144,6 +144,7 @@ extension ClipListView {
                     aiInstructionAction = nil
                     aiInstructionClip = nil
                 }
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(aiInstructionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .help("Run \(aiInstructionAction?.name ?? "the action") with this instruction")

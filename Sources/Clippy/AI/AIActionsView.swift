@@ -154,6 +154,7 @@ struct AIActionSheet: View {
                     onApply(proposal)
                     runner.reset()
                 }
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
             }
         }

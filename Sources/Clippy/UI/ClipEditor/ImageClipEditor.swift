@@ -46,6 +46,7 @@ struct ImageClipEditor: View {
     let clip: Clip
     let store: ClipStore
     let dirtyBridge: EditorDirtyStateBridge?
+    let persistence: ClipEditorPersistence
     let onClose: () -> Void
 
     @ObservedObject var settings = AppSettings.shared
@@ -79,8 +80,10 @@ struct ImageClipEditor: View {
     /// Unsaved edits exist: the image was transformed or the title changed.
     var isDirty: Bool { model.isEdited || title != baseTitle }
 
-    init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?, onClose: @escaping () -> Void) {
+    init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?,
+         persistence: ClipEditorPersistence = .live, onClose: @escaping () -> Void) {
         self.clip = clip
+        self.persistence = persistence
         self.store = store
         self.dirtyBridge = dirtyBridge
         self.onClose = onClose
@@ -162,6 +165,7 @@ struct ImageClipEditor: View {
             .keyboardShortcut(.cancelAction)
             .fixedSize()
             Button("Save") { save { if $0 { onClose() } } }
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
                 .fixedSize()
                 .disabled(!isDirty || isSaving)
@@ -210,7 +214,7 @@ struct ImageClipEditor: View {
             return
         }
         isSaving = true
-        let persistence = ClipEditorPersistence.live
+        let persistence = self.persistence
         let payload = UncheckedSendable(image)
         Task {
             let outcome: Result<Void, Error> = await Task.detached(priority: .userInitiated) { () -> Result<Void, Error> in

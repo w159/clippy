@@ -76,13 +76,11 @@ struct IconPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("Icon", selection: $iconTab) {
-                Text("Symbols").tag(CategoryIconKind.symbol)
-                Text("Emoji").tag(CategoryIconKind.emoji)
-                Text("Apps").tag(CategoryIconKind.appLogo)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            ClippySegmentedPicker("Icon", selection: $iconTab, options: [
+                SegmentOption(value: CategoryIconKind.symbol, title: "Symbols"),
+                SegmentOption(value: CategoryIconKind.emoji, title: "Emoji"),
+                SegmentOption(value: CategoryIconKind.appLogo, title: "Apps"),
+            ])
 
             if iconTab == .symbol {
                 TextField("Search symbols", text: $symbolQuery)

@@ -105,12 +105,10 @@ struct ScriptRunResultView: View {
     @ViewBuilder
     private var streamPicker: some View {
         if !stdout.isEmpty && !stderr.isEmpty {
-            Picker("Stream", selection: Binding(get: { activeStream }, set: { shownStream = $0 })) {
-                Text("stdout").tag(ScriptOutputStream.stdout)
-                Text("stderr").tag(ScriptOutputStream.stderr)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            ClippySegmentedPicker("Stream", selection: Binding(get: { activeStream }, set: { shownStream = $0 }), options: [
+                SegmentOption(value: ScriptOutputStream.stdout, title: "stdout"),
+                SegmentOption(value: ScriptOutputStream.stderr, title: "stderr"),
+            ])
             .controlSize(.small)
         } else {
             Text(activeStream == .stdout ? "stdout" : "stderr")

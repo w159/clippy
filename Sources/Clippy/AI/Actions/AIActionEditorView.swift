@@ -17,6 +17,8 @@ struct AIActionEditorView: View {
     @State private var maxTokens: Int
     @State private var outputDisposition: AIActionOutputDisposition
     @State private var showIconPicker = false
+    /// Validation messages stay hidden until the user edits the prompt (Save is disabled while invalid anyway).
+    @State private var promptTouched = false
 
     @State private var testClips: [Clip] = []
     @State private var testClipID: Int64?
@@ -108,7 +110,7 @@ struct AIActionEditorView: View {
             }
             Section("Model") {
                 LabeledContent("Temperature \(temperature, format: .number.precision(.fractionLength(1)))") {
-                    Slider(value: $temperature, in: 0...1, step: 0.1)
+                    Slider(value: $temperature, in: 0...1, step: 0.1).tint(tokens.accent)
                 }
                 Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 16...4096, step: 64)
             }
@@ -121,7 +123,8 @@ struct AIActionEditorView: View {
 
     private var rightPane: some View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
-            AIActionPromptPane(template: $promptTemplate, issues: issues)
+            AIActionPromptPane(template: $promptTemplate, issues: promptTouched ? issues : [])
+                .onChange(of: promptTemplate) { _, _ in promptTouched = true }
             Divider().overlay(tokens.stroke)
             AIActionTestPanel(
                 clips: testClips, clipID: $testClipID, instruction: $testInstruction,

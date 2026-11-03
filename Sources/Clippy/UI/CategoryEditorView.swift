@@ -108,6 +108,7 @@ struct CategoryEditorView: View {
                     )
                     dismiss()
                 }
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || duplicateNameMessage != nil)
             }

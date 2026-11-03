@@ -23,6 +23,7 @@ struct SnippetsSettingsPane: View {
                 SettingsRow(title: "Accessibility permission") {
                     HStack {
                         Label(trusted ? "Granted" : "Not granted", systemImage: trusted ? "checkmark.circle" : "exclamationmark.triangle")
+                            .lineLimit(1).fixedSize().layoutPriority(1)
                         if !trusted { Button("Open System Settings", action: openAccessibility) }
                         Button("Refresh") { trusted = CaretLocator.isTrusted; apply {} }
                     }

@@ -29,12 +29,8 @@ struct AppearanceSettingsTab: View {
                 .settingsRow("appearance.theme")
                 ThemeSwatchStrip(tokens: settings.theme, themeName: settings.themePreset.label)
 
-                Picker("System appearance", selection: $settings.appearanceMode) {
-                    ForEach(AppearanceMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ClippySegmentedPicker("System appearance", selection: $settings.appearanceMode,
+                                      options: AppearanceMode.allCases.map { SegmentOption(value: $0, title: $0.label) })
                 .disabled(![.system, .automatic].contains(settings.themePreset))
                 .settingsRow("appearance.system")
                 if ![.system, .automatic].contains(settings.themePreset) {

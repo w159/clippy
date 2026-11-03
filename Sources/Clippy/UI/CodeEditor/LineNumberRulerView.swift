@@ -13,6 +13,9 @@ final class LineNumberRulerView: NSRulerView {
         self.textView = textView
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         clientView = textView
+        // Since macOS 14 NSView no longer clips drawing to its bounds by default, so the ruler's
+        // separator/fill could paint past the scroll view (full window height). Clip explicitly.
+        clipsToBounds = true
         NotificationCenter.default.addObserver(self, selector: #selector(contentChanged),
                                                name: NSText.didChangeNotification, object: textView)
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -42,6 +45,7 @@ final class LineNumberRulerView: NSRulerView {
     }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
+        NSBezierPath(rect: bounds).addClip()
         backgroundColor.setFill()
         bounds.fill()
         guard let textView, let layout = textView.layoutManager, let container = textView.textContainer,

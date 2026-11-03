@@ -57,7 +57,8 @@ final class SettingsShellLogicTests: XCTestCase {
     // MARK: File size presets
 
     func testNearestPreset() {
-        XCTAssertEqual(FileSizePresets.nearest(toMB: 50), 25)
+        XCTAssertEqual(FileSizePresets.nearest(toMB: 50), 50)
+        XCTAssertEqual(FileSizePresets.nearest(toMB: 60), 50)
         XCTAssertEqual(FileSizePresets.nearest(toMB: 20), 25)
         XCTAssertEqual(FileSizePresets.nearest(toMB: 400), 500)
         XCTAssertEqual(FileSizePresets.nearest(toMB: 0), 1)
@@ -65,8 +66,16 @@ final class SettingsShellLogicTests: XCTestCase {
     }
 
     func testOptionsKeepStoredNonPresetValue() {
-        XCTAssertEqual(FileSizePresets.options(including: 50), [1, 5, 25, 50, 100, 250, 500])
+        XCTAssertEqual(FileSizePresets.options(including: 30), [1, 5, 25, 30, 50, 100, 250, 500])
+        XCTAssertEqual(FileSizePresets.options(including: 50), FileSizePresets.stepsMB)
         XCTAssertEqual(FileSizePresets.options(including: 25), FileSizePresets.stepsMB)
+    }
+
+    func testDefaultFileSizeIsOneOfThePickerOptions() {
+        let defaultMB = 50 // AppSettings.maxFileSizeMB default
+        XCTAssertTrue(FileSizePresets.stepsMB.contains(defaultMB))
+        XCTAssertTrue(FileSizePresets.options(including: defaultMB).contains(defaultMB))
+        XCTAssertTrue(FileSizePresets.stepsMB.contains(FileSizePresets.nearest(toMB: 0)))
     }
 
     // MARK: Ignored apps

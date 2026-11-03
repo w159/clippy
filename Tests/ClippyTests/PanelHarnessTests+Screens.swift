@@ -110,10 +110,13 @@ extension PanelHarnessTests {
         for (appearance, suffix) in Self.appearances {
             try loadSeededStore()
             let store = try XCTUnwrap(self.store)
+            // Inject persistence over the harness store's own test database so the editor never opens
+            // the on-disk app database.
             let clip = try XCTUnwrap(store.clips.first)
+            let persistence = ClipEditorPersistence(database: store.database)
 
             capture("30-editor-clip-\(suffix)",
-                    ClipEditorView(clip: clip, store: store, onClose: {}),
+                    ClipEditorView(clip: clip, store: store, persistence: persistence, onClose: {}),
                     size: NSSize(width: 720, height: 560), appearance: appearance)
 
             capture("31-sheet-category-\(suffix)",

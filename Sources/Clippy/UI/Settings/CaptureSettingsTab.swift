@@ -51,8 +51,12 @@ struct CaptureSettingsTab: View {
 
     /// Preset MB steps; a stored non-preset value stays selectable so it is never rewritten.
     private func sizePicker(_ title: String, selection: Binding<Int>, id: String) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(FileSizePresets.options(including: selection.wrappedValue), id: \.self) {
+        // A non-positive stored value matches no option; show the nearest preset instead of an empty picker.
+        let shown = Binding<Int>(
+            get: { selection.wrappedValue > 0 ? selection.wrappedValue : FileSizePresets.nearest(toMB: selection.wrappedValue) },
+            set: { selection.wrappedValue = $0 })
+        return Picker(title, selection: shown) {
+            ForEach(FileSizePresets.options(including: shown.wrappedValue), id: \.self) {
                 Text(FileSizePresets.label(forMB: $0)).tag($0)
             }
         }

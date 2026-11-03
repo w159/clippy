@@ -195,7 +195,7 @@ struct McpPreviewSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
                     .frame(height: 180)
             }
-            HStack { Spacer(); Button("Done", action: onClose).keyboardShortcut(.defaultAction) }
+            HStack { Spacer(); Button("Done", action: onClose).buttonStyle(.accent).keyboardShortcut(.defaultAction) }
         }
         .padding(20)
         .frame(width: 520)

@@ -64,6 +64,7 @@ struct InstructionSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Run", action: run)
+                    .buttonStyle(.accent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(trimmed.isEmpty)
             }

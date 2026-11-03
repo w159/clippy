@@ -30,10 +30,14 @@ struct SnippetsView: View {
         HSplitView {
             VStack(spacing: tokens.metrics.space.two) {
                 TextField("Search snippets", text: $query).textFieldStyle(.roundedBorder).focused($searchFocused)
+                    .padding(.horizontal, tokens.metrics.space.three)
                 Picker("Folder", selection: $folderFilter) {
                     Text("All folders").tag("")
                     ForEach(store.folders, id: \.self) { Text($0).tag($0) }
                 }
+                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, tokens.metrics.space.three)
                 List(visible, selection: $selection) { item in
                     VStack(alignment: .leading) {
                         Text(item.displayName).foregroundStyle(item.isEnabled ? tokens.textPrimary : tokens.textSecondary)
@@ -48,7 +52,9 @@ struct SnippetsView: View {
                     }
                 }
                 toolbar
+                    .padding(.horizontal, tokens.metrics.space.three)
             }
+            .padding(.vertical, tokens.metrics.space.two)
             .frame(minWidth: 220, idealWidth: 260)
             editor.frame(minWidth: 340)
         }
@@ -77,8 +83,14 @@ struct SnippetsView: View {
                 Image(systemName: "trash")
             }.accessibilityLabel("Delete").help("Delete snippet").disabled(selection == nil)
             Spacer()
-            Button("Import…", action: importJSON)
-            Button("Export…", action: exportJSON)
+            Menu {
+                Button("Import snippets\u{2026}", action: importJSON)
+                Button("Export snippets\u{2026}", action: exportJSON)
+            } label: { ChromeMenuLabel(systemImage: "square.and.arrow.up.on.square") }
+                .chromeMenuStyle()
+                .fixedSize()
+                .help("Import or export snippets")
+                .accessibilityLabel("Import or export snippets")
         }
     }
 
@@ -163,7 +175,7 @@ struct SnippetEditor: View {
             TextField("Tags (comma separated)", text: Binding(
                 get: { snippet.tags.joined(separator: ", ") },
                 set: { snippet.tags = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }))
-            Toggle("Enabled", isOn: $snippet.isEnabled)
+            Toggle("Enabled", isOn: $snippet.isEnabled).tint(tokens.accent)
             HStack(spacing: tokens.metrics.space.two) {
                 Text("Body").font(.headline)
                 Spacer()

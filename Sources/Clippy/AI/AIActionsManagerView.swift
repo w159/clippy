@@ -13,6 +13,7 @@ struct AIActionsManagerView: View {
     @State private var isCreating = false
     @State private var deletingAction: AIAction?
     @State private var draggingOverActionID: String?
+    @State private var hoveredActionID: UUID?
     @State private var transferMessage: String?
 
     @Environment(\.colorSchemeContrast) private var contrast
@@ -123,9 +124,12 @@ struct AIActionsManagerView: View {
 
     private var actionList: some View {
         ScrollView {
-            LazyVStack(spacing: 4) {
+            LazyVStack(spacing: 0) {
                 ForEach(store.actions) { action in
-                    actionRow(action)
+                    VStack(spacing: 0) {
+                        actionRow(action)
+                        if action.id != store.actions.last?.id { Divider().overlay(tokens.stroke) }
+                    }
                         .reorderDraggable(id: action.id.uuidString)
                         .reorderDropDestination(
                             id: action.id.uuidString,
@@ -183,7 +187,7 @@ struct AIActionsManagerView: View {
                     .controlSize(.small)
                     .tint(tokens.danger)
                     .accessibilityLabel("Delete \(action.name)")
-            } else {
+            } else if action.isModifiedFromDefault {
                 Button("Restore") {
                     if var original = AIAction.builtIns.first(where: { $0.id == action.id }) {
                         // Keep the action's current position; the built-in template
@@ -200,8 +204,9 @@ struct AIActionsManagerView: View {
         }
         .padding(.horizontal, tokens.metrics.space.three)
         .padding(.vertical, tokens.metrics.space.two)
-        .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-        .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.stroke, lineWidth: 1))
+        .background(hoveredActionID == action.id ? tokens.surfaceInset.opacity(0.7) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+        .onHover { hoveredActionID = $0 ? action.id : (hoveredActionID == action.id ? nil : hoveredActionID) }
         .accessibilityElement(children: .contain)
         .help(dispositionHelp(for: action.outputDisposition))
     }

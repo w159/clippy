@@ -108,6 +108,7 @@ private struct CodeEditorRepresentable: NSViewRepresentable {
         scroll.hasHorizontalScroller = !wrapsLines
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
+        scroll.clipsToBounds = true
 
         // Explicit TextKit 1 stack: the gutter and bracket highlighting rely on
         // NSLayoutManager line fragments and temporary attributes.
