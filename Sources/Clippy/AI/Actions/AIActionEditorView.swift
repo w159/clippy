@@ -71,8 +71,7 @@ struct AIActionEditorView: View {
             Button("Cancel") { testTask?.cancel(); onCancel() }.keyboardShortcut(.cancelAction)
             Button("Save") { testTask?.cancel(); onSave(draft()) }
                 .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.borderedProminent)
-                .tint(tokens.accent)
+                .buttonStyle(.accent)
                 .disabled(!isValid)
         }
         .padding(.horizontal, tokens.metrics.space.five)

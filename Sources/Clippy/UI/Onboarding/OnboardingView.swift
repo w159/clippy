@@ -74,17 +74,18 @@ struct OnboardingView: View {
                 .buttonStyle(.borderless)
                 .keyboardShortcut(.leftArrow, modifiers: .command)
             Button("Skip for now") { viewModel.skipAll() }
+                .buttonStyle(.plain)
+                .foregroundStyle(tokens.textSecondary)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityHint("Closes the walkthrough; reopen it from Help, Show Welcome")
             Spacer()
-            if viewModel.model.current.isSkippable {
+            if viewModel.model.current.isSkippable && !viewModel.model.isFirst {
                 Button(viewModel.model.current.isPermission ? "Continue without granting" : "Skip this step") { viewModel.skipStep() }
                     .buttonStyle(.plain)
                     .foregroundStyle(tokens.textSecondary)
             }
             Button(viewModel.model.isLast ? "Get started" : "Continue") { viewModel.advance() }
-                .buttonStyle(.borderedProminent)
-                .tint(tokens.accent)
+                .buttonStyle(.accent)
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 20).padding(.vertical, 12)

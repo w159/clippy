@@ -23,7 +23,7 @@ struct AIActionTestPanel: View {
                 if isTesting {
                     Button("Stop", action: onStop).keyboardShortcut(.escape, modifiers: [])
                 } else {
-                    Button("Run test", action: onRun).disabled(!canRun).buttonStyle(.borderedProminent).tint(tokens.accent)
+                    Button("Run test", action: onRun).disabled(!canRun).buttonStyle(.accent)
                 }
             }
             Picker("Clip", selection: $clipID) {

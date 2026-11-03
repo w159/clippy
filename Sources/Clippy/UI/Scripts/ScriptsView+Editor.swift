@@ -106,7 +106,7 @@ extension ScriptsView {
                 Button { activeDialog = .run } label: {
                     if compact { Image(systemName: "play.fill") } else { Label("Run", systemImage: "play.fill") }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.accent)
                 .disabled((editing?.body.isEmpty ?? true) || !(editing?.isEnabled ?? false) || preflight != nil)
                 .help(preflight ?? "Run the script")
                 .accessibilityLabel("Run")

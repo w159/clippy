@@ -39,14 +39,13 @@ struct OnePasswordStatePanel: View {
     @ViewBuilder private var action: some View {
         switch state {
         case .notInstalled, .empty, .error:
-            Button(stateTitle, action: retry).buttonStyle(.borderedProminent).tint(tokens.accent)
+            Button(stateTitle, action: retry).buttonStyle(.accent)
         case .needsSignIn:
             Button(action: signIn) {
                 if signingIn { ProgressView().controlSize(.small) }
                 else { Text("Sign in with op signin") }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(tokens.accent)
+            .buttonStyle(.accent)
             .disabled(signingIn)
         case .loading:
             ProgressView("Reading vault\u{2026}").controlSize(.small)

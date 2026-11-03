@@ -23,7 +23,7 @@ struct EmptyState: View {
             Image(systemName: systemImage).font(.system(size: 40, weight: .light)).symbolRenderingMode(.hierarchical).foregroundStyle(tokens.textSecondary)
             Text(title).font(.title2.weight(.semibold)).foregroundStyle(tokens.textPrimary)
             if let message { Text(message).font(.body).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center).lineLimit(2) }
-            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.borderedProminent).tint(tokens.accent) }
+            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.accent) }
         }
         .padding(tokens.metrics.space.six)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
