@@ -541,6 +541,12 @@ final class ClipDatabase: Sendable {
         set { starterCategoryIDCache.withLock { $0 = newValue } }
     }
     private let starterCategoryIDCache = OSAllocatedUnfairLock<Int64?>(initialState: nil)
+
+    /// Bumped when the contents are replaced wholesale (backup restore), so caches
+    /// keyed by clip id and row version (ClipWindowLoader) start over.
+    var contentGeneration: Int { contentGenerationCounter.withLock { $0 } }
+    func bumpContentGeneration() { contentGenerationCounter.withLock { $0 &+= 1 } }
+    private let contentGenerationCounter = OSAllocatedUnfairLock<Int>(initialState: 0)
 }
 
 extension Clip {

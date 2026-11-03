@@ -86,9 +86,10 @@ final class PerfBenchmarkTests: XCTestCase {
         // Pin a few clips so the category branch of the list query is exercised.
         for id in stride(from: 5, through: 500, by: 50) { try db.toggleStarterMembership(clipID: Int64(id)) }
 
+        // A fresh loader each round: the cold first load the panel pays on launch.
         let list = try ms("list fetch (ClipStore observation window)") {
             _ = try db.dbQueue.read { conn in
-                try Clip.fetchAll(conn, sql: ClipDatabase.observationWindowSQL, arguments: [300])
+                try ClipWindowLoader().load(conn, limit: 300, generation: db.contentGeneration)
             }
         }
         let search = try ms("FTS search 'invoice'") { _ = try db.search(matching: "invoice", limit: 300) }

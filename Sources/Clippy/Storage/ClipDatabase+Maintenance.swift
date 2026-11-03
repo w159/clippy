@@ -175,6 +175,9 @@ extension ClipDatabase {
         guard report.isHealthy else { throw BackupError.snapshotUnhealthy(report.problems) }
 
         try createBackup()  // safety net taken before anything is overwritten
+        // Before the copy, so no observation pulse during the restore reuses rows
+        // cached from the old contents (ids and row versions repeat across files).
+        bumpContentGeneration()
         try source.backup(to: dbQueue)
         // A snapshot from an older build may predate newer migrations.
         try Self.makeMigrator().migrate(dbQueue)
