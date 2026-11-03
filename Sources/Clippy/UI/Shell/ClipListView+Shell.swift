@@ -153,7 +153,13 @@ extension ClipListView {
             extractText: { if let clip { runOCR(on: clip) } },
             newCategory: { categoryCreationClip = clip },
             featureCommands: featurePaletteCommands,
-            selectionCount: max(selectedClipIDs.count, 1)
+            selectionCount: max(selectedClipIDs.count, 1),
+            rename: { _ = beginRenameSelected() },
+            copyPlain: { copyActionableClips(plainText: true) },
+            toggleReveal: { _ = toggleKeyReveal() },
+            canReveal: singleActionClip.map(CardSensitivity.isSensitive) ?? false,
+            moveTargets: store.categories.compactMap { category in category.id.map { (id: $0, name: category.name) } },
+            moveToCategory: { moveActionableClips(toCategory: $0) }
         )
     }
 }

@@ -25,6 +25,9 @@ extension CategorySidePane {
         case .upArrow: focus = SidebarNavigation.step(in: orderedRows, from: focus, delta: -1)
         case .downArrow: focus = SidebarNavigation.step(in: orderedRows, from: focus, delta: 1)
         case .return: guard let row = focus else { return .ignored }; activate(row)
+        case .tab:
+            // Tab ring: sidebar, search, list. Shift+Tab goes back to the list.
+            if press.modifiers.contains(.shift) { PanelFocusRequest.shared.requestList() } else { PanelFocusRequest.shared.request() }
         case .delete, .deleteForward:
             guard case .category(let categoryID)? = focus, let category = store.categories.first(where: { $0.id == categoryID }) else { return .ignored }
             categoryToDelete = category
@@ -33,7 +36,16 @@ extension CategorySidePane {
         return .handled
     }
 
+    /// Puts keyboard focus on the row of the current pane (Tab ring entry).
+    func focusSelectedRow() {
+        switch selection {
+        case .category(let categoryID): focus = .category(categoryID)
+        default: focus = SidebarTool.allCases.first { $0.selection == selection }?.rowID ?? .history
+        }
+    }
+
     func activate(_ row: SidebarRowID) {
+        defer { if row != .newCategory { PanelFocusRequest.shared.requestList() } }
         switch row {
         case .history: selection = .history
         case .category(let categoryID): selection = selection == .category(categoryID) ? .history : .category(categoryID)

@@ -40,6 +40,8 @@ struct ClipListView: View {
     @State var categoryCreationClip: Clip?
     /// The ID of the clip whose title is currently being edited inline.
     @State var renamingClipID: Int64?
+    /// The sensitive clip the keyboard revealed (Cmd+Shift+R); remasks when the cursor moves.
+    @State var revealedClipID: Int64?
     /// Current toast/banner content (see `PanelStatusPolicy`); nil when none.
     @State var statusItem: PanelStatusItem?
     /// Retry action for `statusItem`, nil when it has none.
@@ -251,6 +253,7 @@ struct ClipListView: View {
             selection = .suggestions
         }
         .onChange(of: selection) { oldValue, newValue in handleSelectionChanged(from: oldValue, to: newValue) }
+        .onChange(of: selectedIndex) { _, _ in revealedClipID = nil }
         .onChange(of: renamingClipID) { oldValue, newValue in
             // The rename field took AppKit first responder outside SwiftUI focus.
             if oldValue != nil, newValue == nil { refocus(PanelFocusPolicy.afterRenameEnded()) }

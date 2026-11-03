@@ -28,11 +28,13 @@ struct ClipCardModel: Equatable {
     let matchedInOCR: Bool
     /// Quick-paste digit (1...9) shown as a keycap, nil when none.
     let quickPasteDigit: Int?
+    /// A sensitive clip the keyboard revealed (Cmd+Shift+R).
+    var isKeyRevealed = false
 
     /// Builds the model for `clip`.
     static func make(
         clip: Clip, isSelected: Bool, isPinned: Bool, isSensitive: Bool,
-        isOCRRunning: Bool, query: String, quickPasteDigit: Int? = nil
+        isOCRRunning: Bool, query: String, quickPasteDigit: Int? = nil, isKeyRevealed: Bool = false
     ) -> ClipCardModel {
         ClipCardModel(
             clipID: clip.id,
@@ -46,7 +48,8 @@ struct ClipCardModel: Equatable {
             isOCRRunning: isOCRRunning,
             hasOCRText: !(clip.ocrText ?? "").isEmpty,
             matchedInOCR: ocrMatched(clip: clip, query: query),
-            quickPasteDigit: quickPasteDigit.flatMap { (1...9).contains($0) ? $0 : nil }
+            quickPasteDigit: quickPasteDigit.flatMap { (1...9).contains($0) ? $0 : nil },
+            isKeyRevealed: isKeyRevealed && isSensitive
         )
     }
 

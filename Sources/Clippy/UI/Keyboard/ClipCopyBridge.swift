@@ -11,10 +11,10 @@ enum ClipCopyBridge {
     nonisolated(unsafe) static var wrapOwnWrite: ((() -> Void) -> Void)?
 
     /// Copies `clips` (text joined by newline; the first image or file wins when
-    /// mixed). Returns false when nothing could be written.
+    /// mixed). `plainText` leaves out the RTF and HTML flavors. Returns false when nothing could be written.
     @discardableResult
     static func copy(_ clips: [Clip], media: MediaStore, database: ClipDatabase? = nil,
-                     pasteboard: NSPasteboard = .general) -> Bool {
+                     plainText: Bool = false, pasteboard: NSPasteboard = .general) -> Bool {
         guard let first = clips.first.map({ clip in database.flatMap { try? $0.withRichContent(clip) } ?? clip })
         else { return false }
         var wrote = false
@@ -25,7 +25,7 @@ enum ClipCopyBridge {
                 pasteboard.clearContents()
                 let item = NSPasteboardItem()
                 item.setString(texts.joined(separator: "\n"), forType: .string)
-                if clips.count == 1 {
+                if clips.count == 1, !plainText {
                     if let rtf = first.contentRTF { item.setData(rtf, forType: .rtf) }
                     if let html = first.contentHTML { item.setData(html, forType: .html) }
                 }

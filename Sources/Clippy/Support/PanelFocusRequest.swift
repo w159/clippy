@@ -27,8 +27,24 @@ final class PanelFocusRequest: ObservableObject {
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
+    /// Increments on every request to focus the clip list. 0 is not a request.
+    @Published private(set) var listToken = 0
+
+    /// Increments on every request to focus the sidebar. 0 is not a request.
+    @Published private(set) var sidebarToken = 0
+
     /// Ask the search field to take focus.
     func request() {
         token &+= 1
+    }
+
+    /// Ask the sidebar to take focus on its selected row (Tab ring).
+    func requestSidebar() {
+        sidebarToken &+= 1
+    }
+
+    /// Ask the clip list to take focus (after the sidebar or a preview hands it back).
+    func requestList() {
+        listToken &+= 1
     }
 }

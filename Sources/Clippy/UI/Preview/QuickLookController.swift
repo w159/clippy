@@ -49,6 +49,7 @@ final class QuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPa
         textWindow?.close()
         textWindow = nil
         release()
+        PanelFocusRequest.shared.requestList()
     }
 
     private func openPanel(for clip: Clip) {

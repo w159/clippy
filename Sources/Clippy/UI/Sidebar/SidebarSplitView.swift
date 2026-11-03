@@ -38,12 +38,14 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
                     .frame(width: width)
                     .frame(maxHeight: .infinity)
                     .clipped()
+                    .focusSection()
                 if isRail {
                     Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                 } else {
                     grabber(panelWidth: panelWidth)
                 }
                 content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .focusSection()
             }
             .animation(ClippyMotion.animation(.standard, reduce: reduceMotion), value: isRail)
         }

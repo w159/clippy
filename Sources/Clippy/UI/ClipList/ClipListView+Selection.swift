@@ -130,6 +130,13 @@ extension ClipListView {
         }
     }
 
+    /// Hands focus to the clip list (sidebar Return, closed preview). A pane
+    /// without clips keeps focus where it is.
+    func focusList() {
+        guard !visibleClips.isEmpty else { return }
+        refocus(.list)
+    }
+
     /// Re-applies focus after the focused view was replaced: the binding may
     /// already hold the value, so clear it first and set it on the next turn.
     func refocus(_ target: PanelFocusTarget) {
