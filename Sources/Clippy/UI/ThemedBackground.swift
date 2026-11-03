@@ -34,6 +34,7 @@ struct ThemedPanelBackground: View {
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.clippyTokens) private var clippyTokens
 
     var body: some View {
         switch settings.panelMaterial.backdrop {
@@ -64,7 +65,7 @@ struct ThemedPanelBackground: View {
         tokens.panel.overlay {
             if colorSchemeContrast == .increased {
                 RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
-                    .strokeBorder(tokens.cardBorder, lineWidth: 1.5)
+                    .strokeBorder(clippyTokens.strokeStrong, lineWidth: 1.5)
             }
         }
     }

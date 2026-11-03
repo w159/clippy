@@ -15,6 +15,7 @@ struct ScriptsView: View {
     @ObservedObject var center = ScriptRunCenter.shared
     @ObservedObject var settings = AppSettings.shared
     var tokens: ThemeTokens { settings.theme }
+    @Environment(\.clippyTokens) var designTokens
 
     /// The script in the editor. Nil means nothing is open. It may be a draft
     /// (an id the store does not have yet).

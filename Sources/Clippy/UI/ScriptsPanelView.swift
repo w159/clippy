@@ -58,6 +58,7 @@ struct ScriptsPanelView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(tokens.textSecondary)
+                    .accessibilityHidden(true)
                 TextField("Search names and script bodies", text: $query)
                     .textFieldStyle(.plain)
                     .font(PanelTypography.metadata(settings))
@@ -69,6 +70,7 @@ struct ScriptsPanelView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Clear search")
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 10)
@@ -174,6 +176,7 @@ private struct ScriptRowView: View {
     @Binding var confirmedScripts: Set<UUID>
     let tokens: ThemeTokens
     let settings: AppSettings
+    @Environment(\.clippyTokens) private var designTokens
 
     @State private var pendingRun = false
 
@@ -193,7 +196,7 @@ private struct ScriptRowView: View {
         .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
-                .strokeBorder(tokens.cardBorder, lineWidth: 1)
+                .strokeBorder(designTokens.stroke, lineWidth: 1)
         )
         .confirmationDialog(
             "Run \"\(script.name.isEmpty ? "Untitled" : script.name)\"?",

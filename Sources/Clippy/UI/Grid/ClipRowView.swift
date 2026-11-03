@@ -72,7 +72,7 @@ struct ClipRowView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in isHovering = false }
         .onDisappear { revealHeld = false }
         .onAppear { if model.isImageLike { OCRWarmupPolicy.shared.noteImageVisible() } }
-        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: showsActions)
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsActions)
         .clipAccessibility(model: model, actions: actions)
     }
 
@@ -105,6 +105,7 @@ struct ClipRowView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(model.isSensitive ? tokens.textSecondary : hue)
                 .frame(width: 24)
+                .accessibilityHidden(true)
                 .help(model.isSensitive ? "Sensitive" : kind.label)
         }
     }
@@ -196,7 +197,10 @@ struct ClipRowView: View {
                 Text(name).font(PanelTypography.metadata(settings)).foregroundStyle(tokens.textSecondary).lineLimit(1).frame(maxWidth: 90)
             }
             if model.matchedInOCR, !comfortable { ClippyBadge("OCR") }
-            if model.isPinned { Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(tokens.accentText) }
+            if model.isPinned {
+                Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(tokens.accentText)
+                    .accessibilityHidden(true)
+            }
             if let digit = model.quickPasteDigit { KeyCap("\u{2325}\u{2318}\(digit)") }
             Text(RelativeTime.string(for: clip.createdAt))
                 .font(PanelTypography.metadata(settings))

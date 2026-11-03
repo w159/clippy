@@ -129,8 +129,8 @@ struct ClipCardView: View {
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous))
         .overlay(cardStroke)
-        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: isHovering)
-        .animation(reduceMotion ? nil : ClippyMotion.animation(.quick, reduce: false), value: model.isSelected)
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: isHovering)
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: model.isSelected)
         .contentShape(Rectangle())
         .onHover(perform: updateHover)
         // LAY-06: a resize can strand hover state on a card the pointer left.

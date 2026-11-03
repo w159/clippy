@@ -39,6 +39,7 @@ extension ScriptsView {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(tokens.textSecondary)
+                    .accessibilityHidden(true)
                 TextField("Search names and bodies", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .font(.subheadline)
@@ -140,7 +141,7 @@ extension ScriptsView {
         RoundedRectangle(cornerRadius: ClippyRadius.inset)
             .fill(selected ? tokens.cardSurface : Color.clear)
             .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset)
-                .strokeBorder(selected ? tokens.cardBorder : Color.clear, lineWidth: 1))
+                .strokeBorder(selected ? designTokens.stroke : Color.clear, lineWidth: 1))
     }
 
     func row(for script: Script) -> some View {

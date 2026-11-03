@@ -54,8 +54,6 @@ private struct ClippyDesignSystemEnvironment: ViewModifier {
     @ObservedObject private var settings = AppSettings.shared
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
         // Resolve against this host's own scheme so a dark window gets dark

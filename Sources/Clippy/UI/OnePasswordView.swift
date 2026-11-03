@@ -71,6 +71,7 @@ struct OnePasswordView: View {
     private var expandedItemID: String? { model.expandedItemID }
 
     private var tokens: ThemeTokens { settings.theme }
+    @Environment(\.clippyTokens) private var designTokens
     private var filteredItems: [OPItem] {
         OnePasswordFilter.filter(model.items, query: searchQuery, vault: settings.onePasswordVault)
     }
@@ -178,7 +179,7 @@ struct OnePasswordView: View {
         .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
         .overlay(
             RoundedRectangle(cornerRadius: ClippyRadius.inset)
-                .strokeBorder(tokens.cardBorder, lineWidth: 1)
+                .strokeBorder(designTokens.stroke, lineWidth: 1)
         )
     }
 
