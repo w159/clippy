@@ -223,4 +223,67 @@ final class ClipWindowLoaderTests: XCTestCase {
         XCTAssertEqual(fullRows, 3_000)
         XCTAssertLessThan(incremental, full, "decoding one row must beat decoding the whole window")
     }
+
+    /// Splits the cost of a from-scratch window load into its steps (best of 5), same
+    /// seed as the pulse benchmark. The "full reload" there is the pre-loader
+    /// `SELECT *` with blobs; this times what a fresh loader actually does.
+    func testWindowFullReloadSplit() throws {
+        let db = try makeTestDatabase(self)
+        try seedFiled(db, count: 3_000, blobBytes: 6_000)
+        for index in 0..<300 {
+            var recent = makeTextClip("recent \(index)")
+            try db.saveCapturedClip(&recent, cap: 10_000)
+        }
+        let clock = ContinuousClock()
+        func millis(_ duration: Duration) -> Double {
+            Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15
+        }
+        func best(_ body: () throws -> Void) rethrows -> Double {
+            var result = Double.infinity
+            for _ in 0..<5 { result = min(result, millis(try clock.measure(body))) }
+            return result
+        }
+        let ids = try db.dbQueue.read { try Int64.fetchAll($0, sql: "SELECT id FROM clips ORDER BY id") }
+        let chunks = stride(from: 0, to: ids.count, by: ClipWindowLoader.chunkSize).map {
+            Array(ids[$0..<min($0 + ClipWindowLoader.chunkSize, ids.count)])
+        }
+        var decoded = 0
+        let stamps = try best {
+            _ = try db.dbQueue.read { try Row.fetchAll($0, sql: ClipWindowLoader.stampsSQL, arguments: [300]).count }
+        }
+        let fetchOnly = try best {
+            try db.dbQueue.read { conn in
+                for chunk in chunks {
+                    _ = try Row.fetchAll(conn, sql: ClipWindowLoader.freshSQL(count: chunk.count), arguments: StatementArguments(chunk)).count
+                }
+            }
+        }
+        let fetchDecode = try best {
+            try db.dbQueue.read { conn in
+                for chunk in chunks {
+                    let rows = try Row.fetchAll(conn, sql: ClipWindowLoader.freshSQL(count: chunk.count), arguments: StatementArguments(chunk))
+                    decoded = 0
+                    for row in rows { _ = try Clip.light(row); decoded += 1 }
+                }
+            }
+        }
+        let cursorDecode = try best {
+            try db.dbQueue.read { conn in
+                for chunk in chunks {
+                    let cursor = try Row.fetchCursor(conn, sql: ClipWindowLoader.freshSQL(count: chunk.count), arguments: StatementArguments(chunk))
+                    while let row = try cursor.next() { _ = try Clip.light(row) }
+                }
+            }
+        }
+        var loaded = 0
+        let whole = try best {
+            loaded = try load(ClipWindowLoader(), db).clips.count
+        }
+        print(String(format: "PERF reload split stamps query: %.2f ms", stamps))
+        print(String(format: "PERF reload split fresh-row fetchAll, no decode: %.2f ms", fetchOnly))
+        print(String(format: "PERF reload split fresh-row fetchAll + Clip.light: %.2f ms (%d rows)", fetchDecode, decoded))
+        print(String(format: "PERF reload split fresh-row cursor + Clip.light: %.2f ms", cursorDecode))
+        print(String(format: "PERF reload split whole loader.load on a fresh loader: %.2f ms (%d clips)", whole, loaded))
+        XCTAssertEqual(loaded, 3_300)
+    }
 }
