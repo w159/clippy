@@ -10,10 +10,10 @@ import XCTest
 /// to `CLIPPY_SCREENSHOT_DIR` (default: a temporary folder, printed).
 @MainActor
 final class PanelHarnessTests: XCTestCase {
-    private var window: NSWindow!
-    private var store: ClipStore!
+    var window: NSWindow!
+    var store: ClipStore!
     private var pasted: [String] = []
-    private var shotDirectory: URL!
+    var shotDirectory: URL!
 
     override func setUp() async throws {
         guard ProcessInfo.processInfo.environment["CLIPPY_UI_HARNESS"] == "1" else {
@@ -36,7 +36,7 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Fixture
 
-    private func seededStore() throws -> ClipStore {
+    func seededStore() throws -> ClipStore {
         let db = try makeTestDatabase(self)
         let base = Date().addingTimeInterval(-3600)
         let texts = [
@@ -78,7 +78,7 @@ final class PanelHarnessTests: XCTestCase {
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
 
-    private func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
+    func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
         NSApp.appearance = NSAppearance(named: appearance)
         let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
                                  styleMask: PastePanel.chromeStyleMask,
@@ -97,7 +97,7 @@ final class PanelHarnessTests: XCTestCase {
         present(window)
     }
 
-    private func present(_ window: NSWindow) {
+    func present(_ window: NSWindow) {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         pump(seconds: 0.5)
@@ -106,12 +106,12 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Run loop and events
 
-    private func pump(seconds: TimeInterval) {
+    func pump(seconds: TimeInterval) {
         let end = Date().addingTimeInterval(seconds)
         while Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
 
-    private func pump(until description: String, timeout: TimeInterval = 5, _ condition: () -> Bool,
+    func pump(until description: String, timeout: TimeInterval = 5, _ condition: () -> Bool,
                       file: StaticString = #filePath, line: UInt = #line) {
         let end = Date().addingTimeInterval(timeout)
         while !condition(), Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
@@ -224,7 +224,7 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Screenshots and diagnostics
 
-    private func screenshot(_ name: String, compositedOnly: Bool = false) {
+    func screenshot(_ name: String, compositedOnly: Bool = false) {
         guard let view = window.contentView else { return }
         pump(seconds: 0.3)
         if !compositedOnly, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
