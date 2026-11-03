@@ -161,6 +161,10 @@ extension PanelHarnessTests {
                                   pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
             capture("40-empty-history-\(suffix)", emptyList(empty), size: size, appearance: appearance)
 
+            // A search error only exists alongside a query: the store clears it when
+            // the query is empty, so run a real search to completion first.
+            empty.query = "invoice"
+            pump(until: "the empty-store search to complete", { empty.completedQuery == "invoice" })
             empty.searchError = "The search index could not be read."
             capture("41-search-error-\(suffix)", emptyList(empty), size: size, appearance: appearance)
 
