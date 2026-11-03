@@ -75,14 +75,14 @@ extension ClipDatabase {
         }
     }
 
-    private struct SearchStatement {
+    struct SearchStatement {
         var sql: String
         var arguments: [DatabaseValueConvertible]
     }
 
     /// Terms SQL could not carry (past the per-query cap, or too long for a LIKE
     /// pattern); the Swift side checks them on the hydrated page.
-    private struct ResidualTerms {
+    struct ResidualTerms {
         var needed: [String] = []
         var forbidden: [String] = []
         var isEmpty: Bool { needed.isEmpty && forbidden.isEmpty }
@@ -90,7 +90,7 @@ extension ClipDatabase {
 
     /// `tiers` are read in order: whole-word matches, then the rest (newest first
     /// within each). A single tier when the query has no word tier.
-    private struct SearchPlan {
+    struct SearchPlan {
         var tiers: [SearchStatement]
         var residual: ResidualTerms
     }
@@ -127,7 +127,7 @@ extension ClipDatabase {
         return .ocr
     }
 
-    private static func plan(_ parsed: ParsedQuery, db: Database, warnings: inout [QueryWarning]) throws -> SearchPlan {
+    static func plan(_ parsed: ParsedQuery, db: Database, warnings: inout [QueryWarning]) throws -> SearchPlan {
         var clauses: [String] = []
         var args: [DatabaseValueConvertible] = []
 
@@ -230,8 +230,10 @@ extension ClipDatabase {
         // history is for (bm25 used to float a weeks-old one-liner above the clip
         // copied a minute ago). The first tier is driven by the FTS index alone, so
         // its cost follows the matches, not the table; the second is the LIKE scan,
-        // which can walk createdAt order and stop at the page size.
-        let inTier = "clips.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)"
+        // which can walk createdAt order and stop at the page size. The unary plus
+        // keeps SQLite walking the createdAt index and stopping at the page size,
+        // instead of fetching every matching row to sort it.
+        let inTier = "+clips.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)"
         let first = statement([inTier] + filterClauses, [tierPattern as DatabaseValueConvertible] + filterArgs)
         let rest = statement(
             textClauses + ["clips.id NOT IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH ?)"] + filterClauses,

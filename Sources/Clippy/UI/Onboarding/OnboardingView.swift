@@ -50,7 +50,6 @@ struct OnboardingView: View {
                         .foregroundStyle(step == viewModel.model.current ? tokens.textPrimary : tokens.textSecondary)
                     Spacer(minLength: 0)
                 }
-                .opacity(step.rawValue > viewModel.model.current.rawValue ? 0.55 : 1)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(RoundedRectangle(cornerRadius: ClippyRadius.control).fill(step == viewModel.model.current ? tokens.selection : .clear))
                 .accessibilityElement(children: .combine)

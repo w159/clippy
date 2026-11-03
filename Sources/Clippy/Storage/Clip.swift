@@ -110,7 +110,8 @@ extension Clip {
                      "contentKind", "mediaFilename", "thumbFilename", "pixelWidth", "pixelHeight", "byteSize",
                      "userTitle", "filePath", "ocrText"]
         let columns = names.map { prefix + $0 }.joined(separator: ", ")
-        return columns + ", (\(prefix)contentRTF IS NOT NULL OR \(prefix)contentHTML IS NOT NULL) AS hasRichContent"
+        // typeof() reads only the record header; IS NOT NULL would load the blobs.
+        return columns + ", (typeof(\(prefix)contentRTF) = 'blob' OR typeof(\(prefix)contentHTML) = 'blob') AS hasRichContent"
     }
 
     /// Decodes a row selected with `lightColumns`: blobs nil, and
