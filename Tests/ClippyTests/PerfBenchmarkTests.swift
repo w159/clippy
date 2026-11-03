@@ -214,8 +214,7 @@ extension PerfBenchmarkTests {
         print(String(format: "PERF window memory, 3000 filed rich clips + recents: %.1f MB held (%d clips)",
                      megabytes, window.clips.count))
         XCTAssertEqual(window.clips.count, 3_300)
-        XCTAssertGreaterThan(megabytes, 30, "the filed blobs are held by the window")
-        XCTAssertLessThan(megabytes, 250, "window memory budget")
+        XCTAssertLessThan(megabytes, 1, "the window holds no rich-text blobs; they load on demand")
     }
 
     /// A cold first window load (fresh loader) on a 50k-clip history with 500 filed clips.

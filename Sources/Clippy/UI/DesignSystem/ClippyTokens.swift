@@ -94,11 +94,11 @@ struct ClippyTokens {
         let strokeStrong = ContrastAudit.adjust(safeStroke, against: allSurfaces, minimum: contrast == .increased ? 4.5 : strokeMinimum)
         let scroll = ContrastAudit.adjust(rgba(tokens.scrollbar), against: allSurfaces, minimum: strokeMinimum)
         let kindPalette: [ClipKindStyle: RGBA] = dark ? [
-            .text: RGBA(hex: "#84B9FF")!, .image: RGBA(hex: "#E59BFF")!, .file: RGBA(hex: "#FFD166")!,
+            .text: RGBA(hex: "#AEB4BE")!, .image: RGBA(hex: "#E59BFF")!, .file: RGBA(hex: "#FFD166")!,
             .link: RGBA(hex: "#62D6C7")!, .email: RGBA(hex: "#FF9A8B")!, .color: RGBA(hex: "#E5A3D8")!,
             .code: RGBA(hex: "#A9D18E")!, .richText: RGBA(hex: "#A8B4FF")!,
         ] : [
-            .text: RGBA(hex: "#0759A6")!, .image: RGBA(hex: "#7B3294")!, .file: RGBA(hex: "#815900")!,
+            .text: RGBA(hex: "#5A616B")!, .image: RGBA(hex: "#7B3294")!, .file: RGBA(hex: "#815900")!,
             .link: RGBA(hex: "#00776A")!, .email: RGBA(hex: "#A33427")!, .color: RGBA(hex: "#8A397D")!,
             .code: RGBA(hex: "#36752B")!, .richText: RGBA(hex: "#4F54A5")!,
         ]
