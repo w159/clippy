@@ -2,7 +2,7 @@
 
 ## Unreleased - UI and UX overhaul (branch `claude/ui-ux-overhaul`)
 
-Built and tested on macOS in CI ([run 41159198613](https://github.com/w159/clippy/actions/runs/41159198613), commit `ac28368`): `swift build`, 1324 XCTests (4 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of the panel, Settings, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).
+Built and tested on macOS in CI ([run 41558298133](https://github.com/w159/clippy/actions/runs/41558298133), commit `c008fba`): `swift build`, 1340 XCTests (4 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of the panel, Settings, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).
 
 ### Search
 
@@ -20,7 +20,12 @@ Search was broken in six ways. The first CI run on the old code with the new tes
 
 - The default theme follows macOS: Clean Light in light mode, GitHub Dark in dark mode (new `Automatic` preset). Before, dark mode kept the light palette and the filter chip labels and the search prompt were unreadable. Explicit theme choices are kept.
 - Filter chips, toast text and the search prompt use explicit token colors.
-- On the real first launch the onboarding glass card sat below an empty titlebar strip with the window buttons floating over the desktop. The card now fills the window, as the panel does; Skip for now (also Escape) closes it. Continue is tinted with the theme accent (macOS draws it gray while the window is inactive).
+- On the real first launch the onboarding glass card sat below an empty titlebar strip with the window buttons floating over the desktop. The card now fills the window, as the panel does; Skip for now (also Escape) closes it.
+- Menus drawn with the borderless menu styles were tinted with the accent by AppKit, which also dropped their custom backgrounds: the Date, App and Category filters showed as gold text beside capsule chips, and the "More" glyphs turned gold beside neutral icons. Menus now draw their labels as written (`chromeMenuStyle()`), so every filter is a chip and every overflow glyph matches the icons beside it.
+- Row and card actions are neutral until hovered (`RowActionButton`); the trash can turns red only while it is hovered, not on every selected row. The colored kind bar at the left edge of each row is gone; the kind icon already says it, and the selection outline is a 1 pt accent stroke.
+- White text on the gold accent measured about 2.2:1. Accent buttons (Clear Search, Continue, Back Up Now, Run, Select and the AI and 1Password actions) now use `AccentButtonStyle`, which picks a black or white label by WCAG contrast for every theme and custom accent (at least 4.5:1, tested for every preset and accent theme) and stays filled when the window is inactive, so Continue no longer reads as disabled on first launch.
+- Onboarding: the welcome step introduces the app (what it finds, keeps and pastes) under a hero icon. The footer has one filled action: Skip for now is a text button and the welcome step drops Skip this step, which meant the same as Continue. Step names no longer wrap.
+- Settings: the New pill on a pane clears once that pane has been opened. The search field's App chip uses a window symbol, and the sidebar divider uses the system separator color.
 
 ### Design system
 
@@ -44,9 +49,10 @@ Search was broken in six ways. The first CI run on the old code with the new tes
 - The copy-only setting is renamed "Double-click and Return copy without pasting", which is what it governs; a single click only selects. Typing in Suggestions searches History. The VoiceOver default action on a row pastes it. A history update that leaves the visible window unchanged no longer re-runs the search.
 - A clip whose image text recognition failed keeps that marker until the user clears it, instead of being retried on every launch.
 
-### Known gaps
+### Performance
 
-- Every history update still reloads the full rows of categorized clips. With very large categories that is extra work on each change; it needs a row-diffing change in the store and is left for later.
+- Every write to `clips` (each capture, OCR result or rename) re-ran the panel's observation, which decoded every categorized clip, RTF and HTML blobs included. `ClipWindowLoader` now reads the window's (id, version) stamps and decodes only new or changed rows. With 3,000 filed rich-text clips, one edit costs 1 decoded row instead of 3,000: 33.13 ms instead of 161.18 ms per pulse on the CI Mac (best of 5, `ClipWindowLoaderTests.testOneEditCostsOneRowNotTheWholeWindow`).
+- Versions live in a `clip_version` table bumped by a trigger on every update from any writer, the MCP server included. The first version of this kept the counter on `clips` itself; a trigger that updates `clips` from inside an update on `clips` re-ran the FTS5 sync triggers in an undefined order and corrupted the search index (SQLite error 11 on every edit, caught by CI). `testEditsKeepTheSearchIndexIntact` runs SQLite's integrity checks after title, OCR and raw SQL edits. A backup restore drops the loader's cache.
 
 ### Copy and accessibility
 
