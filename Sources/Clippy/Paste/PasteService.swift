@@ -229,7 +229,9 @@ final class PasteService {
             pasteboard.clearContents()
             return pasteboard.writeObjects([fileURL as NSURL]) ? .success(()) : .failure(.pasteboardWriteFailed)
         case .text:
-            let items = textItems(for: clip, asPlainText: asPlainText)
+            // List clips are light (no RTF/HTML); the formatting is read here, once, at paste time.
+            let source = asPlainText ? clip : ((try? monitor.database.withRichContent(clip)) ?? clip)
+            let items = textItems(for: source, asPlainText: asPlainText)
             guard !items.isEmpty else { return .failure(.pasteboardWriteFailed) }
             pasteboard.clearContents()
             return pasteboard.writeObjects(items) ? .success(()) : .failure(.pasteboardWriteFailed)

@@ -13,8 +13,10 @@ enum ClipCopyBridge {
     /// Copies `clips` (text joined by newline; the first image or file wins when
     /// mixed). Returns false when nothing could be written.
     @discardableResult
-    static func copy(_ clips: [Clip], media: MediaStore, pasteboard: NSPasteboard = .general) -> Bool {
-        guard let first = clips.first else { return false }
+    static func copy(_ clips: [Clip], media: MediaStore, database: ClipDatabase? = nil,
+                     pasteboard: NSPasteboard = .general) -> Bool {
+        guard let first = clips.first.map({ clip in database.flatMap { try? $0.withRichContent(clip) } ?? clip })
+        else { return false }
         var wrote = false
         let write = {
             if clips.count > 1 || first.contentKind == .text {

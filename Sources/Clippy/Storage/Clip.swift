@@ -30,6 +30,19 @@ struct Clip: Identifiable, Equatable, Codable, FetchableRecord, MutablePersistab
     /// Text recognised in an image clip by the background OCR indexer (searchable).
     /// nil = not scanned yet, "" = scanned, no text found.
     var ocrText: String? = nil
+    /// True when this copy came from a list fetch (`Clip.light`) that skipped the
+    /// RTF and HTML blobs of a clip that has them. Never persisted or encoded;
+    /// `ClipDatabase.withRichContent` fills the blobs in before they are used.
+    /// A light clip must never be written back whole: every write of an existing
+    /// clip goes through targeted `UPDATE` statements by id.
+    var richContentOmitted: Bool = false
+
+    /// Persisted columns only: `richContentOmitted` stays out of every encode path.
+    private enum CodingKeys: String, CodingKey {
+        case id, contentText, contentRTF, contentHTML, typeIdentifier, sourceAppBundleID, sourceAppName
+        case createdAt, contentKind, mediaFilename, thumbFilename, pixelWidth, pixelHeight, byteSize
+        case userTitle, filePath, ocrText
+    }
 
     static let databaseTableName = "clips"
 
@@ -72,12 +85,51 @@ struct Clip: Identifiable, Equatable, Codable, FetchableRecord, MutablePersistab
         }
     }
 
-    var isRich: Bool {
-        contentRTF != nil || contentHTML != nil
+    /// Whether the clip carries formatting. True for a light copy whose blobs
+    /// were skipped, so badges and editor mode do not depend on which copy it is.
+    var hasRichContent: Bool {
+        richContentOmitted || contentRTF != nil || contentHTML != nil
     }
 
     /// Media filenames this clip owns on disk (empty for text clips).
     var mediaFilenames: [String] {
         [mediaFilename, thumbFilename].compactMap { $0 }
+    }
+}
+
+// MARK: - Light rows
+
+extension Clip {
+    /// Every `clips` column except the RTF and HTML blobs, plus `hasRichContent`
+    /// computed in SQL. Lists need none of the blobs; paste, copy, edit, export
+    /// and archive read them through `ClipDatabase.withRichContent`.
+    /// `alias` is the table alias when the query joins other tables.
+    static func lightColumns(alias: String? = nil) -> String {
+        let prefix = alias.map { $0 + "." } ?? ""
+        let names = ["id", "contentText", "typeIdentifier", "sourceAppBundleID", "sourceAppName", "createdAt",
+                     "contentKind", "mediaFilename", "thumbFilename", "pixelWidth", "pixelHeight", "byteSize",
+                     "userTitle", "filePath", "ocrText"]
+        let columns = names.map { prefix + $0 }.joined(separator: ", ")
+        return columns + ", (\(prefix)contentRTF IS NOT NULL OR \(prefix)contentHTML IS NOT NULL) AS hasRichContent"
+    }
+
+    /// Decodes a row selected with `lightColumns`: blobs nil, and
+    /// `richContentOmitted` set only when the stored clip has formatting.
+    static func light(_ row: Row) throws -> Clip {
+        var clip = try Clip(row: row)
+        let hasRich: Bool = row["hasRichContent"]
+        clip.richContentOmitted = hasRich
+        return clip
+    }
+
+    /// Light rows for `ids`, in no particular order.
+    static func fetchLight(_ db: Database, ids: [Int64]) throws -> [Clip] {
+        guard !ids.isEmpty else { return [] }
+        let marks = Array(repeating: "?", count: ids.count).joined(separator: ",")
+        let rows = try Row.fetchAll(
+            db,
+            sql: "SELECT \(lightColumns()) FROM clips WHERE id IN (\(marks))",
+            arguments: StatementArguments(ids))
+        return try rows.map(light)
     }
 }

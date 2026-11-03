@@ -55,7 +55,7 @@ extension ClipCardView {
                     .truncationMode(.tail)
             }
             if variant.kept.contains(.categories) { categoryDots }
-            if variant.kept.contains(.richBadge), clip.isRich {
+            if variant.kept.contains(.richBadge), clip.hasRichContent {
                 Image(systemName: "textformat")
                     .font(.system(size: iconSize - 1))
                     .foregroundStyle(cardSecondaryText)

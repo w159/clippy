@@ -97,6 +97,8 @@ struct TextClipEditor: View {
 
     init(clip: Clip, store: ClipStore, dirtyBridge: EditorDirtyStateBridge?, draft: EditorDraft?,
          persistence: ClipEditorPersistence = .live, onClose: @escaping () -> Void) {
+        // The list hands over a light clip; the editor needs the real RTF/HTML.
+        let clip = (try? persistence.database.withRichContent(clip)) ?? clip
         self.clip = clip
         self.persistence = persistence
         self.store = store
@@ -116,9 +118,9 @@ struct TextClipEditor: View {
         _colors = State(initialValue: ColorValueParser.find(in: startText))
         _csvTable = State(initialValue: nil)
         // Rich clips open in the rich editor unless a recovered plain-text draft is restoring.
-        let source = clip.isRich && draft == nil
+        let source = clip.hasRichContent && draft == nil
             ? RichTextConverter.attributedString(rtf: clip.contentRTF, html: clip.contentHTML) : nil
-        let previewSource = source ?? (clip.isRich
+        let previewSource = source ?? (clip.hasRichContent
             ? RichTextConverter.attributedString(rtf: clip.contentRTF, html: clip.contentHTML) : nil)
         richSource = previewSource
         _richMode = State(initialValue: source != nil)
