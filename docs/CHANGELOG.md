@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased - UI and UX overhaul (branch `claude/ui-ux-overhaul`)
+## v2.3.0 - 2026-11-03 - UI and UX overhaul
 
-Built and tested on macOS in CI ([run 41568738501](https://github.com/w159/clippy/actions/runs/41568738501), commit `03d54ee`): `swift build`, 1349 XCTests (7 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of every Settings pane, every panel pane, the clip editor, every sheet, the palette, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run). The Settings toggle fix listed last below landed in the commit after that run and has its own CI run.
+Built and tested on macOS in CI ([run 41638763966](https://github.com/w159/clippy/actions/runs/41638763966), commit `1fc24b6`): `swift build`, 1388 XCTests (9 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of every Settings pane, every panel pane, the clip editor, every sheet, the palette, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).
 
 ### Search
 
@@ -104,6 +104,15 @@ Measured on macOS CI (GitHub Actions macOS runner, best of 5) before this round 
 - Title Case for buttons, menus and palette commands; "Try Again" everywhere instead of a mix with "Retry"; real ellipsis characters instead of three dots.
 - Row hover buttons, row and card overflow menus, and Scripts icon buttons have accessibility labels. The category section "+" button has a 20 pt hit target, and category counts keep their contrast-adjusted color.
 - README shortcut table and requirements corrected (macOS 26, Swift 6.2; Cmd+2...9 select categories).
+
+### Errors, empty states and keyboard (final round)
+
+- Errors are no longer silent. A failed store write (pin, delete, rename, category change) shows "Couldn't save that change. Try again." Smart search read failures show "Search failed" with a retry button instead of "No clips match". A failed Translate replace shows an error and keeps the sheet open. Smart collection load failures appear in the sidebar and in Settings instead of an empty list. Undo reports the categories it could not restore.
+- Empty states say what to do next: Add Snippet, New Script, Refresh model catalog, and Try Again in Suggestions. Each route has its own copy. Link previews show loading and unavailable rows. Describe Image and CLI install failures name the specific cause.
+- Keyboard: Shift-F10 or the Menu key opens the clip actions palette; Cmd-R renames; Shift-Cmd-C copies as plain text; Shift-Cmd-R reveals a sensitive clip; Cmd-Return toggles a row in a multi-selection; Tab and Shift-Tab move between sidebar, search and list; list focus returns after the preview closes; Return in the sidebar moves focus to the list; keys no longer leak into the list while a title is being renamed.
+- Accessibility: the Clear search button is labeled; panel, script and 1Password borders use contrast-checked strokes (3:1, and 4.5:1 under Increase Contrast); decorative icons are hidden from VoiceOver; sidebar rows have a VoiceOver activate action; Reduce Motion uses fades consistently.
+- Tests: AccessibilityContractTests, StoreErrorSurfacingTests, a panel keyboard journey, and empty and error state screenshots in the UI harness.
+- Settings keyboard shortcuts (pane shortcuts, search by keyboard, Esc to close) were held back: the harness test failed on the macOS runner, so they are not in this release.
 
 ## v2.2.0 - 2026-09-30 - AI providers rebuilt
 
