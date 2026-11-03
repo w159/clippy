@@ -62,7 +62,7 @@ struct OCRResultView: View {
                         .font(monospaced ? .system(.body, design: .monospaced) : .body)
                         .textSelection(.enabled)
                 } else {
-                    Text("No text found. Try a clearer image, then run Extract Text again.")
+                    Text("No text found. Try a clearer image, close this sheet, then choose Extract Text on the clip again.")
                         .foregroundStyle(tokens.textSecondary)
                 }
             }

@@ -14,22 +14,18 @@ extension ScriptsView {
                 editorAndDrawer
             }
         } else {
-            VStack(spacing: 12) {
-                Image(systemName: "applepencil.on.rectangle")
-                    .font(.system(size: 30, weight: .light))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.textSecondary)
-                Text(store.scripts.isEmpty ? "No scripts yet" : "No script selected")
-                    .font(.headline)
-                    .foregroundStyle(tokens.textPrimary)
-                Text("Click + to create a script, then run it from here or the panel.")
-                    .font(.subheadline)
-                    .foregroundStyle(tokens.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            detailEmptyState
         }
+    }
+
+    private var detailEmptyState: some View {
+        EmptyState(
+            systemImage: "applepencil.on.rectangle",
+            title: store.scripts.isEmpty ? "No scripts yet" : "No script selected",
+            message: store.scripts.isEmpty
+                ? "Create a script, then run it from here or the panel."
+                : "Pick a script from the list, or create a new one.",
+            actionTitle: "New Script") { requestNew() }
     }
 
     /// Three tiers: labelled controls on one row, icon-only controls on one row, then the name on
