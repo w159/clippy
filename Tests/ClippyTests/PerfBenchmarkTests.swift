@@ -71,7 +71,7 @@ final class PerfBenchmarkTests: XCTestCase {
             }
             for (index, tier) in tiers.enumerated() {
                 let sql = tier.sql + " LIMIT ? OFFSET ?"
-                let args = StatementArguments(tier.arguments + [300 as DatabaseValueConvertible, 0])
+                let args: StatementArguments = StatementArguments(tier.arguments + [300 as DatabaseValueConvertible, 0])
                 let detail = try db.dbQueue.read { conn in
                     try Row.fetchAll(conn, sql: "EXPLAIN QUERY PLAN " + sql, arguments: args)
                         .map { $0["detail"] as String }.joined(separator: " | ")
