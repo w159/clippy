@@ -6,6 +6,14 @@ import XCTest
 /// Drives the real settings window with real key events: Cmd-digit pane shortcuts, arrow
 /// navigation, search by keyboard and Esc to close. Needs a window server, so it only runs
 /// when `CLIPPY_UI_HARNESS=1` (CI sets it on macOS runners).
+/// A headless CI runner never activates the app, so a plain window stays non-key and
+/// SwiftUI drops keyboard focus and commands. This reports key status as an activated
+/// app would; the product window is unchanged.
+private final class KeyableWindow: NSWindow {
+    override var isKeyWindow: Bool { isVisible }
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class SettingsKeyboardHarnessTests: XCTestCase {
     private var window: NSWindow!
@@ -26,7 +34,7 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
     func testSettingsKeyboardJourney() throws {
         let model = SettingsShellModel()
         model.selection = .general
-        let window = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 1000, height: 700),
+        let window = KeyableWindow(contentRect: NSRect(x: 80, y: 80, width: 1000, height: 700),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
