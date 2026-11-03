@@ -31,6 +31,8 @@ extension ClipListView {
     /// Cmd+R: starts the inline rename of the single targeted clip.
     func beginRenameSelected() -> Bool {
         guard let clip = singleActionClip else { return false }
+        // Release SwiftUI's hold on the list so it does not pull focus back from the rename field.
+        focusTarget = nil
         renamingClipID = clip.id
         return true
     }
