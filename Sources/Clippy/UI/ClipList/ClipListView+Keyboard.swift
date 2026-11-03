@@ -246,7 +246,7 @@ extension ClipListView {
     func copyActionableClips() {
         let clips = actionableClips
         guard !clips.isEmpty else { return }
-        if ClipCopyBridge.copy(clips, media: store.database.media) {
+        if ClipCopyBridge.copy(clips, media: store.database.media, database: store.database) {
             showStatusBanner(clips.count == 1 ? "Copied" : "Copied \(clips.count) clips", severity: .success)
         } else {
             showStatusBanner("Could not copy to the clipboard", severity: .failure)
@@ -258,7 +258,8 @@ extension ClipListView {
     func deleteWithUndo(_ clips: [Clip], snapshots prepared: [DeletedClipSnapshot]? = nil) {
         let media = store.database.media
         let snapshots = prepared ?? clips.compactMap { clip in
-            ClipUndoBuffer.snapshot(of: clip, categoryIDs: store.categoryIDs(for: clip), media: media)
+            ClipUndoBuffer.snapshot(of: clip, categoryIDs: store.categoryIDs(for: clip), media: media,
+                                    database: store.database)
         }
         ClipUndoBuffer.shared.record(snapshots)
         for clip in clips { store.delete(clip) }

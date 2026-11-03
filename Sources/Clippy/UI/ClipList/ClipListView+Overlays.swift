@@ -11,7 +11,8 @@ extension ClipListView {
     /// snapshot cannot come back, so it still goes through the confirmation alert.
     func requestDelete(_ clip: Clip) {
         if let snapshot = ClipUndoBuffer.snapshot(of: clip, categoryIDs: store.categoryIDs(for: clip),
-                                                  media: store.database.media) {
+                                                  media: store.database.media,
+                                                  database: store.database) {
             deleteWithUndo([clip], snapshots: [snapshot])
         } else {
             clipPendingDeletion = clip

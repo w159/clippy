@@ -524,6 +524,23 @@ final class ClipDatabase: Sendable {
 
     // MARK: - Reads
 
+    /// A full copy of `clip`. Light clips (search hits, the panel window) skip the
+    /// RTF and HTML blobs; paste, copy, edit and undo-delete call this first. Returns
+    /// `clip` unchanged when its blobs were not omitted or its row is gone.
+    func withRichContent(_ clip: Clip) throws -> Clip {
+        guard clip.richContentOmitted, let id = clip.id else { return clip }
+        return try dbQueue.read { (connection: Database) -> Clip in
+            guard let row = try Row.fetchOne(
+                connection, sql: "SELECT contentRTF, contentHTML FROM clips WHERE id = ?", arguments: [id])
+            else { return clip }
+            var full = clip
+            full.contentRTF = row["contentRTF"]
+            full.contentHTML = row["contentHTML"]
+            full.richContentOmitted = false
+            return full
+        }
+    }
+
     func allClips() throws -> [Clip] {
         try dbQueue.read { connection in
             try Clip.order(Column("createdAt").desc, Column("id").desc).fetchAll(connection)

@@ -10,7 +10,7 @@ import os
 /// on every pulse, rich-text and HTML blobs included. The loader reads the window's
 /// `(id, rowVersion)` stamps first (the version lives in `clip_version`, bumped by
 /// the `clip_version_bump` trigger on every update, from any writer), then fetches
-/// full rows only for ids it has not seen or whose version moved. Unchanged rows
+/// light rows (no RTF/HTML blobs, see `Clip.light`) only for ids it has not seen or whose version moved. Unchanged rows
 /// are reused.
 ///
 /// Clip ids are never reused (AUTOINCREMENT), so an id and a version name one row
@@ -66,12 +66,12 @@ final class ClipWindowLoader: Sendable {
                 let rows = try Row.fetchAll(
                     db,
                     sql: """
-                        SELECT c.*, COALESCE(v.version, 0) AS rowVersion FROM clips c
+                        SELECT \(Clip.lightColumns(alias: "c")), COALESCE(v.version, 0) AS rowVersion FROM clips c
                         LEFT JOIN clip_version v ON v.clipID = c.id WHERE c.id IN (\(marks))
                         """,
                     arguments: StatementArguments(chunk))
                 for row in rows {
-                    let clip = try Clip(row: row)
+                    let clip = try Clip.light(row)
                     let version: Int64 = row["rowVersion"]
                     if let id = clip.id { fresh[id] = (version, clip) }
                 }

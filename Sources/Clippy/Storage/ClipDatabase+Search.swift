@@ -60,7 +60,7 @@ extension ClipDatabase {
             }
             while found.count < limit {
                 let ids = try nextIDs(pageSize)
-                let byID = Dictionary(uniqueKeysWithValues: try Clip.fetchAll(db, keys: ids).compactMap { clip in
+                let byID = Dictionary(uniqueKeysWithValues: try Clip.fetchLight(db, ids: ids).compactMap { clip in
                     clip.id.map { ($0, clip) }
                 })
                 let page = ids.compactMap { byID[$0] }

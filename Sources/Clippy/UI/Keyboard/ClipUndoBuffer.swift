@@ -43,7 +43,15 @@ final class ClipUndoBuffer {
 
     /// Captures `clip` (with its category memberships and media bytes) before the
     /// caller deletes it. Nil when the media exceeds `maxMediaBytes` or cannot be read.
-    static func snapshot(of clip: Clip, categoryIDs: Set<Int64>, media: MediaStore) -> DeletedClipSnapshot? {
+    /// With `database`, a light clip (no RTF/HTML) is resolved to a full one first, because
+    /// restoring re-inserts this exact row and the blobs cannot be read back after the delete.
+    static func snapshot(of listClip: Clip, categoryIDs: Set<Int64>, media: MediaStore,
+                         database: ClipDatabase? = nil) -> DeletedClipSnapshot? {
+        var clip = listClip
+        if let database {
+            guard let full = try? database.withRichContent(listClip) else { return nil }
+            clip = full
+        }
         var files: [String: Data] = [:]
         var total = 0
         for name in clip.mediaFilenames where !name.isEmpty {
