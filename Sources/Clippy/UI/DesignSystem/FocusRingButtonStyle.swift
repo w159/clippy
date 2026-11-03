@@ -19,6 +19,6 @@ private struct FocusRingBody: View {
     var body: some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.7 : 1)
-            .overlay { if focused { shape.strokeBorder(tokens.focusRing, lineWidth: 2).padding(-2) } }
+            .overlay { if focused { shape.stroke(tokens.focusRing, lineWidth: 2).padding(-3) } }
     }
 }
