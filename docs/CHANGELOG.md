@@ -70,9 +70,31 @@ The CI harness now renders every Settings pane, every panel pane (Assistant, AI 
 
 ### Performance
 
+Measured on macOS CI (GitHub Actions macOS runner, best of 5) before this round (run 41598348619, commit c912b19) and after it (run 41609295874, commit 0e6dc8d); 1373 tests pass.
+
+| Path | Before | After |
+|---|---|---|
+| Word search, 50k rich-text clips ('invoice') | 244.2 ms | 10.4 ms |
+| No-match search, 50k rich-text clips (full scan) | 67.6 ms | 32.4 ms |
+| Word search, 10k rich-text clips | 43.5 ms | 6.2 ms |
+| Two-word search, 10k rich-text clips | 46.9 ms | 9.2 ms |
+| Fragment search 'nvoic', 10k clips | 7.2 ms | 3.9 ms |
+| Filter app:xcode / kind #image | 5.9 / 6.6 ms | 2.6 / 2.8 ms |
+| Panel list fetch | 33.7 ms | 4.6 ms |
+| Panel window cold load, 50k clips | 35.4 ms | 13.7 ms |
+| Panel update after one edit (3000 filed rich clips) | 19.3 ms | 9.1 ms |
+| Memory held by the panel window (3000 filed rich clips) | 34.4 MB | 0.0 MB |
+| Launch (open and migrate, 50k clips) | 5.1 ms | 5.2 ms |
+| Capture a new clip at 50k | 2.5 ms | 2.0 ms |
+
+- Lists, search and the panel load rows without the RTF and HTML data; it loads when a clip is copied, pasted, edited or undone.
+- Word search walks the date index and stops at the page size instead of fetching and sorting every match.
+- Light rows decode by column position instead of Codable (300 rows: 5.9 ms to 2.0 ms in the same run).
+- The panel's change stamps use the date index directly.
+- The full panel reload after a restore is unchanged (104 ms before, 107 ms after).
 - Every write to `clips` (each capture, OCR result or rename) re-ran the panel's observation, which decoded every categorized clip, RTF and HTML blobs included. `ClipWindowLoader` now reads the window's (id, version) stamps and decodes only new or changed rows. With 3,000 filed rich-text clips, one edit costs 1 decoded row instead of 3,000: 33.13 ms instead of 161.18 ms per pulse on the CI Mac (best of 5, `ClipWindowLoaderTests.testOneEditCostsOneRowNotTheWholeWindow`).
 - Versions live in a `clip_version` table bumped by a trigger on every update from any writer, the MCP server included. The first version of this kept the counter on `clips` itself; a trigger that updates `clips` from inside an update on `clips` re-ran the FTS5 sync triggers in an undefined order and corrupted the search index (SQLite error 11 on every edit, caught by CI). `testEditsKeepTheSearchIndexIntact` runs SQLite's integrity checks after title, OCR and raw SQL edits. A backup restore drops the loader's cache.
-- Migration `v14-blobs-last` rebuilds `clips` once so `contentRTF` and `contentHTML` are the last two columns. SQLite keeps a row's large values in overflow pages after the columns in front of them, so with the blobs early every read of `createdAt`, `userTitle` or `ocrText` walked the rich-text pages. In a Python repro of the schema with 50k rich rows a no-match search scan read 145 MB before and 27.5 MB after (54-60 ms to 27 ms), and the window loader's fresh-row fetch 53 MB before and 12 MB after. Rows, ids, indexes, triggers, foreign keys and the search index are kept (`BlobsLastMigrationTests`); the rebuild cost at 50k rich rows is printed by `testBlobsLastMigrationOn50kRichClips`.
+- Migration `v14-blobs-last` rebuilds `clips` once so `contentRTF` and `contentHTML` are the last two columns. SQLite keeps a row's large values in overflow pages after the columns in front of them, so with the blobs early every read of `createdAt`, `userTitle` or `ocrText` walked the rich-text pages. In a Python repro of the schema with 50k rich rows a no-match search scan read 145 MB before and 27.5 MB after (54-60 ms to 27 ms), and the window loader's fresh-row fetch 53 MB before and 12 MB after. Rows, ids, categories, versions, indexes, triggers, foreign keys and the search index are kept (`BlobsLastMigrationTests`). The rebuild took 3.9 s for 50k rich-text clips on CI.
 
 ### Copy and accessibility
 
