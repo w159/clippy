@@ -164,16 +164,18 @@ struct ScriptRunResultView: View {
     /// Save as clip: stdout, stderr, or both, so a failed run's error text can
     /// be kept as well.
     private var saveMenu: some View {
-        Menu("Save as clip") {
+        Menu {
             if !stdout.isEmpty { Button("Output") { save(stdout) } }
             if !stderr.isEmpty { Button("Errors (stderr)") { save(stderr) } }
             if !stdout.isEmpty && !stderr.isEmpty {
                 Button("Output and errors") { save(stdout + "\n--- stderr ---\n" + stderr) }
             }
+        } label: {
+            ChromeMenuLabel("Save as clip")
         }
-        .menuStyle(.button)
-        .controlSize(.small)
+        .chromeMenuStyle()
         .fixedSize()
+        .accessibilityLabel("Save as clip")
     }
 
     private func copy(_ string: String) {

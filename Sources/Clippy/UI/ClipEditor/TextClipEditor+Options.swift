@@ -106,10 +106,9 @@ extension TextClipEditor {
                 ShareLink(item: text) { Label("Share…", systemImage: "square.and.arrow.up") }
             }
         } label: {
-            Image(systemName: "ellipsis.circle").font(.system(size: 14, weight: .medium))
+            ChromeMenuLabel(systemImage: "ellipsis.circle")
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .chromeMenuStyle()
         .fixedSize()
         .help("More options")
         .accessibilityLabel("More options")
@@ -140,13 +139,12 @@ extension TextClipEditor {
             .pickerStyle(.inline)
         } label: {
             if compact {
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                ChromeMenuLabel(systemImage: "chevron.left.forwardslash.chevron.right")
             } else {
-                Label(language.displayName, systemImage: "chevron.left.forwardslash.chevron.right")
-                    .lineLimit(1)
+                ChromeMenuLabel(language.displayName, systemImage: "chevron.left.forwardslash.chevron.right")
             }
         }
-        .menuStyle(.borderlessButton)
+        .chromeMenuStyle()
         .fixedSize()
         .help("Syntax: \(language.displayName)")
         .accessibilityLabel("Syntax: \(language.displayName)")
@@ -160,10 +158,11 @@ extension TextClipEditor {
             Divider()
             ShareLink(item: text) { Label("Share…", systemImage: "square.and.arrow.up") }
         } label: {
-            Label("Export", systemImage: "square.and.arrow.up")
+            ChromeMenuLabel("Export", systemImage: "square.and.arrow.up")
         }
-        .menuStyle(.borderlessButton)
+        .chromeMenuStyle()
         .fixedSize()
+        .accessibilityLabel("Export")
     }
 
     /// Cmd+= / Cmd+- / Cmd+0. Hidden buttons: the window resolves the key

@@ -117,9 +117,8 @@ extension ScriptsView {
                 Button("Export\u{2026}") { exportScripts() }
                 Divider()
                 Button("Delete", role: .destructive) { activeDialog = .delete }
-            } label: { Image(systemName: "ellipsis.circle") }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
+            } label: { ChromeMenuLabel(systemImage: "ellipsis.circle") }
+                .chromeMenuStyle()
                 .fixedSize()
                 .accessibilityLabel("More")
         }

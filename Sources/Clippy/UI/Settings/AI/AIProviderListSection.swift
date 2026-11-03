@@ -104,9 +104,10 @@ struct AIProviderListSection: View {
                 }
             }
         } label: {
-            Label("Add provider", systemImage: "plus")
+            ChromeMenuLabel("Add provider", systemImage: "plus")
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .chromeMenuStyle().fixedSize()
+        .accessibilityLabel("Add provider")
         .settingsRow("ai.provider")
         .padding(.vertical, 10)
     }

@@ -95,9 +95,9 @@ struct AIActionsManagerView: View {
                 Button("Import actions\u{2026}", action: importActions)
                 Button("Export actions\u{2026}", action: exportActions)
             } label: {
-                Label("Import / Export", systemImage: "square.and.arrow.up.on.square")
+                ChromeMenuLabel("Import / Export", systemImage: "square.and.arrow.up.on.square")
             }
-            .menuStyle(.borderlessButton)
+            .chromeMenuStyle()
             .fixedSize()
             .accessibilityLabel("Import or export actions")
             Button {

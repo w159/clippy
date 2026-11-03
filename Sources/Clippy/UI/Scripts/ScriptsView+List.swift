@@ -27,8 +27,8 @@ extension ScriptsView {
                     Divider()
                     Toggle("Keep run history on disk (no output)", isOn: Binding(
                         get: { store.persistHistory }, set: { store.persistHistory = $0 }))
-                } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton)
+                } label: { ChromeMenuLabel(systemImage: "ellipsis.circle") }
+                    .chromeMenuStyle()
                     .fixedSize()
                     .help("Import, export and history options")
                     .accessibilityLabel("More Options")
@@ -94,8 +94,8 @@ extension ScriptsView {
                 Divider()
                 Toggle("Keep run history on disk (no output)", isOn: Binding(
                     get: { store.persistHistory }, set: { store.persistHistory = $0 }))
-            } label: { Image(systemName: "ellipsis.circle") }
-                .menuStyle(.borderlessButton)
+            } label: { ChromeMenuLabel(systemImage: "ellipsis.circle") }
+                .chromeMenuStyle()
                 .fixedSize()
                 .accessibilityLabel("More Options")
         }
