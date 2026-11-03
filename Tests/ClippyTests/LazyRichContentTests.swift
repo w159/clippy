@@ -158,4 +158,41 @@ final class LazyRichContentTests: CaptureTestCase {
         XCTAssertFalse(keys.contains("richContentOmitted"))
         XCTAssertFalse(keys.contains("hasRichContent"))
     }
+
+    func testLightDecodeMatchesFullDecodeFieldByField() throws {
+        let db = try makeTestDatabase(self)
+        var full = makeTextClip("light full", createdAt: Date(timeIntervalSince1970: 1_700_000_123.456))
+        full.contentRTF = rtf
+        full.contentHTML = html
+        full.contentKind = .image
+        full.mediaFilename = "m.png"
+        full.thumbFilename = "t.png"
+        full.pixelWidth = 640
+        full.pixelHeight = 480
+        full.byteSize = 12_345
+        full.userTitle = "Title"
+        full.filePath = "/tmp/f.png"
+        full.ocrText = "scanned"
+        var bare = makeTextClip("light bare")
+        bare.sourceAppBundleID = nil
+        bare.sourceAppName = nil
+        try db.dbQueue.write { try full.insert($0); try bare.insert($0) }
+        let ids = [try XCTUnwrap(full.id), try XCTUnwrap(bare.id)]
+
+        let (light, fulls) = try db.dbQueue.read { conn in
+            (try Clip.fetchLight(conn, ids: ids).sorted { $0.id! < $1.id! },
+             try Clip.fetchAll(conn, keys: ids).sorted { $0.id! < $1.id! })
+        }
+        XCTAssertEqual(light.count, 2)
+        for (l, f) in zip(light, fulls) {
+            var expected = f
+            expected.contentRTF = nil
+            expected.contentHTML = nil
+            expected.richContentOmitted = f.contentRTF != nil || f.contentHTML != nil
+            XCTAssertEqual(l, expected)
+            XCTAssertEqual(l.richContentOmitted, expected.richContentOmitted)
+        }
+        XCTAssertTrue(light[0].richContentOmitted)
+        XCTAssertFalse(light[1].richContentOmitted)
+    }
 }
