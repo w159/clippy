@@ -80,9 +80,12 @@ struct CaptureSettingsTab: View {
                     .onChange(of: settings.captureSoundID) { _, id in
                         SoundPlayer.play(id: id, volume: SoundPlayer.sliderToVolume(settings.captureSoundVolume))
                     }
-                    IconButton("play.circle", label: "Preview selected sound") {
+                    Button {
                         SoundPlayer.play(id: settings.captureSoundID, volume: SoundPlayer.sliderToVolume(settings.captureSoundVolume))
-                    }
+                    } label: { Image(systemName: "play.circle").symbolRenderingMode(.hierarchical) }
+                        .buttonStyle(.plain)
+                        .help("Preview selected sound")
+                        .accessibilityLabel("Preview selected sound")
                 }
             }
             .disabled(!settings.captureSoundEnabled)
