@@ -353,6 +353,7 @@ final class PanelHarnessTests: XCTestCase {
         let preview = NSApp.windows.first { $0 !== window && $0.isVisible && $0.title == "kw" } ?? NSApp.keyWindow
         press(.escape, to: preview)
         pump(until: "Escape closed the preview") { !QuickLookController.shared.isVisible }
+        pump(until: "the panel is key again after the preview closed") { self.window.isKeyWindow }
         pump(until: "list focus after the preview closed") { !self.focusIsInTextField }
         XCTAssertFalse(focusIsInTextField, "closing the preview leaves keyboard focus on the list, not the search field")
 
