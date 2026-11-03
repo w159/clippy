@@ -54,9 +54,11 @@ extension ClipStore {
             }.value
         } catch {
             ClippyLog.error("Loading older clips failed: \(error)", category: ClippyLog.storage)
+            await MainActor.run { olderLoadError = "Couldn't load older clips." }
             return []
         }
         await MainActor.run {
+            olderLoadError = nil
             let known = Set(olderClips.compactMap(\.id))
             olderClips += page.filter { $0.id.map { !known.contains($0) } ?? false }
             hasMoreOlder = page.count == limit
@@ -70,6 +72,7 @@ extension ClipStore {
         guard !olderClips.isEmpty else { return }
         olderClips = []
         hasMoreOlder = true
+        olderLoadError = nil
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { clips = recents }
     }
 

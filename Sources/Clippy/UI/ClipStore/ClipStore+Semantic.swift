@@ -66,8 +66,16 @@ extension ClipStore {
         semanticTask = Task.detached(priority: .utility) { [weak self] in
             guard !Task.isCancelled else { return }
             var fused: (clips: [Clip], sources: [Int64: SearchMatchSource])?
+            var readFailed = false
             if environment.availability() == .ready {
-                let recent = Self.recentTextCandidates(database)
+                let recent: [Clip]
+                do {
+                    recent = try Self.recentTextCandidates(from: database.dbQueue)
+                } catch {
+                    ClippyLog.error("Semantic candidate read failed: \(error)", category: ClippyLog.storage)
+                    readFailed = true
+                    recent = []
+                }
                 guard !Task.isCancelled else { return }
                 let candidates = recent.compactMap { clip in
                     clip.id.map { SemanticCandidate(id: $0, text: clip.contentText, isSensitive: SensitiveContent.isSensitive(clip: clip)) }
@@ -87,8 +95,10 @@ extension ClipStore {
             }
             guard !Task.isCancelled else { return }
             let outcome = fused
+            let failed = readFailed
             await MainActor.run { [weak self] in
                 self?.finishSemanticMerge(runID: runID, token: token, query: query, keyword: keyword, fused: outcome)
+                if failed { self?.reportSemanticFailure(token: token) }
             }
         }
     }
@@ -112,15 +122,22 @@ extension ClipStore {
     /// Newest text clips, the semantic candidate pool. The rich-text blobs of up to 2000 rows are selected as
     /// NULL (every other Clip column stays, so the record decodes as usual); embedding and the sensitivity
     /// scan read only the text. Synchronous so it can run inside a detached task.
-    private nonisolated static func recentTextCandidates(_ database: ClipDatabase) -> [Clip] {
-        (try? database.dbQueue.read { db in
+    /// Throws on a failed read so it never passes for "no clips".
+    nonisolated static func recentTextCandidates(from reader: DatabaseReader) throws -> [Clip] {
+        try reader.read { db in
             try Clip.fetchAll(db, sql: """
                 SELECT id, contentText, NULL AS contentRTF, NULL AS contentHTML, typeIdentifier, sourceAppBundleID,
                        sourceAppName, createdAt, contentKind, mediaFilename, thumbFilename, pixelWidth, pixelHeight,
                        byteSize, userTitle, filePath, ocrText
                 FROM clips WHERE contentKind = ? ORDER BY createdAt DESC, id DESC LIMIT ?
                 """, arguments: [ClipContentKind.text.rawValue, SemanticSearch.candidateCap])
-        }) ?? []
+        }
+    }
+
+    /// Publishes a failed semantic read on `searchError` (banner with Retry) when `token` is still the current search.
+    func reportSemanticFailure(token: Int) {
+        guard refilterToken == token else { return }
+        searchError = "Couldn't finish the smart search. Try again."
     }
 
     /// Full rows for the semantic-only hits, which are shown and so need every field.

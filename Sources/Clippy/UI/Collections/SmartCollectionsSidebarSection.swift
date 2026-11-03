@@ -27,6 +27,9 @@ struct SmartCollectionsSidebarSection: View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
             if showsTitle { Text("Smart collections").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary) }
             ForEach(selection.collections) { collection in row(collection) }
+            if let errorText = selection.errorText {
+                Text(errorText).font(.caption).foregroundStyle(tokens.danger).lineLimit(2)
+            }
             Button { editing = EditTarget(collection: nil) } label: {
                 Label("New smart collection", systemImage: "plus")
             }

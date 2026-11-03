@@ -61,8 +61,13 @@ final class ClipStore: ObservableObject {
     /// Identity of the OCR run currently owning each clip; a completion whose
     /// token no longer matches was cancelled and must not write anything.
     var ocrRunTokens: [Int64: UUID] = [:]
-    /// Last category create/rename/delete failure (DAT-14). UI shows it and clears it.
+    /// Last category create/rename/delete failure (DAT-14) or failed background
+    /// write (pin, delete, rename, filing; see `performWrite`). UI shows it as a
+    /// banner and clears it.
     @Published var categoryError: String?
+    /// Last "load older" page failure. Loaded rows are kept; the list foot shows
+    /// this with a Retry that calls `loadOlder` again. Cleared on the next success.
+    @Published var olderLoadError: String?
     /// Non-nil when the clip table is at or above 90% of the configured ceiling (DAT-06).
     @Published private(set) var storageWarning: StorageUsage?
 
@@ -304,16 +309,25 @@ final class ClipStore: ObservableObject {
 
     // MARK: - Actions
 
-    /// Enqueue a DB mutation on the serial write lane. Failures were previously
-    /// swallowed with try?; log them so background writes are not silent.
+    /// Shown when a background write fails.
+    static let writeFailureMessage = "Couldn't save that change. Try again."
+
+    /// Enqueue a DB mutation on the serial write lane. A failure is logged and
+    /// published once on `categoryError`, which the panel shows as a banner.
     func performWrite(_ label: String, _ body: @escaping () throws -> Void) {
-        writeQueue.async {
+        writeQueue.async { [weak self] in
             do {
                 try body()
             } catch {
                 ClippyLog.error("\(label) failed: \(error)", category: ClippyLog.storage)
+                DispatchQueue.main.async { self?.reportWriteFailure() }
             }
         }
+    }
+
+    /// Publishes a write failure for the panel banner (the `categoryError` path).
+    func reportWriteFailure(_ message: String = ClipStore.writeFailureMessage) {
+        categoryError = message
     }
 
     /// Toggles membership in the starter category (the Cmd+P fast path).
