@@ -35,7 +35,16 @@ final class ClipWindowLoader: Sendable {
         """
 
     /// Ids per `IN (...)` fetch, well under SQLite's bound-parameter limit.
-    private static let chunkSize = 500
+    static let chunkSize = 500
+
+    /// Light rows plus `rowVersion` (the last column) for a chunk of `count` ids.
+    static func freshSQL(count: Int) -> String {
+        let marks = Array(repeating: "?", count: count).joined(separator: ",")
+        return """
+            SELECT \(Clip.lightColumns(alias: "c")), COALESCE(v.version, 0) AS rowVersion FROM clips c
+            LEFT JOIN clip_version v ON v.clipID = c.id WHERE c.id IN (\(marks))
+            """
+    }
 
     private struct State {
         var generation = 0
@@ -56,24 +65,20 @@ final class ClipWindowLoader: Sendable {
                 state = State(generation: generation)
             }
             let total = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clips") ?? 0
-            let stamps = try Row.fetchAll(db, sql: Self.stampsSQL, arguments: [limit]).map { row in
-                Stamp(id: row["id"], version: row["rowVersion"])
-            }
+            // Cursors read each row in place; Row.fetchAll would copy all of them first.
+            var stamps: [Stamp] = []
+            let stampCursor = try Row.fetchCursor(db, sql: Self.stampsSQL, arguments: [limit])
+            while let row = try stampCursor.next() { stamps.append(Stamp(id: row[0], version: row[1])) }
             let stale = stamps.filter { state.rows[$0.id]?.version != $0.version }.map(\.id)
             var fresh: [Int64: (version: Int64, clip: Clip)] = [:]
+            fresh.reserveCapacity(stale.count)
             for start in stride(from: 0, to: stale.count, by: Self.chunkSize) {
                 let chunk = Array(stale[start..<min(start + Self.chunkSize, stale.count)])
-                let marks = Array(repeating: "?", count: chunk.count).joined(separator: ",")
-                let rows = try Row.fetchAll(
-                    db,
-                    sql: """
-                        SELECT \(Clip.lightColumns(alias: "c")), COALESCE(v.version, 0) AS rowVersion FROM clips c
-                        LEFT JOIN clip_version v ON v.clipID = c.id WHERE c.id IN (\(marks))
-                        """,
-                    arguments: StatementArguments(chunk))
-                for row in rows {
+                let cursor = try Row.fetchCursor(
+                    db, sql: Self.freshSQL(count: chunk.count), arguments: StatementArguments(chunk))
+                while let row = try cursor.next() {
                     let clip = try Clip.light(row)
-                    let version: Int64 = row["rowVersion"]
+                    let version: Int64 = row[Clip.lightColumnCount]
                     if let id = clip.id { fresh[id] = (version, clip) }
                 }
             }

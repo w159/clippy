@@ -108,6 +108,9 @@ extension Clip {
         case userTitle, filePath, ocrText, hasRichContent
     }
 
+    /// Number of columns `lightColumns` selects; extra columns start at this index.
+    static let lightColumnCount = LightColumn.allCases.count
+
     /// Every `clips` column except the RTF and HTML blobs, plus `hasRichContent`
     /// computed in SQL. Lists need none of the blobs; paste, copy, edit, export
     /// and archive read them through `ClipDatabase.withRichContent`.
