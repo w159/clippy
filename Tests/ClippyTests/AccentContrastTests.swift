@@ -67,6 +67,7 @@ final class AccentContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(labelRatio(tokens), 4.5)
     }
 
+    @MainActor
     func testCustomAccentOverrideGetsPassingLabel() {
         let settings = AppSettings.shared
         let savedPreset = settings.themePreset
