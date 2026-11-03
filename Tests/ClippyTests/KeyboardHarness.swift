@@ -67,7 +67,7 @@ extension PanelHarnessTests {
         let shifted = extra.contains(.shift)
         let character = shifted ? Character(letter.uppercased()) : letter
         let key = HarnessKey(characters: String(character), code: HarnessKey.codes[letter] ?? 0)
-        press(key, flags: [.command].union(extra))
+        press(key, flags: NSEvent.ModifierFlags.command.union(extra))
     }
 
     func typeText(_ text: String) {
