@@ -9,6 +9,7 @@ extension ClipDatabase {
         registerImageAndTitleMigrations(&migrator)
         registerFileAndRepairMigrations(&migrator)
         registerOcrAndCollectionMigrations(&migrator)
+        registerStorageLayoutMigrations(&migrator)
         return migrator
     }
 
@@ -310,6 +311,79 @@ extension ClipDatabase {
                     DELETE FROM clip_version WHERE clipID = OLD.id;
                 END
                 """)
+        }
+    }
+
+    /// v14: physical column order of `clips`.
+    private static func registerStorageLayoutMigrations(_ migrator: inout DatabaseMigrator) {
+        // Default foreign key handling is required: GRDB switches foreign keys off for the
+        // migration (otherwise DROP TABLE would cascade-delete clip_category rows) and runs a
+        // full foreign_key_check before the commit.
+        migrator.registerMigration("v14-blobs-last") { connection in
+            // SQLite stores a row's columns in declaration order, and a large value spills
+            // into overflow pages in the middle of the record. RTF and HTML were declared
+            // before createdAt, userTitle, ocrText and the rest, so reading any of those
+            // walked the rich-text overflow pages. Rebuild the table with both blobs
+            // declared last (SQLite's table rebuild procedure).
+            let sequence = try Int64.fetchOne(
+                connection, sql: "SELECT seq FROM sqlite_sequence WHERE name = 'clips'")
+            // Indexes and triggers on clips, plus triggers on other tables whose body names
+            // clips (clip_category_unfiled): DROP TABLE removes the first two kinds, and a
+            // surviving trigger on a missing table makes ALTER TABLE RENAME fail.
+            let objects = try Row.fetchAll(connection, sql: """
+                SELECT type, name, sql FROM sqlite_master
+                WHERE sql IS NOT NULL
+                  AND ((type IN ('index', 'trigger') AND tbl_name = 'clips')
+                       OR (type = 'trigger' AND sql LIKE '%clips%'))
+                ORDER BY rowid
+                """)
+            for object in objects where (object["type"] as String) == "trigger" {
+                let name: String = object["name"]
+                try connection.execute(sql: "DROP TRIGGER \"\(name)\"")
+            }
+            try connection.execute(sql: """
+                CREATE TABLE "clips_rebuild" (
+                    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+                    "contentText" TEXT NOT NULL,
+                    "typeIdentifier" TEXT NOT NULL,
+                    "sourceAppBundleID" TEXT,
+                    "sourceAppName" TEXT,
+                    "createdAt" DATETIME NOT NULL,
+                    "contentKind" TEXT NOT NULL DEFAULT 'text',
+                    "mediaFilename" TEXT,
+                    "thumbFilename" TEXT,
+                    "pixelWidth" INTEGER,
+                    "pixelHeight" INTEGER,
+                    "byteSize" INTEGER,
+                    "userTitle" TEXT,
+                    "filePath" TEXT,
+                    "ocrText" TEXT,
+                    "unfiledAt" DATETIME,
+                    "contentRTF" BLOB,
+                    "contentHTML" BLOB
+                )
+                """)
+            let columns = """
+                "id", "contentText", "typeIdentifier", "sourceAppBundleID", "sourceAppName", \
+                "createdAt", "contentKind", "mediaFilename", "thumbFilename", "pixelWidth", \
+                "pixelHeight", "byteSize", "userTitle", "filePath", "ocrText", "unfiledAt", \
+                "contentRTF", "contentHTML"
+                """
+            try connection.execute(sql: "INSERT INTO \"clips_rebuild\" (\(columns)) SELECT \(columns) FROM \"clips\"")
+            try connection.execute(sql: "DROP TABLE \"clips\"")
+            try connection.execute(sql: "ALTER TABLE \"clips_rebuild\" RENAME TO \"clips\"")
+            for object in objects {
+                let sql: String = object["sql"]
+                try connection.execute(sql: sql)
+            }
+            // The copy left the sequence at max(id); keep the old high-water mark so ids of
+            // deleted clips are never reused (media and version rows key on them).
+            if let sequence {
+                let arguments: StatementArguments = [sequence]
+                try connection.execute(
+                    sql: "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'clips'",
+                    arguments: arguments)
+            }
         }
     }
 }
