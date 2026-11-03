@@ -280,3 +280,59 @@ extension PerfBenchmarkTests {
         XCTAssertLessThan(miss, 3_000 * Self.ciSlack, "50k rich-text no-match (full scan) budget")
     }
 }
+
+/// In-process A/B of the two row decoders on the same database: the full-record fetch used
+/// before the light rows (`Clip.fetchAll(keys:)`) against `Clip.fetchLight`.
+extension PerfBenchmarkTests {
+    func testRowDecodeLightVersusFull() throws {
+        let db = try makeTestDatabase(self)
+        try seedRich(db, count: 3_000)
+        let allIDs: [Int64] = try db.dbQueue.read { conn in
+            try Int64.fetchAll(conn, sql: "SELECT id FROM clips ORDER BY id")
+        }
+        XCTAssertEqual(allIDs.count, 3_000)
+
+        func fetchFull(_ conn: Database, _ ids: [Int64], chunk: Int) throws -> [Clip] {
+            var out: [Clip] = []
+            var start = 0
+            while start < ids.count {
+                let slice = Array(ids[start..<min(start + chunk, ids.count)])
+                out.append(contentsOf: try Clip.fetchAll(conn, keys: slice))
+                start += chunk
+            }
+            return out
+        }
+        func fetchLight(_ conn: Database, _ ids: [Int64], chunk: Int) throws -> [Clip] {
+            var out: [Clip] = []
+            var start = 0
+            while start < ids.count {
+                let slice = Array(ids[start..<min(start + chunk, ids.count)])
+                out.append(contentsOf: try Clip.fetchLight(conn, ids: slice))
+                start += chunk
+            }
+            return out
+        }
+
+        let sets: [(label: String, ids: [Int64], chunk: Int)] = [
+            ("300", Array(allIDs.prefix(300)), 300),
+            ("3000", allIDs, 500),
+        ]
+        for set in sets {
+            var full: [Clip] = []
+            var light: [Clip] = []
+            let fullMs = try ms("decode \(set.label) full") {
+                full = try db.dbQueue.read { try fetchFull($0, set.ids, chunk: set.chunk) }
+            }
+            let lightMs = try ms("decode \(set.label) light") {
+                light = try db.dbQueue.read { try fetchLight($0, set.ids, chunk: set.chunk) }
+            }
+            let fullIDs = full.compactMap(\.id).sorted()
+            let lightIDs = light.compactMap(\.id).sorted()
+            XCTAssertEqual(fullIDs, set.ids)
+            XCTAssertEqual(lightIDs, set.ids)
+            XCTAssertTrue(light.allSatisfy { $0.richContentOmitted && $0.contentRTF == nil })
+            XCTAssertLessThan(fullMs, 2_000 * Self.ciSlack, "full decode \(set.label) budget")
+            XCTAssertLessThan(lightMs, 2_000 * Self.ciSlack, "light decode \(set.label) budget")
+        }
+    }
+}
