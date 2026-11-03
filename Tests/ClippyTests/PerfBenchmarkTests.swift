@@ -279,6 +279,51 @@ extension PerfBenchmarkTests {
         XCTAssertLessThan(fragment, 500 * Self.ciSlack, "50k rich-text common fragment budget")
         XCTAssertLessThan(miss, 3_000 * Self.ciSlack, "50k rich-text no-match (full scan) budget")
     }
+
+    /// The one-time v14 table rebuild (blobs last) on a 50k-clip history of rich rows, written
+    /// with the v13 layout. Runs once per install, so a single run is the signal.
+    func testBlobsLastMigrationOn50kRichClips() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("clippy-perf-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        let queue = try DatabaseQueue(path: dir.appendingPathComponent("old.sqlite").path)
+        let migrator = ClipDatabase.makeMigrator()
+        try migrator.migrate(queue, upTo: "v13-row-version")
+
+        let rtf = Data(repeating: 0x7B, count: 6_000)
+        let html = Data(repeating: 0x3C, count: 6_000)
+        let now = Date()
+        try queue.write { conn in
+            let statement = try conn.makeStatement(sql: """
+                INSERT INTO clips (contentText, contentRTF, contentHTML, typeIdentifier, sourceAppBundleID,
+                                   sourceAppName, createdAt, userTitle)
+                VALUES (?, ?, ?, 'public.rtf', ?, 'Notes', ?, ?)
+                """)
+            for index in 0..<50_000 {
+                let body = (0..<40).map { Self.words[(index &* 31 &+ $0 &* 7) % Self.words.count] + "\(index % 97)" }
+                    .joined(separator: " ")
+                let title: String? = index % 5 == 0 ? "Title \(index)" : nil
+                let arguments: StatementArguments = [
+                    body + " #\(index)", rtf, html, "com.test.app\(index % 8)",
+                    now.addingTimeInterval(-Double(index)), title,
+                ]
+                try statement.execute(arguments: arguments)
+            }
+        }
+
+        let clock = ContinuousClock()
+        let elapsed = try clock.measure { try migrator.migrate(queue) }
+        let migrateMs = Double(elapsed.components.attoseconds) / 1e15 + Double(elapsed.components.seconds) * 1000
+        print("PERF migrate blobs-last 50k rich: \(String(format: "%.0f", migrateMs)) ms")
+
+        try queue.read { conn in
+            XCTAssertEqual(try Int.fetchOne(conn, sql: "SELECT COUNT(*) FROM clips"), 50_000)
+            XCTAssertEqual(Array(try conn.columns(in: "clips").map(\.name).suffix(2)), ["contentRTF", "contentHTML"])
+            XCTAssertTrue(try Row.fetchAll(conn, sql: "PRAGMA foreign_key_check").isEmpty)
+        }
+        XCTAssertLessThan(migrateMs, 60_000 * Self.ciSlack, "50k rich-row blobs-last rebuild budget")
+    }
 }
 
 /// In-process A/B of the two row decoders on the same database: the full-record fetch used
