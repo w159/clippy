@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes.
+- Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
 
 ## v2.3.0 - 2026-11-03 - UI and UX overhaul
 

@@ -17,6 +17,7 @@ private final class KeyableWindow: NSWindow {
 @MainActor
 final class SettingsKeyboardHarnessTests: XCTestCase {
     private var window: NSWindow!
+    private var model: SettingsShellModel?
 
     override func setUp() async throws {
         guard ProcessInfo.processInfo.environment["CLIPPY_UI_HARNESS"] == "1" else {
@@ -33,6 +34,7 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
 
     func testSettingsKeyboardJourney() throws {
         let model = SettingsShellModel()
+        self.model = model
         model.selection = .general
         let window = KeyableWindow(contentRect: NSRect(x: 80, y: 80, width: 1000, height: 700),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -97,6 +99,9 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
                 windowNumber: window.windowNumber, context: nil, characters: characters,
                 charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
             else { return XCTFail("could not make key event") }
+            // NSApplication offers a Cmd key-down to the key equivalents (SwiftUI shortcuts) before
+            // the window sees it; NSWindow.sendEvent alone skips that stage.
+            if type == .keyDown, flags.contains(.command), window.performKeyEquivalent(with: event) { continue }
             window.sendEvent(event)
         }
         RunLoop.main.run(until: Date().addingTimeInterval(0.01))
@@ -106,7 +111,8 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
         let field = Self.searchField(in: window.contentView)
         return "firstResponder=\(String(describing: window.firstResponder)) isKey=\(window.isKeyWindow) "
             + "appActive=\(NSApp.isActive) toolbar=\(String(describing: window.toolbar)) "
-            + "searchFieldFound=\(field != nil)"
+            + "searchFieldFound=\(field != nil) selection=\(String(describing: model?.selection)) "
+            + "query=\(model?.query ?? "?")"
     }
 
     private func pump(seconds: TimeInterval) {

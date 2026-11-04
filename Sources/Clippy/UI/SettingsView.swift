@@ -221,7 +221,9 @@ struct SettingsView: View {
     @MainActor
     private func clearInitialTextFocus() async {
         try? await Task.sleep(for: .milliseconds(60))
-        guard model.query.isEmpty, let window = NSApp.keyWindow, window.firstResponder is NSText else { return }
+        guard model.query.isEmpty, let window = hostWindow ?? NSApp.keyWindow else { return }
+        // Swapping panes can leave the window itself as first responder when the focused view goes away.
+        guard window.firstResponder is NSText || window.firstResponder === window else { return }
         if let editor = window.firstResponder as? NSTextView,
            (editor.delegate as? NSView)?.identifier == SettingsSearchField.identifier { return }
         searchFocusToken += 1

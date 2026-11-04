@@ -38,7 +38,7 @@ struct SettingsSearchField: NSViewRepresentable {
         if coordinator.lastFocusToken != focusToken {
             coordinator.lastFocusToken = focusToken
             Task { @MainActor [weak nsView] in
-                guard let nsView, let window = nsView.window else { return }
+                guard let nsView, let window = nsView.window, nsView.currentEditor() == nil else { return }
                 window.makeFirstResponder(nsView)
             }
         }
