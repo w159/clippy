@@ -18,6 +18,7 @@ private final class KeyableWindow: NSWindow {
 final class SettingsKeyboardHarnessTests: XCTestCase {
     private var window: NSWindow!
     private var model: SettingsShellModel?
+    private var originalField: NSSearchField?
 
     override func setUp() async throws {
         guard ProcessInfo.processInfo.environment["CLIPPY_UI_HARNESS"] == "1" else {
@@ -46,6 +47,7 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
         pump(seconds: 0.8)
 
         let field = try XCTUnwrap(Self.searchField(in: window.contentView))
+        originalField = field
         pump(until: "search field has focus on open") { (window.firstResponder as? NSTextView)?.delegate === field }
 
         let panes = SettingsPaneSection.all.flatMap(\.panes)
@@ -111,7 +113,7 @@ final class SettingsKeyboardHarnessTests: XCTestCase {
         let field = Self.searchField(in: window.contentView)
         return "firstResponder=\(String(describing: window.firstResponder)) isKey=\(window.isKeyWindow) "
             + "appActive=\(NSApp.isActive) toolbar=\(String(describing: window.toolbar)) "
-            + "searchFieldFound=\(field != nil) selection=\(String(describing: model?.selection)) "
+            + "searchFieldFound=\(field != nil) sameField=\(field === originalField) selection=\(String(describing: model?.selection)) "
             + "query=\(model?.query ?? "?")"
     }
 

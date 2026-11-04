@@ -79,6 +79,19 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var paneList: some View {
+        // The field sits beside the list, not inside it: swapping the pane list for the results list
+        // while typing must not rebuild the field, or it loses focus after the first character.
+        VStack(spacing: 0) {
+            SettingsSearchField(text: $model.query, focusToken: searchFocusToken, onMove: handleMove,
+                                onSubmit: openHighlightedHit, onCancel: closeOrClearSearch)
+                .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
+            paneListBody
+        }
+        .onChange(of: model.query) { _, _ in highlightedHit = 0 }
+    }
+
+    @ViewBuilder
+    private var paneListBody: some View {
         Group {
             if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
                 ScrollViewReader { proxy in
@@ -108,12 +121,6 @@ struct SettingsView: View {
         .listStyle(.sidebar)
         .environment(\.sidebarRowSize, .small)
         .controlSize(.small)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            SettingsSearchField(text: $model.query, focusToken: searchFocusToken, onMove: handleMove,
-                                onSubmit: openHighlightedHit, onCancel: closeOrClearSearch)
-                .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
-        }
-        .onChange(of: model.query) { _, _ in highlightedHit = 0 }
     }
 
     private func closeOrClearSearch() {
