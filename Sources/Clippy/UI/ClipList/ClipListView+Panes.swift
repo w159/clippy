@@ -48,7 +48,11 @@ extension ClipListView {
         } else if selection == .pasteStack {
             PasteStackTray(onPasteNext: { PasteStackController.shared.pasteNext() })
         } else if visibleClips.isEmpty {
+            // A calm opaque card: empty-state text sits on a solid surface, not on the panel material.
             emptyState
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
         } else {
             sectionedList
         }
