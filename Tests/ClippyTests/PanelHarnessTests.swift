@@ -204,24 +204,78 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Screenshots and diagnostics
 
+    /// Saves `name.png` as the window server composites the window, so Liquid Glass and system materials are
+    /// drawn as a user sees them. Falls back to `cacheDisplay` when the capture fails, and logs which path ran.
+    /// `compositedOnly` is kept for existing call sites; every screenshot now prefers the composited capture.
     func screenshot(_ name: String, compositedOnly: Bool = false) {
         guard let view = window.contentView else { return }
-        pump(seconds: 0.3)
-        if !compositedOnly, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+        window.orderFrontRegardless()
+        pump(seconds: 0.4)
+        let target = shotDirectory.appendingPathComponent("\(name).png")
+        if captureWindow(to: target) {
+            print("capture=window \(name)")
+            return
+        }
+        try? FileManager.default.removeItem(at: target)
+        if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: rep)
             if let png = rep.representation(using: .png, properties: [:]) {
-                try? png.write(to: shotDirectory.appendingPathComponent("\(name).png"))
+                try? png.write(to: target)
             }
         }
-        // A composited capture as well: cacheDisplay skips materials and vibrancy.
+        print("capture=cache \(name)")
+    }
+
+    /// `screencapture -x -o -l <window id>`: no sound, no shadow. True when the file exists and is not blank.
+    private func captureWindow(to url: URL) -> Bool {
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        capture.arguments = ["-x", "-o", "-l", "\(window.windowNumber)",
-                             shotDirectory.appendingPathComponent("\(name)-window.png").path]
-        guard (try? capture.run()) != nil else { return }
-        let deadline = Date().addingTimeInterval(5)
+        capture.arguments = ["-x", "-o", "-l", "\(window.windowNumber)", url.path]
+        let errors = Pipe()
+        capture.standardError = errors
+        do { try capture.run() } catch {
+            print("HARNESS screencapture failed to start: \(error)")
+            return false
+        }
+        let deadline = Date().addingTimeInterval(8)
         while capture.isRunning, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
-        if capture.isRunning { capture.terminate() }
+        if capture.isRunning {
+            capture.terminate()
+            print("HARNESS screencapture timed out")
+            return false
+        }
+        guard capture.terminationStatus == 0 else {
+            let message = String(data: errors.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+            print("HARNESS screencapture exit \(capture.terminationStatus): \(message)")
+            return false
+        }
+        guard let image = NSImage(contentsOf: url),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              !Self.isBlank(cg)
+        else {
+            print("HARNESS screencapture produced a missing or blank image")
+            return false
+        }
+        return true
+    }
+
+    /// True when the image is fully transparent or a single color.
+    private static func isBlank(_ image: CGImage) -> Bool {
+        let width = 64, height = 64
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let drew = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drew else { return true }
+        let first = Array(pixels[0..<4])
+        if first[3] == 0, stride(from: 3, to: pixels.count, by: 4).allSatisfy({ pixels[$0] == 0 }) { return true }
+        for i in stride(from: 4, to: pixels.count, by: 4) where Array(pixels[i..<i + 4]) != first { return false }
+        return true
     }
 
     private func dumpDiagnostics(_ context: String) {
