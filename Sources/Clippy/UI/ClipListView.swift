@@ -194,20 +194,14 @@ struct ClipListView: View {
     private var panelLayout: some View {
         VStack(spacing: 0) {
             panelHeader
-            Divider()
             if SearchFieldPolicy.showsSearchField(for: selection), showsSearchExtras { searchBar }
             errorBanners
             splitContent
-            Divider()
-            if selectedClipIDs.count >= 2 { batchActionBar; Divider() }
+            if selectedClipIDs.count >= 2 { batchActionBar }
             footer
         }
         .background(ThemedPanelBackground(tokens: tokens, opacity: settings.panelOpacity))
-        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
-                .strokeBorder(designTokens.stroke, lineWidth: 1)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.xl, style: .continuous))
         .tint(tokens.accent)
         .overlay { paletteOverlay }
         .background(paletteShortcut)

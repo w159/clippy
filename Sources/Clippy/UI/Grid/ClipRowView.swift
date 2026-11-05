@@ -52,22 +52,21 @@ struct ClipRowView: View {
     var body: some View {
         HStack(spacing: 8) {
             leadingGlyph
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 if isRenaming { renameField } else { contentLine }
                 if comfortable { metaLine }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             trailingSlot
         }
-        .padding(.leading, 6)
-        .padding(.trailing, 8)
-        .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight)
-        .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
+        .padding(.leading, 10)
+        .padding(.trailing, 12)
+        .padding(.vertical, comfortable ? 4 : 2)
+        .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight + 4)
+        .background(rowBackground, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
-                // A hairline that sharpens the selection fill's edge; the fill carries the state.
-                .strokeBorder(tokens.accent.opacity(0.45), lineWidth: model.isSelected ? 1 : 0)
+            RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous)
+                .strokeBorder(tokens.accent.opacity(0.7), lineWidth: model.isSelected ? 1.5 : 0)
         )
         .contentShape(Rectangle())
         .onHover { hovering in
@@ -84,11 +83,15 @@ struct ClipRowView: View {
 
     // MARK: - Pieces
 
+    /// Rows are rounded cards: calm elevated fill at rest, accent wash on hover and selection.
+    static let rowRadius: CGFloat = 12
+
     private var rowBackground: Color {
-        model.isSelected ? tokens.selection : (isHovering ? tokens.textPrimary.opacity(0.06) : Color.clear)
+        if model.isSelected { return tokens.accent.opacity(0.18) }
+        return isHovering ? tokens.accent.opacity(0.10) : tokens.surfaceElevated
     }
 
-    private var glyphSide: CGFloat { comfortable ? 32 : 24 }
+    private var glyphSide: CGFloat { comfortable ? 38 : 24 }
 
     /// Source app icon, when icons are on and the app is known.
     private var appIcon: NSImage? {
@@ -98,10 +101,10 @@ struct ClipRowView: View {
     /// Comfortable rows: a 32pt rounded tile. App icon with a kind badge in its corner,
     /// or the kind symbol on a tile tinted with the kind color.
     private var kindTile: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
         return ZStack(alignment: .bottomTrailing) {
             if !model.isSensitive, let icon = appIcon {
-                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 32, height: 32)
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 38, height: 38)
                 Image(systemName: visual.symbol)
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(onHue)
@@ -110,16 +113,16 @@ struct ClipRowView: View {
                     .offset(x: 3, y: 3)
             } else {
                 shape.fill(tileFill)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 38, height: 38)
                     .overlay {
                         Image(systemName: visual.symbol)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(tileSymbol)
                     }
             }
         }
-        .frame(width: 32, height: 32)
+        .frame(width: 38, height: 38)
         .accessibilityHidden(true)
         .help(visual.label)
     }
@@ -127,7 +130,7 @@ struct ClipRowView: View {
     /// Tinted by kind; filled with the kind color when the row is selected. Sensitive stays neutral.
     private var tileFill: Color {
         if model.isSensitive { return tokens.surfaceInset }
-        return model.isSelected ? hue : hue.opacity(0.2)
+        return model.isSelected ? hue : hue.opacity(0.16)
     }
 
     private var tileSymbol: Color {
@@ -148,8 +151,8 @@ struct ClipRowView: View {
                 }
             }
             .frame(width: glyphSide, height: glyphSide)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: comfortable ? 8 : ClippyRadius.xs, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: comfortable ? 8 : ClippyRadius.xs, style: .continuous))
+            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: comfortable ? 11 : ClippyRadius.xs, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: comfortable ? 11 : ClippyRadius.xs, style: .continuous))
             .task(id: clip.thumbFilename) {
                 guard let name = clip.thumbFilename else { return }
                 thumbnail = ClipCardView.cachedThumbnail(for: name)
@@ -183,7 +186,7 @@ struct ClipRowView: View {
         } else {
             let text = rowText
             Text(HighlightedPreview.attributed(text, query: query, color: tokens.accent))
-                .font(PanelTypography.body(settings))
+                .font(PanelTypography.body(settings).weight(.medium))
                 .foregroundStyle(tokens.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -211,8 +214,8 @@ struct ClipRowView: View {
             Text(visual.label).lineLimit(1)
             if model.matchedInOCR { ClippyBadge("OCR match") }
         }
-        .font(PanelTypography.micro(settings))
-        .foregroundStyle(tokens.textSecondary)
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     private var metaDot: some View {

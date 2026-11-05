@@ -100,7 +100,7 @@ struct CategorySidePane: View {
     private var expanded: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 4) {
                     sectionHeader("Library", .library)
                     if isOpen(.library) { historyRow }
                     sectionHeader("Categories", .categories, count: store.categories.count, addLabel: "New category") { isCreating = true }
@@ -121,18 +121,17 @@ struct CategorySidePane: View {
                         }
                     }
                 }
-                .padding(.horizontal, 6)
-                .padding(.top, 6)
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
             }
             .accessibilityRotor("Categories") {
                 ForEach(store.categories) { category in
                     AccessibilityRotorEntry(Text(category.name), id: category.id ?? -1, in: rotorNamespace)
                 }
             }
-            newCategoryRow.padding(.horizontal, 6).padding(.bottom, 6)
+            newCategoryRow.padding(.horizontal, 10).padding(.bottom, 10)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(tokens.surfaceSidebar.opacity(settings.panelOpacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Categories")
         .onKeyPress(phases: .down) { press in handleKey(press) }

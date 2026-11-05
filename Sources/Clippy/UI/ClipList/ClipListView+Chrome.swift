@@ -71,18 +71,18 @@ extension ClipListView {
             if settings.aiEnabled {
                 batchButton("Generate Titles", "sparkles", help: "Name each selected clip with AI") { runBatchAITitles() }
             }
-            Divider().frame(height: 14)
             batchButton("Delete", "trash", help: "Delete the selected clips", role: .destructive) { requestBatchDelete() }
             Spacer()
         }
-        .padding(.horizontal, space.three).padding(.vertical, space.two)
-        .background(tokens.footerBar.opacity(settings.panelOpacity))
+        .padding(.horizontal, space.four).padding(.vertical, space.two)
+        .glassEffect(.regular, in: Capsule())
+        .padding(.horizontal, space.three).padding(.bottom, space.one)
     }
 
     func batchButton(_ label: String, _ symbol: String, help: String, role: ButtonRole? = nil,
                      action: @escaping () -> Void) -> some View {
         Button(role: role, action: action) {
-            Label(label, systemImage: symbol).font(PanelTypography.metadata(settings))
+            Label(label, systemImage: symbol).font(.callout)
         }
         .buttonStyle(.borderless)
         .foregroundStyle(role == .destructive ? designTokens.danger : designTokens.textPrimary)
@@ -91,35 +91,40 @@ extension ClipListView {
 
     var footer: some View {
         let space = designTokens.metrics.space
-        return HStack(spacing: space.three) {
-            if selectedClipIDs.count >= 2 {
-                Text("\(selectedClipIDs.count) selected")
-                    .font(PanelTypography.micro(settings))
-                    .padding(.horizontal, space.two).padding(.vertical, 2)
-                    .background(designTokens.selection, in: Capsule())
-                    .foregroundStyle(designTokens.accentText)
+        return GlassEffectContainer(spacing: space.two) {
+            HStack(spacing: space.two) {
+                if selectedClipIDs.count >= 2 {
+                    Text("\(selectedClipIDs.count) selected")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, space.three).padding(.vertical, space.one + 1)
+                        .foregroundStyle(designTokens.onAccent)
+                        .glassEffect(.regular.tint(designTokens.accent), in: Capsule())
+                }
+                ForEach(PanelDisclosure.footerHints(selectedCount: selectedClipIDs.count, hasClips: !visibleClips.isEmpty,
+                                                    plainByDefault: settings.pastePlainTextByDefault,
+                                                    isPinnedPanel: settings.panelPinned, width: listWidth), id: \.key) { hint in
+                    keyHint(hint.key, hint.label)
+                }
+                Spacer()
             }
-            ForEach(PanelDisclosure.footerHints(selectedCount: selectedClipIDs.count, hasClips: !visibleClips.isEmpty,
-                                                plainByDefault: settings.pastePlainTextByDefault,
-                                                isPinnedPanel: settings.panelPinned, width: listWidth), id: \.key) { hint in
-                keyHint(hint.key, hint.label)
-            }
-            Spacer()
         }
-        .padding(.horizontal, space.three)
-        .padding(.vertical, space.two)
-        .background(tokens.footerBar.opacity(settings.panelOpacity))
+        .padding(.horizontal, space.four)
+        .frame(height: PanelLayout.footerHeight)
     }
 
-    /// One footer hint: a key cap (shared `KeyCap` component, so the footer and
-    /// the command palette draw keys the same way) and its action in secondary text.
+    /// One footer hint: a small glass capsule holding the key and its action.
     func keyHint(_ key: String, _ action: String) -> some View {
-        HStack(spacing: designTokens.metrics.space.one) {
-            KeyCap(key)
+        HStack(spacing: designTokens.metrics.space.one + 2) {
+            Text(key)
+                .font(.caption.monospaced().weight(.semibold))
+                .foregroundStyle(.primary)
             Text(action)
-                .font(PanelTypography.metadata(settings))
-                .foregroundStyle(designTokens.textSecondary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, designTokens.metrics.space.three)
+        .padding(.vertical, designTokens.metrics.space.one + 1)
+        .glassEffect(.regular, in: Capsule())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(key), \(action)")
     }

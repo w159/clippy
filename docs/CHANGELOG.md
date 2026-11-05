@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Panel redesign for macOS 26 Liquid Glass: the header is a floating glass strip with the section title, a large capsule search field and round glass icon buttons grouped together; the hairline rules and opaque bars are gone and the panel sits on a system material.
+- Sidebar is a source-list column: larger rows with an SF Symbol per collection, counts trailing in secondary text, and a solid accent highlight on the selected row.
+- Clip rows are rounded cards (12 pt) with a 38 pt colored kind or app tile, a medium-weight title over a caption line, and an accent wash on hover and selection.
+- Detail pane is an inset rounded card with a large kind tile, headline title, a calm content well, a metadata grid, a prominent glass Paste button and a glass Quick Look button.
+- Footer key hints are small glass capsules; the multi-select bar floats as a glass capsule.
+- Command palette is a larger glass panel with a capsule search field, grouped results with tinted symbol tiles and an accent selection; empty and no-results states use the system unavailable-content layout.
 - Built with Swift 6.3; app state uses the Observation framework (`@Observable`) instead of Combine `ObservableObject`.
 - Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
 - The New pill on a Settings pane now clears as soon as that pane is shown, including from search, and stays cleared after relaunch.

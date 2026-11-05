@@ -66,7 +66,7 @@ extension ClipListView {
         let metadata = cardMetadata(for: clips)
         return ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: density == .compact ? 2 : GridMetrics.spacing, pinnedViews: []) {
+                LazyVStack(spacing: density == .compact ? 4 : 6, pinnedViews: []) {
                     Color.clear.frame(height: 0).id(Self.topAnchorID)
                     ForEach(sections(for: clips)) { section in
                         if !section.title.isEmpty {
@@ -173,21 +173,21 @@ extension ClipListView {
         return map
     }
 
-    /// Section header: small-caps title with a count badge; no rule line.
+    /// Section header: sentence-case title with a quiet count; no rule line.
     func sectionHeader(_ title: String, count: Int) -> some View {
         HStack(spacing: 6) {
-            Text(title.uppercased())
-                .font(PanelTypography.micro(settings).weight(.semibold))
-                .foregroundStyle(tokens.textSecondary)
-                .kerning(0.6)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
             Text("\(count)")
-                .font(PanelTypography.micro(settings))
-                .foregroundStyle(tokens.textSecondary)
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
                 .monospacedDigit()
             Spacer(minLength: 0)
         }
-        .padding(.top, 8)
-        .padding(.horizontal, 4)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
+        .padding(.horizontal, 6)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }

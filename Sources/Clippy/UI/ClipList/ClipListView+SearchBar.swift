@@ -30,28 +30,27 @@ extension ClipListView {
             }
         }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsFilterRow)
-        .padding(.horizontal, designTokens.metrics.space.three)
-        .padding(.vertical, designTokens.metrics.space.one)
-        .background(tokens.headerBar.opacity(settings.panelOpacity))
+        .padding(.horizontal, designTokens.metrics.space.four)
+        .padding(.bottom, designTokens.metrics.space.two)
     }
 
     /// The text field with a search glyph, grammar help and a clear button.
     var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(.body.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tokens.textSecondary)
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             // Explicit prompt color: the system placeholder follows the window
             // appearance, not the theme, and vanishes when the two disagree.
             TextField(text: $store.query, selection: $searchSelection,
-                      prompt: Text("Search clips").foregroundStyle(tokens.textSecondary)) {
+                      prompt: Text("Search clips").foregroundStyle(.secondary)) {
                 Text("Search clips")
             }
                 .textFieldStyle(.plain)
-                .font(.system(size: 15))
-                .foregroundStyle(tokens.textPrimary)
+                .font(.title3)
+                .foregroundStyle(.primary)
                 .focused($focusTarget, equals: .search)
                 .accessibilityLabel("Search clips")
                 .accessibilityHint("Supports quotes, minus to exclude, and kind, app, in, before, after, on and size filters.")

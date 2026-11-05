@@ -35,7 +35,6 @@ extension ClipListView {
                 onClose: onClose,
                 search: { headerSearchField }
             )
-            .background(tokens.headerBar.opacity(settings.panelOpacity))
         } else {
             PanelHeaderView(
                 sectionTitle: sectionTitle,
@@ -46,7 +45,6 @@ extension ClipListView {
                 onOpenSettings: onOpenSettings,
                 onClose: onClose
             )
-            .background(tokens.headerBar.opacity(settings.panelOpacity))
         }
     }
 

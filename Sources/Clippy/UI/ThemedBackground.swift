@@ -34,38 +34,26 @@ struct ThemedPanelBackground: View {
     private let settings = AppSettings.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-    @Environment(\.clippyTokens) private var clippyTokens
 
+    /// Floating panel base: a system material with a light theme tint, so the
+    /// glass controls above it have something to refract. Solid when the user
+    /// asked for it or accessibility settings remove transparency. Content
+    /// areas draw their own opaque cards on top.
     var body: some View {
         switch settings.panelMaterial.backdrop {
         case .solid:
             tokens.panel
-        case .glass where reduceTransparency || colorSchemeContrast == .increased:
-            solidFallback
+        case _ where reduceTransparency || colorSchemeContrast == .increased:
+            tokens.panel
         case .glass:
             ZStack {
-                Rectangle().fill(.clear).glassEffect(.regular, in: RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous))
-                tokens.panel.opacity(opacity)
+                Rectangle().fill(.regularMaterial)
+                tokens.panel.opacity(opacity * 0.45)
             }
-        case .vibrancy where reduceTransparency || colorSchemeContrast == .increased:
-            solidFallback
         case .vibrancy:
             ZStack {
-                VisualEffectBlur(material: settings.panelMaterial == .regular ? .hudWindow : .menu, isDark: tokens.isDark)
-                tokens.panel.opacity(opacity)
-            }
-        }
-    }
-
-    /// High-contrast, opaque fallback when material transparency is unavailable.
-    private var solidFallback: some View {
-        // The panel root already draws its 1pt border and clips to
-        // `ClippyRadius.panel`; this fallback only thickens that edge under
-        // Increase Contrast, on the same shape so the corners line up.
-        tokens.panel.overlay {
-            if colorSchemeContrast == .increased {
-                RoundedRectangle(cornerRadius: ClippyRadius.panel, style: .continuous)
-                    .strokeBorder(clippyTokens.strokeStrong, lineWidth: 1.5)
+                Rectangle().fill(.thickMaterial)
+                tokens.panel.opacity(opacity * 0.55)
             }
         }
     }

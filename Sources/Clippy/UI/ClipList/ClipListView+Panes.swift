@@ -20,8 +20,6 @@ extension ClipListView {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Background behind the scrolling cards; tracks the transparency slider.
-            .background(tokens.scrollBackground.opacity(settings.panelOpacity))
             .animation(ClippyMotion.animation(.standard, reduce: reduceMotion), value: selection)
             .clipped()
 

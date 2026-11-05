@@ -46,7 +46,7 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
                     .clipped()
                     .focusSection()
                 if isRail {
-                    Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
+                    Color.clear.frame(width: 4)
                 } else {
                     grabber(panelWidth: panelWidth)
                 }
@@ -81,8 +81,10 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
     private func grabber(panelWidth: CGFloat) -> some View {
         ZStack {
             Rectangle().fill(.clear)
-            Rectangle().fill(grabberHovered || dragStartWidth != nil ? tokens.accent : Color(nsColor: .separatorColor))
-                .frame(width: grabberHovered || dragStartWidth != nil ? 2 : 1)
+            Capsule().fill(tokens.accent)
+                .frame(width: 3)
+                .padding(.vertical, 24)
+                .opacity(grabberHovered || dragStartWidth != nil ? 1 : 0)
         }
         .frame(width: SidebarMetrics.grabberWidth)
         .frame(maxHeight: .infinity)

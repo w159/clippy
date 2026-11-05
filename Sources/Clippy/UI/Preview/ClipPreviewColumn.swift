@@ -43,9 +43,13 @@ struct ClipPreviewColumn: View {
     var body: some View {
         HStack(spacing: 0) {
             resizeHandle
-            content.frame(width: width)
+            content
+                .frame(width: width)
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: .black.opacity(0.10), radius: 10, y: 3)
         }
-        .background(tokens.surfaceSidebar)
+        .padding(.trailing, 12)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -55,7 +59,8 @@ struct ClipPreviewColumn: View {
                 .transition(.opacity)
                 .id(clip.id)
         } else {
-            Text("Select a clip to preview").font(.callout).foregroundStyle(tokens.textSecondary)
+            ContentUnavailableView("No Clip Selected", systemImage: "doc.on.clipboard",
+                                   description: Text("Select a clip to preview it here."))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -85,23 +90,23 @@ struct ClipPreviewColumn: View {
         let time = RelativeTime.string(for: clip.createdAt)
         let subtitle = visual == nil ? time : [clip.sourceAppName, time].compactMap { $0 }.joined(separator: " \u{00B7} ")
         return HStack(alignment: .top, spacing: tokens.metrics.space.three) {
-            RoundedRectangle(cornerRadius: tokens.metrics.radius.md, style: .continuous)
-                .fill(visual == nil ? tokens.surfaceInset : hue.opacity(0.2))
-                .frame(width: 40, height: 40)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(visual == nil ? tokens.surfaceInset : hue.opacity(0.18))
+                .frame(width: 52, height: 52)
                 .overlay {
                     Image(systemName: visual?.symbol ?? "lock.fill")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.title2.weight(.semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(hue)
                 }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.title(for: clip, item: item, sensitive: visual == nil))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(tokens.textPrimary)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle).font(.system(size: 12)).foregroundStyle(tokens.textSecondary).lineLimit(1)
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -122,20 +127,19 @@ struct ClipPreviewColumn: View {
 
     /// Content in a rounded card on the design-system surface that fills the free height.
     private func contentCard(item: ClipPreviewItem) -> some View {
-        let shape = RoundedRectangle(cornerRadius: tokens.metrics.radius.card, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         return ScrollView { ClipPreviewView(item: item, lineLimit: 60, contentFontSize: 13) }
             .padding(tokens.metrics.space.three)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(shape.fill(tokens.surfaceElevated))
-            .overlay(shape.strokeBorder(tokens.stroke))
+            .background(Color.primary.opacity(0.05), in: shape)
     }
 
     private func metadataGrid(_ meta: ClipPreviewMetadata) -> some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: tokens.metrics.space.three, verticalSpacing: tokens.metrics.space.one) {
             ForEach(Array(meta.rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    Text(row.label).font(.system(size: 12)).foregroundStyle(tokens.textSecondary)
-                    Text(row.value).font(.system(size: 12)).foregroundStyle(tokens.textPrimary)
+                    Text(row.label).font(.callout).foregroundStyle(.secondary)
+                    Text(row.value).font(.callout).foregroundStyle(.primary)
                         .textSelection(.enabled).lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -150,21 +154,24 @@ struct ClipPreviewColumn: View {
                 Button(action: onPaste) {
                     Label("Paste", systemImage: "arrow.down.doc").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.accent)
+                .buttonStyle(.glassProminent)
+                .tint(tokens.accent)
+                .controlSize(.large)
                 .accessibilityLabel("Paste selected clip")
             }
             if let onQuickLook, !sensitive {
                 Button(action: onQuickLook) {
                     Label("Quick Look", systemImage: "eye").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.glass)
+                .controlSize(.large)
                 .accessibilityLabel("Quick Look selected clip")
             }
         }
     }
 
     private var resizeHandle: some View {
-        Rectangle().fill(tokens.stroke).frame(width: 1)
+        Color.clear.frame(width: 8)
             .overlay(Color.clear.frame(width: 8).contentShape(Rectangle()).onHover { inside in
                 if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
             }.gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global).onChanged { drag in

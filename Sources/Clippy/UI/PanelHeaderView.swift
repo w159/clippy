@@ -20,7 +20,6 @@ struct PanelHeaderView<Search: View>: View {
     @Bindable private var grid = GridPreferences.shared
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var overflowHovered = false
 
     private let settings = AppSettings.shared
 
@@ -42,8 +41,8 @@ struct PanelHeaderView<Search: View>: View {
     }
 
     var body: some View {
-        ZStack {
-            HStack(spacing: tokens.metrics.space.one) {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
                 sectionLabel
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
@@ -51,22 +50,25 @@ struct PanelHeaderView<Search: View>: View {
                     Spacer(minLength: 0)
                 } else {
                     search
-                        .padding(.horizontal, tokens.metrics.space.two)
-                        .frame(height: 30)
-                        .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .glassEffect(.regular, in: Capsule())
                         .frame(minWidth: 120, maxWidth: .infinity)
                 }
-                IconButton("sidebar.left", label: "Toggle sidebar", help: "Show or hide the sidebar", action: onToggleSidebar)
-                IconButton(isPinned ? "pin.fill" : "pin", label: isPinned ? "Unpin panel" : "Pin panel",
-                           help: isPinned ? "Unpin panel" : "Pin panel", state: isPinned ? .selected : .rest,
-                           action: onTogglePin)
-                    .accessibilityValue(isPinned ? "pinned" : "not pinned")
-                    .accessibilityHint("Keeps the panel visible when you click elsewhere.")
-                overflowMenu
-                IconButton("xmark", label: "Close", action: onClose)
+                HStack(spacing: 8) {
+                    IconButton("sidebar.left", label: "Toggle sidebar", help: "Show or hide the sidebar",
+                               glass: true, action: onToggleSidebar)
+                    IconButton(isPinned ? "pin.fill" : "pin", label: isPinned ? "Unpin panel" : "Pin panel",
+                               help: isPinned ? "Unpin panel" : "Pin panel", state: isPinned ? .selected : .rest,
+                               glass: true, action: onTogglePin)
+                        .accessibilityValue(isPinned ? "pinned" : "not pinned")
+                        .accessibilityHint("Keeps the panel visible when you click elsewhere.")
+                    overflowMenu
+                    IconButton("xmark", label: "Close", glass: true, action: onClose)
+                }
             }
-            .padding(.horizontal, tokens.metrics.space.three)
         }
+        .padding(.horizontal, 16)
         .frame(height: PanelLayout.headerHeight)
         // Any area not covered by a control starts a window drag.
         .background(WindowDragRegion())
@@ -77,14 +79,14 @@ struct PanelHeaderView<Search: View>: View {
     private var sectionLabel: some View {
         if !sectionTitle.isEmpty {
             Text(sectionTitle)
-                .font(.headline)
-                .foregroundStyle(tokens.textPrimary)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .allowsHitTesting(false)
             if let clipCount {
                 Text("\(clipCount)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(tokens.textSecondary)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
                     .allowsHitTesting(false)
                     .accessibilityLabel(CopyFormat.counted(clipCount, "clip"))
             }
@@ -111,15 +113,14 @@ struct PanelHeaderView<Search: View>: View {
             Button("Settings\u{2026}", systemImage: "gearshape", action: onOpenSettings)
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 14, weight: .medium))
-                .frame(minWidth: 28, minHeight: 28)
-                .foregroundStyle(tokens.textPrimary)
-                .background(overflowHovered ? tokens.surfaceInset : .clear,
-                            in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-                .contentShape(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-                .onHover { overflowHovered = $0 }
+                .font(.body.weight(.medium))
+                .frame(width: 20, height: 20)
         }
-        .chromeMenuStyle()
+        .menuStyle(.button)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(.large)
+        .menuIndicator(.hidden)
         .fixedSize()
         .help("Density, columns and settings")
         .accessibilityLabel("More")

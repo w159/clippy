@@ -10,11 +10,11 @@ enum GridMetrics {
     /// Gap between cards and rows.
     static let spacing: CGFloat = 8
     /// Scroll content padding on each side.
-    static let listPadding: CGFloat = 10
+    static let listPadding: CGFloat = 12
     /// Compact row height (LAY-08).
     static let compactRowHeight: CGFloat = 32
     /// Comfortable (two-line, 32pt tile) row height.
-    static let comfortableRowHeight: CGFloat = 52
+    static let comfortableRowHeight: CGFloat = 60
     /// Typical card height, used to size a page jump in the cards density.
     static let cardPageStride: CGFloat = 90
 
