@@ -94,7 +94,7 @@ extension AppDelegate {
         panelController.hide()
         if settingsWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
+                contentRect: NSRect(x: 0, y: 0, width: 715, height: 540),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false

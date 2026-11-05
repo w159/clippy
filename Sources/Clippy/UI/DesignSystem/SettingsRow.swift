@@ -95,8 +95,8 @@ struct SettingsRow<Control: View>: View {
             .toggleStyle(AccentToggleStyle()).toggleStyle(.switch)
             .lineLimit(1)
         }
-        .padding(.vertical, tokens.metrics.space.three)
-        .frame(minHeight: 44)
+        .padding(.vertical, tokens.metrics.space.two)
+        .frame(minHeight: 32)
         .opacity(enabled ? 1 : 0.68)
         .disabled(!enabled)
     }

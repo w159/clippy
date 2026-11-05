@@ -10,7 +10,7 @@ final class ModelBrowserWindowController: NSObject, NSWindowDelegate {
 
     func present(providerID: UUID, currentModel: String, onSelect: @escaping @MainActor (String) -> Void) {
         window?.close()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 640),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 520),
                               styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Choose a Model"
         window.isReleasedWhenClosed = false
@@ -18,7 +18,7 @@ final class ModelBrowserWindowController: NSObject, NSWindowDelegate {
         let model = ModelBrowserViewModel(providerID: providerID, currentModel: currentModel, onSelect: onSelect)
         model.onClose = { [weak self] in self?.window?.close() }
         window.contentView = NSHostingView(rootView: ModelBrowserView(model: model).clippyDesignSystem())
-        window.minSize = NSSize(width: 760, height: 480)
+        window.minSize = NSSize(width: 620, height: 400)
         window.center()
         window.setFrameAutosaveName("AIModelBrowser")
         self.model = model

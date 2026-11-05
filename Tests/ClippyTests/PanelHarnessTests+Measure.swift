@@ -14,7 +14,7 @@ extension PanelHarnessTests {
     }
 
     /// Content size the Settings window is shown at by the Settings screenshot tests and by the measurement.
-    static let settingsWindowSize = NSSize(width: 1000, height: 700)
+    static let settingsWindowSize = NSSize(width: 715, height: 540)
 
     private func format(_ value: CGFloat) -> String { String(format: "%.1f", Double(value)) }
 
