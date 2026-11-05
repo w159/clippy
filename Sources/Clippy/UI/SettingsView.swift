@@ -7,7 +7,6 @@ struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     @StateObject private var model: SettingsShellModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     @State private var hostWindow: NSWindow?
     @State private var highlightedHit = 0
     @State private var searchFocusToken = 0
@@ -173,7 +172,6 @@ struct SettingsView: View {
             guard let newValue else { return }
             model.selection = newValue
             model.compactShowsPane = true
-            seenPanes = SettingsSeenPanes.marking(newValue, in: seenPanes)
         })
     }
 
