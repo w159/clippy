@@ -81,7 +81,9 @@ final class PanelHarnessTests: XCTestCase {
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
 
-    func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
+    func show<V: View>(_ content: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
+        // CI runners cannot always activate the test host, which draws accent controls grey; capture them active.
+        let view = content.environment(\.appearsActive, true)
         NSApp.appearance = NSAppearance(named: appearance)
         let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
                                  styleMask: PastePanel.chromeStyleMask,
@@ -104,7 +106,7 @@ final class PanelHarnessTests: XCTestCase {
         self.window = window
         makeKeyInActiveApp(window)
         pump(seconds: 0.5)
-        if !window.isKeyWindow { print("HARNESS warning: window is not key") }
+        if !window.isKeyWindow { print("HARNESS warning: window is not key (appActive=\(NSApp.isActive))") }
     }
 
     /// Accent controls draw grey while the app is inactive or the window is not key. Activate the app, make the
@@ -478,7 +480,8 @@ final class PanelHarnessTests: XCTestCase {
             let defaults = try XCTUnwrap(UserDefaults(suiteName: "clippy.harness.onboarding.\(UUID())"))
             NSApp.appearance = NSAppearance(named: appearance)
             let onboarding = OnboardingWindowController.makeWindow(
-                rootView: OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem())
+                rootView: OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem()
+                    .environment(\.appearsActive, true))
             onboarding.appearance = NSAppearance(named: appearance)
             present(onboarding)
             pump(seconds: 0.8)
