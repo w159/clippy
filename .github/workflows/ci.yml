@@ -210,8 +210,17 @@ jobs:
               run: |
                   cp ci/before-2.2.0/BeforeScreenshotTests.swift v220/Tests/ClippyTests/
                   cd v220
-                  swift test --filter BeforeScreenshotTests || echo "::warning::2.2.0 screenshot tests reported failures"
-                  ls "$CLIPPY_SCREENSHOT_DIR" | wc -l
+                  # One process per test: 2.2.0's onboarding view model calls
+                  # UNUserNotificationCenter.current(), which raises an
+                  # NSInternalInconsistencyException without an app bundle and would kill
+                  # every other test. testOnboardingScreenshots is skipped for 2.2.0 (the
+                  # comparison then shows the placeholder in that column).
+                  for t in testPanelScreenshots testSettingsPaneScreenshots testClipEditorScreenshots testPaletteScreenshots; do
+                      swift test --filter "BeforeScreenshotTests/$t" || echo "::warning::2.2.0 $t reported failures"
+                  done
+                  count=$(ls "$CLIPPY_SCREENSHOT_DIR" | wc -l)
+                  echo "$count"
+                  if [ "$count" -lt 30 ]; then echo "::warning::only $count 2.2.0 screenshots were written"; fi
 
             - name: Download current screenshots
               uses: actions/download-artifact@v8
