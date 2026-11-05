@@ -79,10 +79,10 @@ final class ThemeTests: XCTestCase {
         }
     }
 
-    func testDefaultThemeIsCleanLight() {
+    func testDefaultThemeIsAutomatic() {
         let defaults = UserDefaults(suiteName: "clippy.theme.defaults.\(UUID())")!
         AppSettings.registerDefaults(defaults)
-        XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.cleanLight.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.automatic.rawValue)
     }
 
     func testAutomaticTokensFollowTheHostColorScheme() {

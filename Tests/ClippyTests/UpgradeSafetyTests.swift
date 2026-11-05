@@ -2,16 +2,16 @@ import GRDB
 import XCTest
 @testable import Clippy
 
-/// 2.3.1: the default theme is Clean Light again, and an existing database with pending
+/// 2.3.1: the default theme follows the system appearance, and an existing database with pending
 /// migrations is backed up before they run.
 @MainActor
 final class UpgradeSafetyTests: XCTestCase {
-    func testRegisteredThemeDefaultIsCleanLight() throws {
+    func testRegisteredThemeDefaultIsAutomatic() throws {
         let name = "clippy-defaults-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         AppSettings.registerDefaults(defaults)
-        XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.cleanLight.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.automatic.rawValue)
         XCTAssertNotNil(ThemePreset(rawValue: ThemePreset.automatic.rawValue), "Automatic stays selectable")
     }
 
