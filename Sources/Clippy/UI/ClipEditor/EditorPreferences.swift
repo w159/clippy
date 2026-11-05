@@ -45,7 +45,7 @@ final class EditorPreferences {
 
     private func bool(_ key: String, default value: Bool) -> Bool {
         _ = revision
-        defaults.object(forKey: key) == nil ? value : defaults.bool(forKey: key)
+        return defaults.object(forKey: key) == nil ? value : defaults.bool(forKey: key)
     }
 
     private func set(_ value: Bool, _ key: String) {
