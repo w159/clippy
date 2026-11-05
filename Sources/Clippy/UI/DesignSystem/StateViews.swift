@@ -24,7 +24,7 @@ struct EmptyState: View {
         } description: {
             if let message { Text(message) }
         } actions: {
-            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.glass) }
+            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.bordered) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
@@ -78,7 +78,7 @@ struct ErrorState: View {
         } description: {
             Text(message)
         } actions: {
-            if let retryTitle, let retry { Button(retryTitle, action: retry).buttonStyle(.glass) }
+            if let retryTitle, let retry { Button(retryTitle, action: retry).buttonStyle(.bordered) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
