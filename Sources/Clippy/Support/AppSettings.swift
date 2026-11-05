@@ -147,7 +147,7 @@ final class AppSettings: ObservableObject {
     // MARK: - Theme
 
     /// Named theme preset. Drives the whole token table; see Theme.tokens().
-    @AppDefault(Keys.themePreset, default: ThemePreset.automatic)
+    @AppDefault(Keys.themePreset, default: ThemePreset.cleanLight)
     var themePreset: ThemePreset
 
     /// Whether the custom palette is a dark theme (affects scrollbar/appearance).

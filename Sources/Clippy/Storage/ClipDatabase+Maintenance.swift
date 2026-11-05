@@ -208,6 +208,35 @@ extension ClipDatabase {
                               databaseBytes: (attrs[.size] as? NSNumber)?.int64Value ?? 0)
     }
 
+    // MARK: - Upgrade safety
+
+    static func fileHasContent(_ url: URL) -> Bool {
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber
+        return (size?.int64Value ?? 0) > 0
+    }
+
+    /// Runs the migrations. An existing database with migrations still pending is
+    /// snapshotted first (some migrations rebuild whole tables at launch), and the
+    /// run is timed. A failed snapshot is logged and the upgrade goes on: refusing
+    /// to open would be worse than migrating without the safety net.
+    func migrateBackingUpFirst(existedBefore: Bool) throws {
+        let migrator = Self.makeMigrator()
+        if existedBefore, try dbQueue.read({ try !migrator.hasCompletedMigrations($0) }) {
+            do {
+                let snapshot = try createBackup()
+                ClippyLog.info("Backed up database before upgrade: \(snapshot.url.lastPathComponent)",
+                               category: ClippyLog.storage)
+            } catch {
+                ClippyLog.error("Pre-upgrade backup failed, migrating anyway: \(error)",
+                                category: ClippyLog.storage)
+            }
+        }
+        let started = ContinuousClock.now
+        try migrator.migrate(dbQueue)
+        let elapsed = started.duration(to: .now)
+        ClippyLog.info("Database migrations finished in \(elapsed)", category: ClippyLog.storage)
+    }
+
     // MARK: - Orphaned media
 
     /// Compare the media folder with what clips reference. With `remove` false

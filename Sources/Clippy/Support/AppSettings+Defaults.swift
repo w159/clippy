@@ -33,8 +33,8 @@ extension AppSettings {
                 Keys.highContrastCardText: false,
                 Keys.fontFamily: PanelFontFamily.systemDefault.rawValue,
                 Keys.fontSizeBase: 13,
-                // Clean Light in light mode, its GitHub Dark counterpart in dark mode.
-                Keys.themePreset: ThemePreset.automatic.rawValue,
+                // Clean Light. "Automatic" (Clean Light / GitHub Dark by system appearance) stays selectable.
+                Keys.themePreset: ThemePreset.cleanLight.rawValue,
                 Keys.panelOpacity: 1.0,
                 Keys.customIsDark: false,
                 // Per-token overrides default to "" (no override) so a fresh install

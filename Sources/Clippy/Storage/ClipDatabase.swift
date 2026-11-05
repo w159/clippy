@@ -122,8 +122,9 @@ final class ClipDatabase: Sendable {
                 directory: mediaDirectory ?? supportDir.appendingPathComponent("media", isDirectory: true)
             )
         }
+        let existedBefore = Self.fileHasContent(self.databaseURL)
         dbQueue = try DatabasePool(path: self.databaseURL.path, configuration: Self.makeConfiguration())
-        try Self.makeMigrator().migrate(dbQueue)
+        try migrateBackingUpFirst(existedBefore: existedBefore)
     }
 
     /// Hook run on every new connection before anything else. This is the seam
