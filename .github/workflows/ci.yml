@@ -98,6 +98,8 @@ jobs:
                   mkdir -p "$RUNNER_TEMP/screenshots"
                   open build/Clippy.app
                   sleep 8
+                  open build/Clippy.app
+                  sleep 2
                   pgrep -x Clippy
                   /usr/sbin/screencapture -x "$RUNNER_TEMP/screenshots/09-first-launch.png" || true
                   pkill -x Clippy || true

@@ -36,9 +36,9 @@ struct AboutSettingsPane: View {
             .settingsRow("about")
             Section("Links") {
                 Link("Clippy on GitHub", destination: URL(string: "https://github.com/w159/clippy")!)
-                    .tint(Color.clippyAccent)
+                    .foregroundStyle(Color.clippyAccent)
                 Link("Report an issue", destination: URL(string: "https://github.com/w159/clippy/issues")!)
-                    .tint(Color.clippyAccent)
+                    .foregroundStyle(Color.clippyAccent)
             }
             Section("Licenses") {
                 SettingsNote("Clippy uses GRDB.swift (MIT), TOMLKit (MIT), swift-markdown-ui (MIT) and Sparkle (MIT). Full license texts ship inside the app bundle.")
