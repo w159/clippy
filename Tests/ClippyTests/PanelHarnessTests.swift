@@ -172,19 +172,18 @@ final class PanelHarnessTests: XCTestCase {
     }
 
     /// The SwiftUI tree is not reachable through `accessibilityChildren` of the
-    /// hosting view, so assertions read what is actually drawn: render the content
-    /// view at 2x and run text recognition over it.
+    /// hosting view, so assertions read what is actually drawn: capture the window as the window server
+    /// composites it (what a user sees, Liquid Glass included), falling back to rendering the content view at
+    /// 2x, and run text recognition over it.
     private func recognizedLines() -> [RecognizedLine] {
         guard let view = window?.contentView else { return [] }
-        let bounds = view.bounds
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        else { return [] }
-        rep.size = bounds.size
-        view.cacheDisplay(in: bounds, to: rep)
-        guard let cgImage = rep.cgImage else { return [] }
+        var source = "window"
+        var image = windowCaptureImage()
+        if image == nil {
+            source = "cache"
+            image = cacheDisplayImage(of: view)
+        }
+        guard let cgImage = image else { return [] }
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
@@ -199,8 +198,27 @@ final class PanelHarnessTests: XCTestCase {
         let lines = (request.results ?? []).compactMap { observation in
             observation.topCandidates(1).first.map { RecognizedLine(text: $0.string, box: observation.boundingBox) }
         }
-        if lines.isEmpty { print("HARNESS ocr found no text in a \(cgImage.width)x\(cgImage.height) px render") }
+        if lines.isEmpty { print("HARNESS ocr found no text in a \(cgImage.width)x\(cgImage.height) px \(source) render") }
         return lines
+    }
+
+    private func windowCaptureImage() -> CGImage? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("clippy-ocr-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard captureWindow(to: url), let image = NSImage(contentsOf: url) else { return nil }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
+    private func cacheDisplayImage(of view: NSView) -> CGImage? {
+        let bounds = view.bounds
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return nil }
+        rep.size = bounds.size
+        view.cacheDisplay(in: bounds, to: rep)
+        return rep.cgImage
     }
 
     private func isShown(_ fragment: String) -> Bool {
