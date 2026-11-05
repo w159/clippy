@@ -7,17 +7,17 @@ enum SidebarMetrics {
     /// Widest the expanded sidebar may be, as a fraction of the panel width.
     static let expandedMaxFraction: CGFloat = 0.45
     /// Width of the icon rail shown when the sidebar is collapsed.
-    static let railWidth: CGFloat = 52
+    static let railWidth: CGFloat = 44
     /// Panel widths below this always show the icon rail.
     static let collapseBreakpoint: CGFloat = 520
     /// Default expanded width; double-clicking the grabber restores it.
-    static let defaultWidth: CGFloat = 176
+    static let defaultWidth: CGFloat = 168
     /// Hit strip width of the resize grabber.
     static let grabberWidth: CGFloat = 6
 
     /// Narrowest the clip list may get while the preview column is showing; below
     /// this the sidebar collapses to its rail instead of squeezing the list.
-    static let minListWidthWithPreview: CGFloat = 360
+    static let minListWidthWithPreview: CGFloat = 320
 
     /// True when an expanded sidebar of `sidebarWidth` would leave the list less than
     /// `minListWidthWithPreview` after `reservedWidth` (the preview column) is taken.

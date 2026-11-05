@@ -31,7 +31,7 @@ private struct SidebarPreviewHarness: View {
                 Text("Sidebar preview database unavailable")
             }
         }
-        .frame(height: 440)
+        .frame(height: 320)
         .clippyDesignSystem()
     }
 }

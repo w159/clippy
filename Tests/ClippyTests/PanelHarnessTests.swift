@@ -61,7 +61,7 @@ final class PanelHarnessTests: XCTestCase {
         return ClipStore(database: db, pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
     }
 
-    private func openPanel(appearance: NSAppearance.Name) throws {
+    func openPanel(appearance: NSAppearance.Name, size: NSSize = NSSize(width: 1000, height: 620)) throws {
         store = try seededStore()
         pasted = []
         pastedMany = []
@@ -76,7 +76,7 @@ final class PanelHarnessTests: XCTestCase {
             onClose: {},
             onOpenSettings: {}
         )
-        show(view.clippyDesignSystem(), size: NSSize(width: 1000, height: 620), appearance: appearance, panelChrome: true)
+        show(view.clippyDesignSystem(), size: size, appearance: appearance, panelChrome: true)
         pump(until: "clips loaded") { self.store.clips.count == 8 && !self.store.categories.isEmpty }
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
@@ -478,7 +478,7 @@ final class PanelHarnessTests: XCTestCase {
 
     func testSettingsAndOnboardingScreenshots() throws {
         for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
-            show(SettingsView(), size: NSSize(width: 1000, height: 700), appearance: appearance)
+            show(SettingsView(), size: Self.settingsWindowSize, appearance: appearance)
             pump(seconds: 0.8)
             // cacheDisplay cannot draw the split view's sidebar material.
             screenshot("07-settings-\(suffix)", compositedOnly: true)

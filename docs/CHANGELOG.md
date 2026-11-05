@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Density pass on the main panel (fixes the oversized look of 2.4.0): the default panel is 760x480 again instead of 920x560, and a saved size of exactly 920x560 (what 2.4.0 wrote) goes back to 760x480 once; any other size you chose is kept.
+- Header is one 44 pt row: section title and count, a 26 pt search field instead of the 38 pt capsule, and 24 pt glass icon buttons. The footer is 28 pt with small key hints and the multi-select bar is slimmer.
+- Clip rows are native size: comfortable rows are 42 pt with a 28 pt tile, compact rows are 28 pt, with 2 pt between rows, 8 pt list padding and 8 pt corners. Sidebar rows are 28 pt with 8 pt padding and the icon rail is 44 pt wide. The expanded sidebar now fits beside the detail pane at the default size.
+- Detail pane is tighter: 260 pt wide by default, 12 pt padding, a 32 pt kind tile, caption metadata and regular-size Paste and Quick Look buttons. The command palette is smaller (480 pt wide) with regular-size text, and the empty states use the standard size.
 - About pane links ("Clippy on GitHub", "Report an issue") now use the Clippy accent color instead of system blue.
 - Onboarding buttons now draw in the accent color when the window is active; snippets empty state text wraps inside the list column; the category icon picker uses the app accent for the selected symbol and has a single full-width search field.
 - Panel redesign for macOS 26 Liquid Glass: the header is a floating glass strip with the section title, a large capsule search field and round glass icon buttons grouped together; the hairline rules and opaque bars are gone and the panel sits on a system material.

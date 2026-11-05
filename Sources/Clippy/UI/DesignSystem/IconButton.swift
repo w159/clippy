@@ -36,19 +36,17 @@ struct IconButton: View {
         }
     }
 
-    /// Toolbar variant: a circular Liquid Glass button; the system supplies hover, press and focus.
+    /// Toolbar variant: a 24pt circular Liquid Glass button. Neutral glass; only an active toggle (pinned) takes the accent.
     private var glassButton: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.body.weight(.medium))
-                .frame(width: 20, height: 20)
+                .font(.callout.weight(.medium))
+                .frame(width: 24, height: 24)
                 .foregroundStyle(state == .selected ? tokens.accentText : tokens.textPrimary)
+                .glassEffect(state == .selected ? .regular.tint(tokens.accent).interactive() : .regular.interactive(), in: Circle())
+                .contentShape(Circle())
         }
-        .buttonStyle(.glass)
-        // Neutral glass; only an active toggle (pinned) takes the accent.
-        .tint(state == .selected ? tokens.accent : nil)
-        .buttonBorderShape(.circle)
-        .controlSize(.large)
+        .buttonStyle(.plain)
         .disabled(state == .disabled)
         .help(help)
         .accessibilityLabel(label)
@@ -57,8 +55,8 @@ struct IconButton: View {
     private var button: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .medium))
-                .frame(minWidth: 28, minHeight: 28)
+                .font(.callout.weight(.medium))
+                .frame(minWidth: 24, minHeight: 24)
                 .foregroundStyle(dimmed ? tokens.textSecondary : tokens.textPrimary)
                 .background((hovered || state == .pressed || state == .selected) ? tokens.surfaceInset : .clear, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
                 .overlay { if focused || state == .focused { RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.focusRing, lineWidth: 2).padding(-2) } }

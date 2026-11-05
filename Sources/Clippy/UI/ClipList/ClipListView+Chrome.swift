@@ -74,15 +74,15 @@ extension ClipListView {
             batchButton("Delete", "trash", help: "Delete the selected clips", role: .destructive) { requestBatchDelete() }
             Spacer()
         }
-        .padding(.horizontal, space.four).padding(.vertical, space.two)
+        .padding(.horizontal, space.three).padding(.vertical, space.one)
         .glassEffect(.regular, in: Capsule())
-        .padding(.horizontal, space.three).padding(.bottom, space.one)
+        .padding(.horizontal, space.two).padding(.bottom, space.one)
     }
 
     func batchButton(_ label: String, _ symbol: String, help: String, role: ButtonRole? = nil,
                      action: @escaping () -> Void) -> some View {
         Button(role: role, action: action) {
-            Label(label, systemImage: symbol).font(.callout)
+            Label(label, systemImage: symbol).font(.caption)
         }
         .buttonStyle(.borderless)
         .foregroundStyle(role == .destructive ? designTokens.danger : designTokens.textPrimary)
@@ -96,7 +96,7 @@ extension ClipListView {
                 if selectedClipIDs.count >= 2 {
                     Text("\(selectedClipIDs.count) selected")
                         .font(.caption.weight(.semibold))
-                        .padding(.horizontal, space.three).padding(.vertical, space.one + 1)
+                        .padding(.horizontal, space.two).padding(.vertical, 2)
                         .foregroundStyle(designTokens.onAccent)
                         .glassEffect(.regular.tint(designTokens.accent), in: Capsule())
                 }
@@ -108,13 +108,14 @@ extension ClipListView {
                 Spacer()
             }
         }
-        .padding(.horizontal, space.four)
+        .padding(.horizontal, space.three)
         .frame(height: PanelLayout.footerHeight)
+        .layoutProbe("footer")
     }
 
     /// One footer hint: a small glass capsule holding the key and its action.
     func keyHint(_ key: String, _ action: String) -> some View {
-        HStack(spacing: designTokens.metrics.space.one + 2) {
+        HStack(spacing: designTokens.metrics.space.one) {
             Text(key)
                 .font(.caption.monospaced().weight(.semibold))
                 .foregroundStyle(.primary)
@@ -122,8 +123,8 @@ extension ClipListView {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, designTokens.metrics.space.three)
-        .padding(.vertical, designTokens.metrics.space.one + 1)
+        .padding(.horizontal, designTokens.metrics.space.two)
+        .padding(.vertical, 2)
         .glassEffect(.regular, in: Capsule())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(key), \(action)")

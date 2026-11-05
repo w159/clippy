@@ -50,8 +50,8 @@ extension ClipListView {
         } else if visibleClips.isEmpty {
             // A calm opaque card: empty-state text sits on a solid surface, not on the panel material.
             emptyState
-                .background(designTokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .padding(.horizontal, 12)
+                .background(designTokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.horizontal, 8)
                 .padding(.bottom, 8)
         } else {
             sectionedList

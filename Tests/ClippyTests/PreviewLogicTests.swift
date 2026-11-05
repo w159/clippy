@@ -82,33 +82,42 @@ final class PreviewLogicTests: XCTestCase {
     /// Tight space collapses the sidebar to its rail instead of squeezing the list.
     func testSidebarCollapsesForPreviewBeforeListGetsTooNarrow() {
         XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 920, reservedWidth: 300, sidebarWidth: 176))
+        XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 760, reservedWidth: 260, sidebarWidth: 168),
+                       "the default panel keeps the expanded sidebar beside the detail pane")
         XCTAssertTrue(SidebarMetrics.collapsesForPreview(panelWidth: 760, reservedWidth: 300, sidebarWidth: 176))
         XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 760, reservedWidth: 300, sidebarWidth: SidebarMetrics.railWidth))
         XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 300, reservedWidth: 0, sidebarWidth: 176), "no preview, no forced rail")
     }
 
     @MainActor
-    func testSavedPanelSizeBumpRunsOnceAndNeverShrinks() throws {
-        let suite = "PanelBump.\(UUID().uuidString)"
+    func testSavedPanelSizeFrom240GoesBackToTheNewDefaultOnce() throws {
+        let suite = "PanelLower.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set(640.0, forKey: AppSettings.Keys.panelWidth)
-        defaults.set(480.0, forKey: AppSettings.Keys.panelHeight)
-        AppSettings.bumpSavedPanelSize(defaults)
-        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 920)
+        defaults.set(920.0, forKey: AppSettings.Keys.panelWidth)
+        defaults.set(560.0, forKey: AppSettings.Keys.panelHeight)
+        AppSettings.lowerBumpedPanelSize(defaults)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 760)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelHeight), 480)
+        defaults.set(920.0, forKey: AppSettings.Keys.panelWidth)  // the user resizes to the old default on purpose
+        defaults.set(560.0, forKey: AppSettings.Keys.panelHeight)
+        AppSettings.lowerBumpedPanelSize(defaults)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 920, "second run changes nothing")
         XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelHeight), 560)
-        defaults.set(700.0, forKey: AppSettings.Keys.panelWidth)  // the user shrinks it afterwards
-        AppSettings.bumpSavedPanelSize(defaults)
-        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 700, "second run changes nothing")
+    }
 
-        let large = "PanelBump.large.\(UUID().uuidString)"
-        let bigDefaults = try XCTUnwrap(UserDefaults(suiteName: large))
-        defer { bigDefaults.removePersistentDomain(forName: large) }
-        bigDefaults.set(1200.0, forKey: AppSettings.Keys.panelWidth)
-        bigDefaults.set(900.0, forKey: AppSettings.Keys.panelHeight)
-        AppSettings.bumpSavedPanelSize(bigDefaults)
-        XCTAssertEqual(bigDefaults.double(forKey: AppSettings.Keys.panelWidth), 1200)
-        XCTAssertEqual(bigDefaults.double(forKey: AppSettings.Keys.panelHeight), 900)
+    @MainActor
+    func testAnyOtherSavedPanelSizeIsKept() throws {
+        for (width, height) in [(640.0, 480.0), (700.0, 520.0), (920.0, 600.0), (1200.0, 900.0), (900.0, 560.0)] {
+            let suite = "PanelKeep.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            defaults.set(width, forKey: AppSettings.Keys.panelWidth)
+            defaults.set(height, forKey: AppSettings.Keys.panelHeight)
+            AppSettings.lowerBumpedPanelSize(defaults)
+            XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), width)
+            XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelHeight), height)
+        }
     }
 
     func testColumnWidthPersistence() throws {

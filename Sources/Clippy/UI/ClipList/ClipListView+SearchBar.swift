@@ -21,24 +21,24 @@ extension ClipListView {
 
     /// Warning notice and filter chips stacked under the header.
     var searchBar: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             if !searchWarnings.isEmpty { searchNotice }
             if showsFilterRow {
                 SearchChipsRow(query: $store.query, categories: store.categories, appNames: knownAppNames)
-                    .frame(height: 28)
+                    .frame(height: 24)
                     .transition(.opacity)
             }
         }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsFilterRow)
-        .padding(.horizontal, designTokens.metrics.space.four)
-        .padding(.bottom, designTokens.metrics.space.two)
+        .padding(.horizontal, designTokens.metrics.space.three)
+        .padding(.bottom, designTokens.metrics.space.one)
     }
 
     /// The text field with a search glyph, grammar help and a clear button.
     var searchField: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.body.weight(.medium))
+                .font(.callout.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
@@ -49,7 +49,6 @@ extension ClipListView {
                 Text("Search clips")
             }
                 .textFieldStyle(.plain)
-                .font(.title3)
                 .foregroundStyle(.primary)
                 .focused($focusTarget, equals: .search)
                 .accessibilityLabel("Search clips")

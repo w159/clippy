@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The 52pt icon rail: History, categories, then tools, each a
+/// The 44pt icon rail: History, categories, then tools, each a
 /// `SidebarRailItem` with tooltip, count in the tooltip and selection state.
 struct CategoryRail: View {
     @Environment(\.clippyTokens) private var tokens
@@ -14,9 +14,9 @@ struct CategoryRail: View {
     let onNewCategory: () -> Void
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             ScrollView {
-                VStack(spacing: 4) {
+                VStack(spacing: 2) {
                     historyItem
                     divider
                     ForEach(store.categories) { category in categoryItem(category) }
@@ -31,7 +31,7 @@ struct CategoryRail: View {
             SidebarRailItem("New Category", systemImage: "plus", action: onNewCategory)
         }
         .padding(.horizontal, 4)
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
         .frame(maxHeight: .infinity, alignment: .top)
         // Same transparency as the expanded pane, so collapsing the sidebar doesn't change it.
         .accessibilityElement(children: .contain)
@@ -39,7 +39,7 @@ struct CategoryRail: View {
     }
 
     private var divider: some View {
-        Rectangle().fill(tokens.stroke).frame(width: 24, height: 1).padding(.vertical, 2)
+        Rectangle().fill(tokens.stroke).frame(width: 20, height: 1).padding(.vertical, 2)
     }
 
     private var historyItem: some View {
@@ -58,7 +58,7 @@ struct CategoryRail: View {
             selection = .category(categoryID)
         }
         .overlay(alignment: .topTrailing) {
-            Circle().fill(Color(hexString: category.colorHex)).frame(width: 8, height: 8).padding(.top, 3).padding(.trailing, 5)
+            Circle().fill(Color(hexString: category.colorHex)).frame(width: 6, height: 6).padding(.top, 3).padding(.trailing, 4)
                 .accessibilityHidden(true)
         }
         .overlay { dropRing(.category(categoryID)) }

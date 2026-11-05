@@ -541,7 +541,7 @@ final class AppSettings {
         // before the user has touched a setting. @AppDefault reads .standard
         // directly, so this must happen before any wrapper is accessed.
         Self.registerDefaults(defaults)
-        Self.bumpSavedPanelSize(defaults)
+        Self.lowerBumpedPanelSize(defaults)
 
         // Init loads only the properties that cannot be expressed as a plain
         // @AppDefault read: those requiring range clamping or migration logic.

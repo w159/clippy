@@ -3,20 +3,26 @@ import Foundation
 // UserDefaults default registration and sound-id migration for AppSettings.
 
 extension AppSettings {
-    /// Default panel size; wide enough for the list and the detail pane.
-    nonisolated static let defaultPanelWidth = 920.0
-    nonisolated static let defaultPanelHeight = 560.0
-    /// One-time flag for `bumpSavedPanelSize`.
-    nonisolated static let panelSizeBumpKey = "panel.sizeBump.v24"
+    /// Default panel size: 640 wide in 2.2.0; 760 is the width the list, the sidebar and the detail pane need.
+    nonisolated static let defaultPanelWidth = 760.0
+    nonisolated static let defaultPanelHeight = 480.0
+    /// The size 2.4.0 registered as its default and wrote over saved smaller sizes.
+    nonisolated static let v240PanelWidth = 920.0
+    nonisolated static let v240PanelHeight = 560.0
+    /// One-time flag for `lowerBumpedPanelSize`.
+    nonisolated static let panelSizeLowerKey = "panel.sizeLower.v241"
 
-    /// First run of this version: raises a saved panel size to at least the new default so
-    /// existing users (often 640 wide) see the detail pane. Never shrinks a larger size;
-    /// guarded by `panelSizeBumpKey`, so a later manual resize is left alone.
-    static func bumpSavedPanelSize(_ defaults: UserDefaults) {
-        guard !defaults.bool(forKey: panelSizeBumpKey) else { return }
-        defaults.set(max(defaults.double(forKey: Keys.panelWidth), defaultPanelWidth), forKey: Keys.panelWidth)
-        defaults.set(max(defaults.double(forKey: Keys.panelHeight), defaultPanelHeight), forKey: Keys.panelHeight)
-        defaults.set(true, forKey: panelSizeBumpKey)
+    /// First run of this version: a saved panel size of exactly 920 x 560 (what 2.4.0 wrote) goes back to the
+    /// new default. Any other saved size is the user's own and is kept. Guarded by `panelSizeLowerKey`, so a later
+    /// manual resize to 920 x 560 is left alone.
+    static func lowerBumpedPanelSize(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: panelSizeLowerKey) else { return }
+        if defaults.double(forKey: Keys.panelWidth) == v240PanelWidth,
+           defaults.double(forKey: Keys.panelHeight) == v240PanelHeight {
+            defaults.set(defaultPanelWidth, forKey: Keys.panelWidth)
+            defaults.set(defaultPanelHeight, forKey: Keys.panelHeight)
+        }
+        defaults.set(true, forKey: panelSizeLowerKey)
     }
 
     /// Register every default so UserDefaults returns correct values before the user touches a setting.

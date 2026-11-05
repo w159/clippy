@@ -33,7 +33,7 @@ extension PanelHarnessTests {
                 setenv("CLIPPY_SETTINGS_SECTION", pane.rawValue, 1)
                 // cacheDisplay cannot draw the split view's sidebar material.
                 capture("10-settings-\(pane.rawValue)-\(suffix)", SettingsView(),
-                        size: NSSize(width: 1000, height: 700), appearance: appearance, compositedOnly: true)
+                        size: Self.settingsWindowSize, appearance: appearance, compositedOnly: true)
             }
         }
     }

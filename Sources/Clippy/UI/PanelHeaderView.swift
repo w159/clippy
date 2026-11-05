@@ -41,8 +41,8 @@ struct PanelHeaderView<Search: View>: View {
     }
 
     var body: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
                 sectionLabel
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
@@ -50,12 +50,13 @@ struct PanelHeaderView<Search: View>: View {
                     Spacer(minLength: 0)
                 } else {
                     search
-                        .padding(.horizontal, 14)
-                        .frame(height: 38)
-                        .glassEffect(.regular, in: Capsule())
+                        .padding(.horizontal, 8)
+                        .frame(height: 26)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .layoutProbe("search")
                         .frame(minWidth: 120, maxWidth: .infinity)
                 }
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     IconButton("sidebar.left", label: "Toggle sidebar", help: "Show or hide the sidebar",
                                glass: true, action: onToggleSidebar)
                     IconButton(isPinned ? "pin.fill" : "pin", label: isPinned ? "Unpin panel" : "Pin panel",
@@ -68,8 +69,9 @@ struct PanelHeaderView<Search: View>: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .frame(height: PanelLayout.headerHeight)
+        .layoutProbe("header")
         // Any area not covered by a control starts a window drag.
         .background(WindowDragRegion())
     }
@@ -79,13 +81,13 @@ struct PanelHeaderView<Search: View>: View {
     private var sectionLabel: some View {
         if !sectionTitle.isEmpty {
             Text(sectionTitle)
-                .font(.title3.weight(.semibold))
+                .font(.headline)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .allowsHitTesting(false)
             if let clipCount {
                 Text("\(clipCount)")
-                    .font(.callout.monospacedDigit())
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .allowsHitTesting(false)
                     .accessibilityLabel(CopyFormat.counted(clipCount, "clip"))
@@ -113,13 +115,13 @@ struct PanelHeaderView<Search: View>: View {
             Button("Settings\u{2026}", systemImage: "gearshape", action: onOpenSettings)
         } label: {
             Image(systemName: "ellipsis")
-                .font(.body.weight(.medium))
-                .frame(width: 20, height: 20)
+                .font(.callout.weight(.medium))
+                .frame(width: 24, height: 24)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .contentShape(Circle())
         }
         .menuStyle(.button)
-        .buttonStyle(.glass).tint(nil)
-        .buttonBorderShape(.circle)
-        .controlSize(.large)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Density, columns and settings")

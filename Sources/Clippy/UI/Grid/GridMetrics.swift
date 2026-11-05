@@ -9,20 +9,22 @@ enum GridMetrics {
     static let maxCardWidth: CGFloat = 340
     /// Gap between cards and rows.
     static let spacing: CGFloat = 8
+    /// Gap between rows in the compact and comfortable lists.
+    static let rowSpacing: CGFloat = 2
     /// Scroll content padding on each side.
-    static let listPadding: CGFloat = 12
+    static let listPadding: CGFloat = 8
     /// Compact row height (LAY-08).
-    static let compactRowHeight: CGFloat = 32
-    /// Comfortable (two-line, 32pt tile) row height.
-    static let comfortableRowHeight: CGFloat = 60
+    static let compactRowHeight: CGFloat = 28
+    /// Comfortable (two-line, 28pt tile) row height.
+    static let comfortableRowHeight: CGFloat = 42
     /// Typical card height, used to size a page jump in the cards density.
     static let cardPageStride: CGFloat = 90
 
     /// Vertical distance from one row to the next for `density` (row height plus gap).
     static func rowStride(for density: ClipDensity) -> CGFloat {
         switch density {
-        case .compact: return compactRowHeight + 2
-        case .comfortable: return comfortableRowHeight + spacing
+        case .compact: return compactRowHeight + rowSpacing
+        case .comfortable: return comfortableRowHeight + rowSpacing
         case .cards: return cardPageStride
         }
     }

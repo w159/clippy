@@ -29,16 +29,16 @@ struct CommandPaletteHost: View {
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
                 .accessibilityHidden(true)
-            GlassSurface(in: RoundedRectangle(cornerRadius: ClippyRadius.xl, style: .continuous)) {
+            GlassSurface(in: RoundedRectangle(cornerRadius: 12, style: .continuous)) {
                 VStack(spacing: tokens.metrics.space.two) {
                     searchField
                     resultList
                     hintBar
                 }
             }
-            .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
-            .frame(maxWidth: 560, maxHeight: 440)
-            .padding(tokens.metrics.space.four)
+            .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
+            .frame(maxWidth: 480, maxHeight: 360)
+            .padding(tokens.metrics.space.three)
             .accessibilityAddTraits(.isModal)
             .accessibilityLabel("Command palette")
         }
@@ -51,18 +51,17 @@ struct CommandPaletteHost: View {
 
     private var searchField: some View {
         HStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(systemName: "magnifyingglass").font(.body).foregroundStyle(.secondary).accessibilityHidden(true)
             TextField("Type a command", text: $query)
                 .textFieldStyle(.plain)
-                .font(.title2)
                 .focused($fieldFocused)
                 .accessibilityLabel("Command search")
                 .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
             KeyCap("esc")
         }
         .padding(.horizontal, tokens.metrics.space.three)
-        .padding(.vertical, tokens.metrics.space.two)
-        .background(Color.primary.opacity(0.06), in: Capsule())
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var resultList: some View {
@@ -78,7 +77,7 @@ struct CommandPaletteHost: View {
                     ForEach(Array(layout.groups.enumerated()), id: \.offset) { _, group in
                         if let title = group.title {
                             Text(title)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, tokens.metrics.space.three)
                                 .padding(.top, tokens.metrics.space.two)
@@ -106,13 +105,13 @@ struct CommandPaletteHost: View {
     }
 
     private func row(_ command: any PaletteCommand, selected: Bool, hovered: Bool, showsContext: Bool) -> some View {
-        HStack(spacing: tokens.metrics.space.three) {
+        HStack(spacing: tokens.metrics.space.two) {
             Image(systemName: command.symbol)
-                .font(.body.weight(.semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(selected ? tokens.onAccent : tokens.accentText)
-                .frame(width: 30, height: 30)
+                .frame(width: 24, height: 24)
                 .background(selected ? Color.white.opacity(0.2) : tokens.accent.opacity(0.14),
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 0) {
                 Text(command.title).font(.body).foregroundStyle(selected ? tokens.onAccent : tokens.textPrimary)
                 if let subtitle = command.subtitle {
@@ -132,9 +131,9 @@ struct CommandPaletteHost: View {
             }
         }
         .padding(.horizontal, tokens.metrics.space.two)
-        .padding(.vertical, tokens.metrics.space.one + 2)
+        .padding(.vertical, 3)
         .background(selected ? tokens.accent : (hovered ? Color.primary.opacity(0.08) : .clear),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(command.title)
@@ -155,7 +154,7 @@ struct CommandPaletteHost: View {
             Spacer()
         }
         .padding(.horizontal, tokens.metrics.space.two)
-        .padding(.vertical, tokens.metrics.space.one)
+        .padding(.bottom, tokens.metrics.space.one)
         .accessibilityElement(children: .combine)
     }
 
