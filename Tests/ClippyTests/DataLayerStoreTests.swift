@@ -1,4 +1,3 @@
-import Combine
 import XCTest
 @testable import Clippy
 
@@ -199,20 +198,19 @@ final class DataLayerStoreTests: XCTestCase {
         let stub = Deferred()
         let store = ClipStore(database: db, pasteboard: scratchBoard(), recognizer: stub.recognizer)
 
-        var affectedChanges = 0
-        var otherChanges = 0
         let affected = store.ocrProgress(for: id)
         let other = store.ocrProgress(for: id + 999)
-        let subs = [affected.objectWillChange.sink { affectedChanges += 1 },
-                    other.objectWillChange.sink { otherChanges += 1 }]
+        let affectedRecorder = ChangeRecorder(tracking: { _ = affected.isRunning })
+        let otherRecorder = ChangeRecorder(tracking: { _ = other.isRunning })
 
         store.extractText(from: clip) { _ in }
         XCTAssertTrue(affected.isRunning)
-        XCTAssertGreaterThanOrEqual(affectedChanges, 1)
-        XCTAssertEqual(otherChanges, 0, "an unrelated card's observable must not fire")
+        XCTAssertGreaterThanOrEqual(affectedRecorder.count, 1)
+        XCTAssertEqual(otherRecorder.count, 0, "an unrelated card's observable must not fire")
         stub.finish?(.success("done"))
         XCTAssertFalse(affected.isRunning)
-        XCTAssertEqual(otherChanges, 0)
-        withExtendedLifetime(subs) {}
+        XCTAssertEqual(otherRecorder.count, 0)
+        affectedRecorder.cancel()
+        otherRecorder.cancel()
     }
 }

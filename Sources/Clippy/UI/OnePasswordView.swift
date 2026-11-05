@@ -6,11 +6,11 @@ import SwiftUI
 /// individual field on demand, and creates a new secret. No values are stored
 /// or logged by Clippy.
 struct OnePasswordView: View {
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Owns the list/detail loads and the state machine (OPW-01, OPW-02).
-    @StateObject private var model = OnePasswordViewModel(
+    @State private var model = OnePasswordViewModel(
         makeService: { OnePasswordService(vault: AppSettings.shared.onePasswordVault) })
     @State private var creating = false
     @State private var newTitle = ""
@@ -31,7 +31,6 @@ struct OnePasswordView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
             content
         }
         .onAppear { model.reload() }
@@ -80,25 +79,33 @@ struct OnePasswordView: View {
         HStack(spacing: 8) {
             Label {
                 Text("1Password · \(settings.onePasswordVault)")
-                    .foregroundStyle(tokens.textPrimary)
                     .lineLimit(1)
             } icon: {
                 Image(systemName: "key.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(tokens.accent, tokens.textSecondary)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.clippyAccent)
             }
-            .font(PanelTypography.body(settings).weight(.semibold))
-            TextField("Search items", text: $searchQuery)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search 1Password items by title or vault")
-                .focused($searchFocused)
-                .disabled(model.state != .ready)
-            IconButton("plus", label: "New secret", state: creating ? .selected : .rest) { creating.toggle() }
-                .disabled(cliUnavailable)
-            IconButton("arrow.clockwise", label: "Refresh", state: loading ? .disabled : .rest) { model.reload() }
-                .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
+            .font(.title3.weight(.semibold))
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                TextField("Search items", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .accessibilityLabel("Search 1Password items by title or vault")
+                    .focused($searchFocused)
+                    .disabled(model.state != .ready)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .glassEffect(.regular, in: Capsule())
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    IconButton("plus", label: "New secret", state: creating ? .selected : .rest) { creating.toggle() }
+                        .disabled(cliUnavailable)
+                    IconButton("arrow.clockwise", label: "Refresh", state: loading ? .disabled : .rest) { model.reload() }
+                        .symbolEffect(.variableColor, isActive: !reduceMotion && loading)
+                }
+            }
         }
-        .padding(10)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -133,10 +140,10 @@ struct OnePasswordView: View {
                     ClippyBanner("Could not create the secret. \(createError)", severity: .danger,
                                  actionTitle: "Try Again", action: create, dismiss: { self.createError = nil })
                 }
-                if let status { Text(status).font(.caption).foregroundStyle(tokens.textSecondary) }
+                if let status { Text(status).font(.caption).foregroundStyle(.secondary) }
                 if filteredItems.isEmpty {
-                    Text(searchQuery.isEmpty ? "No items in this vault." : "No items match this search.")
-                        .font(.callout).foregroundStyle(tokens.textSecondary)
+                    ContentUnavailableView(searchQuery.isEmpty ? "No items in this vault." : "No items match this search.",
+                                           systemImage: searchQuery.isEmpty ? "key" : "magnifyingglass")
                         .frame(maxWidth: .infinity).padding(.vertical, 20)
                 }
                 ForEach(filteredItems) { item in
@@ -150,37 +157,40 @@ struct OnePasswordView: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(16)
         }
     }
 
     private var newSecretForm: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextField("Title", text: $newTitle)
-                .textFieldStyle(.roundedBorder)
-                .focused($titleFocused)
-                .onSubmit { create() }
-            SecureField("Secret value", text: $newValue)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { create() }
-            HStack {
-                Spacer()
-                Button("Cancel") { creating = false; newTitle = ""; newValue = "" }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(isCreating)
-                Button("Create") { create() }
-                    .buttonStyle(.accent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(newTitle.isEmpty || newValue.isEmpty || isCreating)
+        VStack(spacing: 0) {
+            Form {
+                Section("New Secret") {
+                    TextField("Title", text: $newTitle)
+                        .focused($titleFocused)
+                        .onSubmit { create() }
+                    SecureField("Secret value", text: $newValue)
+                        .onSubmit { create() }
+                }
             }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button("Cancel") { creating = false; newTitle = ""; newValue = "" }
+                        .buttonStyle(.glass).tint(nil)
+                        .keyboardShortcut(.cancelAction)
+                        .disabled(isCreating)
+                    Button("Create") { create() }
+                        .buttonStyle(.glassProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(newTitle.isEmpty || newValue.isEmpty || isCreating)
+                }
+            }
+            .padding(.horizontal, 12).padding(.bottom, 10)
         }
         .disabled(isCreating)
-        .padding(8)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClippyRadius.inset)
-                .strokeBorder(designTokens.stroke, lineWidth: 1)
-        )
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     // MARK: - Actions

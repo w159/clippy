@@ -48,29 +48,38 @@ struct InstructionSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(action.name).font(.headline)
-            Text(message).foregroundStyle(.secondary)
-            TextField("Instruction", text: $instruction)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(run)
-            if !instruction.isEmpty && trimmed.isEmpty {
-                Text("Enter an instruction.")
-                    .font(.caption)
-                    .foregroundStyle(Color(nsColor: .systemRed))
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    TextField("Instruction", text: $instruction)
+                        .onSubmit(run)
+                } header: {
+                    Label(action.name, systemImage: "sparkles").font(.headline)
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(message)
+                        if !instruction.isEmpty && trimmed.isEmpty {
+                            Text("Enter an instruction.").foregroundStyle(.red)
+                        }
+                    }
+                }
             }
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Run", action: run)
-                    .buttonStyle(.accent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(trimmed.isEmpty)
+            .formStyle(.grouped)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button("Cancel", role: .cancel) { dismiss() }
+                        .buttonStyle(.glass).tint(nil)
+                        .keyboardShortcut(.cancelAction)
+                    Button("Run", action: run)
+                        .buttonStyle(.glassProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(trimmed.isEmpty)
+                }
             }
+            .padding(.horizontal, 16).padding(.bottom, 14).padding(.top, 4)
         }
-        .padding(16)
-        .frame(width: 360)
+        .frame(width: 400)
     }
 
     private func run() {
@@ -91,22 +100,26 @@ struct EditorCompareSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
                 pane("Your version", text: mine)
-                Divider()
                 pane("Stored version", text: stored)
             }
-            Divider()
-            HStack {
-                Spacer()
-                Button("Use Stored Version", action: onReload)
-                    .help("Discard your edits and load the stored text")
-                Button("Keep My Version", action: onKeepMine)
-                    .help("Keep your edits; Save overwrites the stored text")
-                Button("Close", role: .cancel, action: onClose)
-                    .keyboardShortcut(.cancelAction)
-            }
             .padding(12)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button("Use Stored Version", action: onReload)
+                        .buttonStyle(.glass).tint(nil)
+                        .help("Discard your edits and load the stored text")
+                    Button("Keep My Version", action: onKeepMine)
+                        .buttonStyle(.glassProminent)
+                        .help("Keep your edits; Save overwrites the stored text")
+                    Button("Close", role: .cancel, action: onClose)
+                        .buttonStyle(.glass).tint(nil)
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 14)
         }
         .frame(minWidth: 640, minHeight: 360)
     }
@@ -121,7 +134,8 @@ struct EditorCompareSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

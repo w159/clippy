@@ -61,12 +61,31 @@ final class GridMetricsTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let prefs = GridPreferences(defaults: defaults)
-        XCTAssertEqual(prefs.density, .compact)
+        XCTAssertEqual(prefs.density, .comfortable, "no stored density: comfortable rows")
         XCTAssertEqual(prefs.columnMode, .auto)
         prefs.density = .cards
         prefs.columnMode = .fixed(2)
         let reread = GridPreferences(defaults: defaults)
         XCTAssertEqual(reread.density, .cards)
         XCTAssertEqual(reread.columnMode, .fixed(2))
+    }
+
+    /// A density the user already chose is never overwritten by the new default.
+    @MainActor
+    func testStoredDensityWinsOverNewDefault() throws {
+        let suite = "grid-prefs-stored-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(ClipDensity.compact.rawValue, forKey: GridPreferences.densityKey)
+        XCTAssertEqual(GridPreferences(defaults: defaults).density, .compact)
+    }
+
+    /// Page jumps use the real row stride, not a fixed 90pt.
+    func testPageRowsUseRealRowHeight() {
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .comfortable), 8)
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .compact), 17)
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .cards), 6)
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: 0, density: .comfortable), 1)
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: .nan, density: .compact), 1)
     }
 }

@@ -79,7 +79,7 @@ struct TranslateClipSheet: View {
                 .foregroundStyle(tokens.textSecondary)
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Translate anyway") { confirmed = true }.buttonStyle(.accent).keyboardShortcut(.defaultAction)
+                Button("Translate anyway") { confirmed = true }.buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
             }
         }
     }
@@ -97,7 +97,7 @@ struct TranslateClipSheet: View {
                 .frame(maxWidth: 240)
                 .disabled(isWorking)
                 Button(errorMessage == nil ? "Translate" : "Try Again") { start() }
-                    .buttonStyle(.accent)
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(result == nil ? .defaultAction : nil)
                     .disabled(isWorking || isSameLanguage)
             }
@@ -141,7 +141,7 @@ struct TranslateClipSheet: View {
                     saveError = nil
                     status = "Copied"
                 }
-                .buttonStyle(.accent)
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.defaultAction)
                 Button("Save as New Clip") {
                     if sink.saveAsNewClip(translated) {

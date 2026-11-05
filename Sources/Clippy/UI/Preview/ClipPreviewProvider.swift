@@ -79,11 +79,31 @@ enum ClipPreviewProvider {
             if let table = CSVTable.preview(text) { return .csv(table) }
             return .text(text)
         case .markdown: return .markdown(text)
-        case .plain: return .text(text)
+        case .plain:
+            if let language = codeSnippetLanguage(trimmed) {
+                let capped = capLines(text, limit: lineLimit)
+                return .code(text: capped.text, language: language, truncatedLines: capped.dropped)
+            }
+            return .text(text)
         case let language:
             let capped = capLines(text, limit: lineLimit)
             return .code(text: capped.text, language: language, truncatedLines: capped.dropped)
         }
+    }
+
+    /// Language guess for a short statement the sniffer scores too low to call code (one `let` line),
+    /// or nil when the text reads as prose. Needs a declaration keyword plus a call or assignment.
+    static func codeSnippetLanguage(_ trimmed: String) -> CodeLanguage? {
+        guard trimmed.count <= 2048 else { return nil }
+        let starters: [(prefix: String, language: CodeLanguage)] = [
+            ("let ", .swift), ("var ", .swift), ("func ", .swift), ("guard ", .swift),
+            ("def ", .python), ("const ", .javascript), ("function ", .javascript),
+        ]
+        guard let match = starters.first(where: { trimmed.hasPrefix($0.prefix) }) else { return nil }
+        let hasCall = trimmed.contains("(") && trimmed.contains(")")
+        let hasAssign = trimmed.contains(" = ")
+        guard (hasCall && hasAssign) || (hasCall && match.prefix == "func ") else { return nil }
+        return match.language
     }
 
     /// Keeps at most `limit` lines; `dropped` is how many were removed.
@@ -104,5 +124,63 @@ enum ClipPreviewProvider {
               let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
         return url
+    }
+}
+
+/// Tile color, symbol and label for one clip, derived from the same classifier as the preview.
+struct ClipVisualKind: Equatable {
+    let style: ClipKindStyle
+    let label: String
+    let symbol: String
+}
+
+extension ClipKindStyle {
+    /// SF Symbol for the kind tile.
+    var symbolName: String {
+        switch self {
+        case .text: return "text.alignleft"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .link: return "globe"
+        case .email: return "envelope"
+        case .color: return "paintpalette"
+        case .code: return "chevron.left.forwardslash.chevron.right"
+        case .richText: return "doc.richtext"
+        }
+    }
+}
+
+extension ClipPreviewProvider {
+    /// Kind style, label and symbol for a non-sensitive clip. Uses only the in-memory clip text (the
+    /// 300-character preview for text), never the database, so it is cheap enough for list rows.
+    static func visual(for clip: Clip) -> ClipVisualKind {
+        if clip.isImageLike { return ClipVisualKind(style: .image, label: "Image", symbol: ClipKindStyle.image.symbolName) }
+        if clip.contentKind == .file { return ClipVisualKind(style: .file, label: "File", symbol: ClipKindStyle.file.symbolName) }
+        switch clip.kind {
+        case .email: return ClipVisualKind(style: .email, label: "Email", symbol: ClipKindStyle.email.symbolName)
+        case .colorValue: return ClipVisualKind(style: .color, label: "Color", symbol: ClipKindStyle.color.symbolName)
+        case .link: return ClipVisualKind(style: .link, label: "Link", symbol: ClipKindStyle.link.symbolName)
+        case .filePath: return ClipVisualKind(style: .file, label: "File path", symbol: "folder")
+        case .image, .file, .text: break
+        }
+        let item = textItem(clip.previewText)
+        let style = item.kindStyle
+        let label = style == .richText ? "Rich text" : item.kindLabel
+        return ClipVisualKind(style: style, label: label, symbol: style.symbolName)
+    }
+}
+
+extension ClipPreviewItem {
+    /// Semantic kind style for tinting.
+    var kindStyle: ClipKindStyle {
+        switch self {
+        case .masked, .text, .csv: return .text
+        case .code, .json: return .code
+        case .markdown: return .richText
+        case .image: return .image
+        case .file: return .file
+        case .color: return .color
+        case .link: return .link
+        }
     }
 }

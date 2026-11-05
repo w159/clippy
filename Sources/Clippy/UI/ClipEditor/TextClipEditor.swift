@@ -1,14 +1,15 @@
 import AppKit
-import Combine
 import GRDB
 import SwiftUI
+import Observation
 
 // MARK: - Observation
 
 /// Owns the GRDB observation of the edited clip so it lives and dies with the view.
 @MainActor
-final class ClipObservationHolder: ObservableObject {
-    private var token: AnyDatabaseCancellable?
+@Observable
+final class ClipObservationHolder {
+    @ObservationIgnored private var token: AnyDatabaseCancellable?
 
     func start(id: Int64?, persistence: ClipEditorPersistence, onChange: @escaping (Clip?) -> Void) {
         guard token == nil, let id else { return }
@@ -39,12 +40,12 @@ struct TextClipEditor: View {
     let dirtyBridge: EditorDirtyStateBridge?
     let onClose: () -> Void
 
-    @ObservedObject var settings = AppSettings.shared
+    var settings = AppSettings.shared
     @Environment(\.clippyTokens) var dsTokens
-    @ObservedObject var prefs = EditorPreferences.shared
-    @ObservedObject var actionStore = AIActionStore.shared
-    @StateObject var assistant = AIActionRunner()
-    @StateObject var observation = ClipObservationHolder()
+    var prefs = EditorPreferences.shared
+    var actionStore = AIActionStore.shared
+    @State var assistant = AIActionRunner()
+    @State var observation = ClipObservationHolder()
     @State var text: String
     @State var title: String
     /// Stored text the current edits started from; dirty means text != baseText.
@@ -132,9 +133,7 @@ struct TextClipEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            Divider()
             optionsBar
-            Divider()
             if conflictText != nil {
                 EditorConflictBanner(
                     onReload: { reloadFromConflict() },
@@ -145,20 +144,21 @@ struct TextClipEditor: View {
             if clipDeleted { EditorDeletedBanner(onCopy: { copyEditedText() }) }
             if !colors.isEmpty && !richMode {
                 ColorSwatchStrip(colors: colors)
-                Divider()
             }
             editingSurface
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             if !pendingEffects.isEmpty {
                 EditorPendingBar(effects: pendingEffects) { effect in
                     pendingEffects.removeAll { $0.id == effect.id }
                 }
             }
             statusBar
-            Divider()
             footer
         }
         .frame(minWidth: 520, minHeight: 380)
-        .background(tokens.cardSurface)
+        .background(Color(nsColor: .windowBackgroundColor))
         .task(id: StatusKey(text: text, selection: selectionRange)) {
             try? await Task.sleep(for: .milliseconds(60))
             guard !Task.isCancelled else { return }

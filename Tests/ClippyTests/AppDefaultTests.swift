@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 import XCTest
 @testable import Clippy
 
@@ -17,24 +17,30 @@ private enum FixtureColor: String, Equatable {
     case blue
 }
 
-private class FixtureSettings: ObservableObject {
+@MainActor
+@Observable
+private final class FixtureSettings: ObservationNotifying {
     init() {}
+    private(set) var storageRevision = 0
+
     // Unique key prefixes chosen to avoid colliding with live app keys.
-    @AppDefault("_test.appdefault.label", default: "hello")
+    @ObservationIgnored @AppDefault("_test.appdefault.label", default: "hello")
     var label: String
 
-    @AppDefault("_test.appdefault.enabled", default: false)
+    @ObservationIgnored @AppDefault("_test.appdefault.enabled", default: false)
     var enabled: Bool
 
-    @AppDefault("_test.appdefault.color", default: FixtureColor.red)
+    @ObservationIgnored @AppDefault("_test.appdefault.color", default: FixtureColor.red)
     var color: FixtureColor
+
+    func announceStorageReloaded() { storageRevision &+= 1 }
 }
 
 // MARK: - Tests
 
+@MainActor
 final class AppDefaultTests: XCTestCase {
     private var fixture: FixtureSettings!
-    private var cancellables: Set<AnyCancellable> = []
 
     private let labelKey   = "_test.appdefault.label"
     private let enabledKey = "_test.appdefault.enabled"
@@ -47,7 +53,6 @@ final class AppDefaultTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: enabledKey)
         UserDefaults.standard.removeObject(forKey: colorKey)
         fixture = FixtureSettings()
-        cancellables = []
     }
 
     override func tearDown() {
@@ -55,7 +60,6 @@ final class AppDefaultTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: enabledKey)
         UserDefaults.standard.removeObject(forKey: colorKey)
         fixture = nil
-        cancellables = []
         super.tearDown()
     }
 
@@ -119,89 +123,61 @@ final class AppDefaultTests: XCTestCase {
         XCTAssertEqual(fresh.color, .red)
     }
 
-    // MARK: objectWillChange fires on set
+    // MARK: observers are notified on set
 
-    func testObjectWillChangeFiredOnStringSet() {
-        var callCount = 0
-        fixture.objectWillChange
-            .sink { callCount += 1 }
-            .store(in: &cancellables)
-
-        fixture.label = "trigger"
-        // objectWillChange fires synchronously before the value is written.
-        XCTAssertEqual(callCount, 1)
+    func testObserversNotifiedOnStringSet() {
+        let changes = observedChangeCount(tracking: { _ = self.fixture.label }, during: { self.fixture.label = "trigger" })
+        // Observers are told synchronously, before the value is written.
+        XCTAssertEqual(changes, 1)
     }
 
-    func testObjectWillChangeFiredOnBoolSet() {
-        var callCount = 0
-        fixture.objectWillChange
-            .sink { callCount += 1 }
-            .store(in: &cancellables)
-
-        fixture.enabled = true
-        XCTAssertEqual(callCount, 1)
+    func testObserversNotifiedOnBoolSet() {
+        let changes = observedChangeCount(tracking: { _ = self.fixture.enabled }, during: { self.fixture.enabled = true })
+        XCTAssertEqual(changes, 1)
     }
 
-    func testObjectWillChangeFiredOnEnumSet() {
-        var callCount = 0
-        fixture.objectWillChange
-            .sink { callCount += 1 }
-            .store(in: &cancellables)
-
-        fixture.color = .blue
-        XCTAssertEqual(callCount, 1)
+    func testObserversNotifiedOnEnumSet() {
+        let changes = observedChangeCount(tracking: { _ = self.fixture.color }, during: { self.fixture.color = .blue })
+        XCTAssertEqual(changes, 1)
     }
 
-    func testObjectWillChangeNotFiredWithoutSet() {
-        var callCount = 0
-        fixture.objectWillChange
-            .sink { callCount += 1 }
-            .store(in: &cancellables)
-
-        // Read-only access must not trigger the publisher.
-        _ = fixture.label
-        _ = fixture.enabled
-        _ = fixture.color
-        XCTAssertEqual(callCount, 0)
+    func testObserversNotNotifiedWithoutSet() {
+        let changes = observedChangeCount(
+            tracking: { _ = self.fixture.label },
+            during: {
+                // Read-only access must not notify.
+                _ = self.fixture.label
+                _ = self.fixture.enabled
+                _ = self.fixture.color
+            })
+        XCTAssertEqual(changes, 0)
     }
 
     // MARK: Notification-mechanism safeguard
 
-    // AppDefault's enclosing-instance subscript constrains
-    // EnclosingSelf.ObjectWillChangePublisher == ObservableObjectPublisher,
-    // making a silent-no-notification regression impossible at compile time
-    // for any type that the wrapper is used on. The tests below document
-    // that this constraint holds for the test fixture and that the publisher
-    // is the concrete ObservableObjectPublisher, not a custom type.
+    // The wrapper reports reads and writes to the owning class's registrar
+    // through ObservationNotifying. The tests below pin the two behaviors a
+    // silent regression would break: a write must notify observers of that
+    // property, and must not notify observers of a different property.
 
-    func testFixturePublisherIsObservableObjectPublisher() {
-        // If FixtureSettings.objectWillChange were ever changed to a custom
-        // publisher type, @AppDefault inside it would stop compiling (the
-        // where clause in the static subscript would not be satisfied). This
-        // test explicitly checks the concrete type as an early-warning
-        // canary at the Swift runtime level.
-        let publisher = fixture.objectWillChange
-        // Check the dynamic type. The static type is already
-        // ObservableObjectPublisher, so a conditional cast would always
-        // succeed and warn; comparing the runtime type keeps the canary.
-        XCTAssertTrue(
-            type(of: publisher) == ObservableObjectPublisher.self,
-            "FixtureSettings.objectWillChange must be ObservableObjectPublisher; " +
-            "a custom publisher type would break the @AppDefault where-clause constraint."
-        )
+    func testWriteDoesNotNotifyObserversOfOtherProperties() {
+        let changes = observedChangeCount(tracking: { _ = self.fixture.enabled }, during: { self.fixture.label = "other" })
+        XCTAssertEqual(changes, 0, "a write must only notify observers of the property it changed")
     }
 
-    func testObjectWillChangeFiredExactlyOncePerSetNotPerGet() {
-        // Guards against a regression where the subscript getter accidentally
-        // triggers the publisher, or the setter fires it more than once.
-        var callCount = 0
-        fixture.objectWillChange
-            .sink { callCount += 1 }
-            .store(in: &cancellables)
+    func testStorageReloadNotifiesObserversOfEveryWrappedProperty() {
+        let changes = observedChangeCount(tracking: { _ = self.fixture.color }, during: { self.fixture.announceStorageReloaded() })
+        XCTAssertEqual(changes, 1, "a bulk reset must re-render readers of wrapped settings")
+    }
 
-        _ = fixture.label    // get -- must not fire
-        fixture.label = "a"  // set -- fires once
-        _ = fixture.label    // get -- must not fire again
-        XCTAssertEqual(callCount, 1)
+    func testSetNotifiesOnceAndGetNever() {
+        let changes = observedChangeCount(
+            tracking: { _ = self.fixture.label },
+            during: {
+                _ = self.fixture.label    // get -- must not notify
+                self.fixture.label = "a"  // set -- notifies once
+                _ = self.fixture.label    // get -- must not notify again
+            })
+        XCTAssertEqual(changes, 1)
     }
 }

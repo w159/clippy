@@ -37,7 +37,7 @@ struct DescribeImageSheet: View {
                         confirmed = true
                         startAnalysis()
                     }
-                    .buttonStyle(.accent)
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
                 }
             } else {
@@ -77,7 +77,7 @@ struct DescribeImageSheet: View {
             HStack {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Try again") { startAnalysis() }.buttonStyle(.accent).keyboardShortcut(.defaultAction)
+                Button("Try again") { startAnalysis() }.buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
             }
         }
         if let result {
@@ -90,7 +90,7 @@ struct DescribeImageSheet: View {
                     NSPasteboard.general.setString(result.text, forType: .string)
                     copied = true
                 }
-                .buttonStyle(.accent)
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.defaultAction)
                 Button(saved ? "Saved" : "Save as clip") {
                     guard !saved else { return }

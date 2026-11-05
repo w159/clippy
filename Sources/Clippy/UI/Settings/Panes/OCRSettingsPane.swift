@@ -24,12 +24,10 @@ struct OCRSettingsPane: View {
                     ])
                     .onChange(of: level) { _, value in OCRPreferences.level = value }
                 }
-                Divider()
                 SettingsRow(title: "Use document recognition", detail: Text("Reads paragraphs and tables when macOS provides it.")) {
                     Toggle("Use document recognition", isOn: $documentRecognition).labelsHidden()
                         .onChange(of: documentRecognition) { _, value in OCRPreferences.useDocumentRecognition = value }
                 }
-                Divider()
                 SettingsRow(title: "PDF pages read", detail: Text("First \(pdfPages) page\(pdfPages == 1 ? "" : "s") of each PDF.")) {
                     Stepper("PDF pages read", value: $pdfPages, in: 1...OCRPreferences.maxPDFMaxPages).labelsHidden()
                         .onChange(of: pdfPages) { _, value in OCRPreferences.pdfMaxPages = value }
@@ -62,7 +60,6 @@ struct OCRSettingsPane: View {
     private var languageList: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(supported) { language in
-                Divider()
                 Toggle(isOn: Binding(get: { languages.contains(language.code) }, set: { _ in toggle(language.code) })) {
                     HStack {
                         Text(language.name).foregroundStyle(tokens.textPrimary)

@@ -1,16 +1,18 @@
 import AppKit
 import SwiftUI
+import Observation
 
 // MARK: - Image
 /// Working image plus undo registration for transforms (EDT-08). A class so
 /// `UndoManager` can target it.
 @MainActor
-final class ImageEditModel: ObservableObject {
-    @Published private(set) var working: NSImage?
+@Observable
+final class ImageEditModel {
+    private(set) var working: NSImage?
     /// A rotate/flip/crop was applied since the editor opened.
-    @Published private(set) var isEdited = false
+    private(set) var isEdited = false
     /// Pixel size and alpha of `working`, recomputed only when the image changes.
-    @Published private(set) var info: ImageInfo
+    private(set) var info: ImageInfo
 
     init(image: NSImage?) {
         working = image
@@ -49,10 +51,10 @@ struct ImageClipEditor: View {
     let persistence: ClipEditorPersistence
     let onClose: () -> Void
 
-    @ObservedObject var settings = AppSettings.shared
+    var settings = AppSettings.shared
     @Environment(\.clippyTokens) var dsTokens
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    @StateObject var model: ImageEditModel
+    @State var model: ImageEditModel
     @Environment(\.undoManager) var undoManager
     @State var title: String
     @State var baseTitle: String
@@ -89,25 +91,24 @@ struct ImageClipEditor: View {
         self.onClose = onClose
         _title = State(initialValue: clip.userTitle ?? "")
         _baseTitle = State(initialValue: clip.userTitle ?? "")
-        _model = StateObject(wrappedValue: ImageEditModel(
+        _model = State(initialValue: ImageEditModel(
             image: store.imageURL(for: clip).flatMap { NSImage(contentsOf: $0) }))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            Divider()
             toolbar
-            Divider()
             if let ocrNotice { ocrBanner(ocrNotice) }
             canvas
-            Divider()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             statusBar
-            Divider()
             footer
         }
         .frame(minWidth: 520, minHeight: 460)
-        .background(tokens.cardSurface)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             // Wire the title-bar close button to the same dirty/save logic as
             // the Cancel button (see EditorWindowController.windowShouldClose).
@@ -148,34 +149,41 @@ struct ImageClipEditor: View {
                     .layoutPriority(-1)
                     .help(saveError)
             }
-            Button("Save a copy\u{2026}") { saveCopy() }
-                .fixedSize()
-                .disabled(model.working == nil)
-            Spacer(minLength: 0)
-            Button("Cancel", role: .cancel) {
-                if cropping {
-                    // Esc / Cancel leaves the crop tool first, keeping the edits made so far.
-                    setCropping(false)
-                } else if isDirty {
-                    showingDiscardPrompt = true
-                } else {
-                    onClose()
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("Save a copy\u{2026}") { saveCopy() }
+                        .buttonStyle(.glass).tint(nil)
+                        .fixedSize()
+                        .disabled(model.working == nil)
+                    Spacer(minLength: 0)
+                    Button("Cancel", role: .cancel) {
+                        if cropping {
+                            // Esc / Cancel leaves the crop tool first, keeping the edits made so far.
+                            setCropping(false)
+                        } else if isDirty {
+                            showingDiscardPrompt = true
+                        } else {
+                            onClose()
+                        }
+                    }
+                    .buttonStyle(.glass).tint(nil)
+                    .keyboardShortcut(.cancelAction)
+                    .fixedSize()
+                    Button("Save") { save { if $0 { onClose() } } }
+                        .buttonStyle(.glassProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .fixedSize()
+                        .disabled(!isDirty || isSaving)
                 }
+                .controlSize(.large)
             }
-            .keyboardShortcut(.cancelAction)
-            .fixedSize()
-            Button("Save") { save { if $0 { onClose() } } }
-                .buttonStyle(.accent)
-                .keyboardShortcut(.defaultAction)
-                .fixedSize()
-                .disabled(!isDirty || isSaving)
             Button("") { save { if $0 { onClose() } } }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!isDirty || isSaving)
                 .hidden()
                 .frame(width: 0, height: 0)
         }
-        .padding(12)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     // MARK: - Operations

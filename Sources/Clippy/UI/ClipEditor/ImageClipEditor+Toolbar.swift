@@ -6,18 +6,19 @@ extension ImageClipEditor {
     var titleBar: some View {
         HStack(spacing: 8) {
             TextField("Title (optional)", text: $title)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .font(.title3.weight(.semibold))
                 .accessibilityLabel("Clip title")
             if isDirty {
                 HStack(spacing: 4) {
-                    Circle().fill(dsTokens.accent).frame(width: 8, height: 8)
-                    Text("unsaved").font(.caption).foregroundStyle(dsTokens.textSecondary)
+                    Circle().fill(Color.clippyAccent).frame(width: 8, height: 8)
+                    Text("unsaved").font(.caption).foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Unsaved changes")
             }
         }
-        .padding(10)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 6)
     }
 
     var toolbar: some View {
@@ -68,9 +69,11 @@ extension ImageClipEditor {
             }
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(dsTokens.surfaceElevated)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .glassEffect(.regular, in: Capsule())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
     }
 
     /// Aspect presets, Apply and Cancel while cropping.
@@ -82,7 +85,7 @@ extension ImageClipEditor {
             .labelsHidden().pickerStyle(.menu).fixedSize()
             .accessibilityLabel("Crop aspect ratio")
             Button("Apply crop") { applyCrop() }
-                .buttonStyle(.bordered).controlSize(.small)
+                .buttonStyle(.glass).tint(nil).controlSize(.small)
                 .disabled(selection == nil)
                 .keyboardShortcut(.return, modifiers: .command)
                 .help("Apply crop (Cmd Return)")

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Observation
 
 /// Which end `PasteStack.next()` takes from.
 enum PasteStackOrder: String, CaseIterable, Identifiable {
@@ -45,18 +46,19 @@ struct PasteStackItem: Identifiable, Equatable {
 /// persisted: quitting the app clears it. Sensitive clips are refused. Mutate
 /// from the main thread (it publishes to SwiftUI).
 @MainActor
-final class PasteStack: ObservableObject {
+@Observable
+final class PasteStack {
     /// The app-wide stack.
     static let shared = PasteStack()
     /// Maximum queued items.
     static let capacity = 50
 
     /// Items in stack order: index 0 is the oldest.
-    @Published private(set) var items: [PasteStackItem] = []
+    private(set) var items: [PasteStackItem] = []
     /// While true, every newly captured clip is appended (in addition to history).
-    @Published var isCollecting = false
+    var isCollecting = false
     /// Which end `next()` pops. Persisted via `AppendPreferences.stackOrder`.
-    @Published var order: PasteStackOrder {
+    var order: PasteStackOrder {
         didSet { AppendPreferences.stackOrder = order }
     }
 

@@ -1,7 +1,7 @@
 import Foundation
-import Combine
 import Network
 import os
+import Observation
 
 // MARK: - Status
 
@@ -67,25 +67,25 @@ enum McpPortStatus: Equatable {
 // MARK: - Controller
 
 @MainActor
-final class McpServerController: ObservableObject {
+@Observable
+final class McpServerController {
     static let shared = McpServerController()
 
-    @Published var status: McpServerStatus = .stopped
+    var status: McpServerStatus = .stopped
     /// Status of the configured port, derived from the running server (SET-03).
-    @Published private(set) var portStatus: McpPortStatus = .available
+    private(set) var portStatus: McpPortStatus = .available
 
     private let lifecycle: McpLifecycle
     private let settings = AppSettings.shared
     private let tokenProvider: McpTokenProvider
-    private var cancellables = Set<AnyCancellable>()
 
     // Commands run strictly in submission order: each awaits the one before it.
     // Without this, `stop()` followed by `start()` could reach the actor reversed.
-    private var chain: Task<Void, Never>?
+    @ObservationIgnored private var chain: Task<Void, Never>?
 
     // Pid of the live child, mirrored outside the lifecycle actor so `stop()` can
     // signal it synchronously. The app-terminate path cannot wait for an async hop.
-    private var livePid: Int32?
+    @ObservationIgnored private var livePid: Int32?
 
     private init() {
         self.lifecycle = McpLifecycle(launcher: McpServerController.productionLauncher)
@@ -384,36 +384,28 @@ final class McpServerController: ObservableObject {
     // MARK: - Settings observation
 
     /// Call once from AppDelegate after launch. Starts the server if enabled,
-    /// and wires up Combine sinks so future settings changes take effect live.
+    /// and observes the settings so future settings changes take effect live.
     func syncWithSettings() {
         if settings.mcpEnabled { start() }
 
-        settings.$mcpEnabled
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] enabled in
-                if enabled { self?.start() } else { self?.stop() }
-            }
-            .store(in: &cancellables)
+        observeChanges(of: { [settings] in settings.mcpEnabled }) { [weak self] enabled in
+            if enabled { self?.start() } else { self?.stop() }
+        }
 
         // A port change restarts the server and re-points every installed client
         // at the new URL; without the re-sync their configs go stale (MCP-03).
-        settings.$mcpPort
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] port in
+        observeChanges(of: { [settings] in settings.mcpPort }) { [weak self] port in
+            guard let self else { return }
+            self.refreshPortStatus()
+            guard self.settings.mcpEnabled else { return }
+            self.enqueue { [weak self] in
                 guard let self else { return }
-                self.refreshPortStatus()
-                guard self.settings.mcpEnabled else { return }
-                self.enqueue { [weak self] in
-                    guard let self else { return }
-                    await self.stopNow()
-                    await self.startNow()
-                    await McpInstallService.resyncInstalledClients(port: port,
-                                                                   tokenProvider: self.tokenProvider)
-                }
+                await self.stopNow()
+                await self.startNow()
+                await McpInstallService.resyncInstalledClients(port: port,
+                                                               tokenProvider: self.tokenProvider)
             }
-            .store(in: &cancellables)
+        }
     }
 
     // MARK: - Test connection

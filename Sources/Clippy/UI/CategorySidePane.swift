@@ -5,7 +5,7 @@ import SwiftUI
 /// drops (file) and category drops (reorder), rename inline, and are keyboard
 /// operable. Row views live in `CategorySidePane+Rows`, behavior in `+Actions`.
 struct CategorySidePane: View {
-    @ObservedObject var store: ClipStore
+    var store: ClipStore
     @Binding var selection: PanelSelection
     /// Render the icon rail instead of the expanded list.
     var isRail: Bool
@@ -14,10 +14,10 @@ struct CategorySidePane: View {
     /// Smart collections model; nil hides the section.
     var smartCollections: SmartCollectionSelection?
 
-    @ObservedObject var settings = AppSettings.shared
-    @ObservedObject var scriptStore = ScriptStore.shared
-    @StateObject var dragState = SidebarDragState()
-    @StateObject var undo: CategoryUndo
+    var settings = AppSettings.shared
+    var scriptStore = ScriptStore.shared
+    @State var dragState = SidebarDragState()
+    @State var undo: CategoryUndo
     @Environment(\.clippyTokens) var tokens
     @Environment(\.undoManager) var undoManager
     @FocusState var focus: SidebarRowID?
@@ -47,7 +47,7 @@ struct CategorySidePane: View {
         self.isRail = isRail
         self.historyCount = historyCount
         self.smartCollections = smartCollections
-        self._undo = StateObject(wrappedValue: CategoryUndo(backend: ClipStoreCategoryBackend(store: store)))
+        self._undo = State(initialValue: CategoryUndo(backend: ClipStoreCategoryBackend(store: store)))
     }
 
     var body: some View {
@@ -100,7 +100,7 @@ struct CategorySidePane: View {
     private var expanded: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: 4) {
                     sectionHeader("Library", .library)
                     if isOpen(.library) { historyRow }
                     sectionHeader("Categories", .categories, count: store.categories.count, addLabel: "New category") { isCreating = true }
@@ -121,21 +121,20 @@ struct CategorySidePane: View {
                         }
                     }
                 }
-                .padding(.horizontal, 6)
-                .padding(.top, 6)
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
             }
             .accessibilityRotor("Categories") {
                 ForEach(store.categories) { category in
                     AccessibilityRotorEntry(Text(category.name), id: category.id ?? -1, in: rotorNamespace)
                 }
             }
-            newCategoryRow.padding(.horizontal, 6).padding(.bottom, 6)
+            newCategoryRow.padding(.horizontal, 10).padding(.bottom, 10)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(tokens.surfaceSidebar.opacity(settings.panelOpacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Categories")
         .onKeyPress(phases: .down) { press in handleKey(press) }
-        .onReceive(PanelFocusRequest.shared.$sidebarToken.dropFirst()) { _ in focusSelectedRow() }
+        .onChange(of: PanelFocusRequest.shared.sidebarToken) { _, _ in focusSelectedRow() }
     }
 }

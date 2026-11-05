@@ -79,7 +79,7 @@ final class ThemeTests: XCTestCase {
         }
     }
 
-    func testDefaultThemeFollowsTheSystem() {
+    func testDefaultThemeIsAutomatic() {
         let defaults = UserDefaults(suiteName: "clippy.theme.defaults.\(UUID())")!
         AppSettings.registerDefaults(defaults)
         XCTAssertEqual(defaults.string(forKey: AppSettings.Keys.themePreset), ThemePreset.automatic.rawValue)

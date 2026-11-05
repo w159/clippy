@@ -1,28 +1,29 @@
 import AppKit
 import Carbon.HIToolbox
-import Combine
+import Observation
 
 /// Global hotkeys via Carbon RegisterEventHotKey: works from a background
 /// (accessory) app and needs no special permissions, unlike NSEvent global
 /// monitors. Supports one user-defined chord per `HotKeyAction`, persisted in
 /// UserDefaults (`HotKeyAction.defaultsKey`).
 @MainActor
-final class HotKeyCenter: ObservableObject {
+@Observable
+final class HotKeyCenter {
     static let shared = HotKeyCenter()
 
-    private var hotKeyRefs: [HotKeyAction: EventHotKeyRef] = [:]
-    private var eventHandlerRef: EventHandlerRef?
+    @ObservationIgnored private var hotKeyRefs: [HotKeyAction: EventHotKeyRef] = [:]
+    @ObservationIgnored private var eventHandlerRef: EventHandlerRef?
     private let defaults: UserDefaults
 
     /// Per-action callbacks, run on the main actor.
-    var handlers: [HotKeyAction: () -> Void] = [:]
+    @ObservationIgnored var handlers: [HotKeyAction: () -> Void] = [:]
 
     /// Latest failure message per action; empty when everything registered.
     /// Observable so Settings and onboarding can show a banner.
-    @Published private(set) var errors: [HotKeyAction: String] = [:]
+    private(set) var errors: [HotKeyAction: String] = [:]
 
     /// Currently configured chords (nil = binding off). Observable.
-    @Published private(set) var chords: [HotKeyAction: HotKeyChord] = [:]
+    private(set) var chords: [HotKeyAction: HotKeyChord] = [:]
 
     /// First registration failure message, or nil when all registered.
     var lastError: String? {

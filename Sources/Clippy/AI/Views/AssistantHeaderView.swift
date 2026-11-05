@@ -3,7 +3,7 @@ import SwiftUI
 /// Assistant header: title, provider status, capability chip, conversation usage,
 /// tool drawer and clear button. Layout collapses gracefully at compact widths.
 struct AssistantHeaderView: View {
-    @ObservedObject var viewModel: AIAssistantViewModel
+    var viewModel: AIAssistantViewModel
     let capabilities: AssistantCapabilities
     let onOpenSettings: () -> Void
     @Environment(\.clippyTokens) private var tokens
@@ -15,12 +15,12 @@ struct AssistantHeaderView: View {
         VStack(spacing: 0) {
             HStack(spacing: tokens.metrics.space.two) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.title3)
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.accentText)
+                    .foregroundStyle(Color.clippyAccent)
                     .symbolEffect(.variableColor, isActive: !reduceMotion && viewModel.state == .streaming)
                     .accessibilityHidden(true)
-                Text("AI Assistant").font(.headline).foregroundStyle(tokens.textPrimary).lineLimit(1)
+                Text("AI Assistant").font(.title3.weight(.semibold)).lineLimit(1)
                 ReasonChip(title: viewModel.env.providerName(), systemImage: "cpu",
                            explanation: "Provider used for replies. Change it in Settings > AI.", action: onOpenSettings)
                 AssistantCapabilityChip(capabilities: capabilities, onOpenSettings: onOpenSettings)
@@ -30,23 +30,25 @@ struct AssistantHeaderView: View {
                         .help("Tokens used in this conversation, as reported by the provider")
                         .accessibilityLabel("Conversation usage \(usage)")
                 }
-                IconButton("wrench.and.screwdriver", label: "Assistant tools", help: "Tools the assistant can use",
-                           state: showTools ? .selected : .rest) { showTools.toggle() }
-                    .popover(isPresented: $showTools) { AssistantToolDrawer(viewModel: viewModel) }
-                IconButton("trash", label: "Clear conversation", help: "Clear conversation",
-                           state: viewModel.messages.isEmpty ? .disabled : .rest) { confirmClear = true }
-                    .confirmationDialog("Clear this conversation?", isPresented: $confirmClear, titleVisibility: .visible) {
-                        Button("Clear", role: .destructive) { viewModel.clearConversation() }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("All messages will be removed and cannot be recovered.")
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        IconButton("wrench.and.screwdriver", label: "Assistant tools", help: "Tools the assistant can use",
+                                   state: showTools ? .selected : .rest) { showTools.toggle() }
+                            .popover(isPresented: $showTools) { AssistantToolDrawer(viewModel: viewModel) }
+                        IconButton("trash", label: "Clear conversation", help: "Clear conversation",
+                                   state: viewModel.messages.isEmpty ? .disabled : .rest) { confirmClear = true }
+                            .confirmationDialog("Clear this conversation?", isPresented: $confirmClear, titleVisibility: .visible) {
+                                Button("Clear", role: .destructive) { viewModel.clearConversation() }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("All messages will be removed and cannot be recovered.")
+                            }
                     }
+                }
             }
-            .padding(.horizontal, tokens.metrics.space.three)
-            .padding(.vertical, tokens.metrics.space.two)
-            Divider().overlay(tokens.stroke)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .background(tokens.surface)
     }
 }
 
@@ -72,8 +74,8 @@ struct AssistantEmptyView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: tokens.metrics.space.four) {
-                Image(systemName: "sparkles").font(.system(size: 36, weight: .light))
-                    .symbolRenderingMode(.hierarchical).foregroundStyle(tokens.textSecondary).accessibilityHidden(true)
+                Image(systemName: "sparkles").resizable().scaledToFit().frame(width: 44, height: 44)
+                    .symbolRenderingMode(.hierarchical).foregroundStyle(Color.clippyAccent).accessibilityHidden(true)
                 Text("Ask the assistant about your clips").font(.title3.weight(.semibold)).foregroundStyle(tokens.textPrimary)
                 Text("Try one of these, or type your own.").font(.callout).foregroundStyle(tokens.textSecondary)
                 VStack(spacing: tokens.metrics.space.two) {
@@ -86,9 +88,8 @@ struct AssistantEmptyView: View {
                             }
                             .padding(.horizontal, tokens.metrics.space.three)
                             .padding(.vertical, tokens.metrics.space.two)
-                            .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-                            .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.stroke, lineWidth: 1))
-                            .contentShape(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+                            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Ask: \(prompt)")

@@ -8,15 +8,10 @@ import SwiftUI
 ///
 /// `knownBundleIDs` feeds the Apps tab. Pass an empty array to show the
 /// "Copy something from an app..." placeholder.
-///
-/// `accentHex` tints the selected-cell background the same way CategoryEditorView
-/// does; pass nil to fall back to a plain `.accentColor` tint.
 struct IconPickerView: View {
     @Binding var iconKind: CategoryIconKind
     @Binding var iconValue: String
     var knownBundleIDs: [String] = []
-    /// Optional hex string used to colorize the selected cell background.
-    var accentHex: String? = nil
 
     @State private var iconTab: CategoryIconKind
     @State private var symbolQuery: String = ""
@@ -25,13 +20,11 @@ struct IconPickerView: View {
     init(
         iconKind: Binding<CategoryIconKind>,
         iconValue: Binding<String>,
-        knownBundleIDs: [String] = [],
-        accentHex: String? = nil
+        knownBundleIDs: [String] = []
     ) {
         _iconKind = iconKind
         _iconValue = iconValue
         self.knownBundleIDs = knownBundleIDs
-        self.accentHex = accentHex
         // Start the tab on whatever kind is already selected.
         _iconTab = State(initialValue: iconKind.wrappedValue)
     }
@@ -76,26 +69,39 @@ struct IconPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ClippySegmentedPicker("Icon", selection: $iconTab, options: [
-                SegmentOption(value: CategoryIconKind.symbol, title: "Symbols"),
-                SegmentOption(value: CategoryIconKind.emoji, title: "Emoji"),
-                SegmentOption(value: CategoryIconKind.appLogo, title: "Apps"),
-            ])
+            Picker("Icon", selection: $iconTab) {
+                Text("Symbols").tag(CategoryIconKind.symbol)
+                Text("Emoji").tag(CategoryIconKind.emoji)
+                Text("Apps").tag(CategoryIconKind.appLogo)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
             if iconTab == .symbol {
-                TextField("Search symbols", text: $symbolQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                searchField(prompt: "Search symbols", text: $symbolQuery)
             } else if iconTab == .emoji {
                 // The emoji tab previously had no search while symbols did. Emojis
                 // lack system names, so we match against the keyword list above.
-                TextField("Search emoji", text: $emojiQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                searchField(prompt: "Search emoji", text: $emojiQuery)
             }
 
             iconGrid
         }
+    }
+
+    /// One full-width field with a leading magnifier and the prompt inside it. The label is hidden so a grouped
+    /// Form does not lay it out as a separate leading title.
+    private func searchField(prompt: String, text: Binding<String>) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField(prompt, text: text, prompt: Text(prompt))
+                .textFieldStyle(.plain)
+                .labelsHidden()
+        }
+        .font(.callout)
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Grid
@@ -103,14 +109,12 @@ struct IconPickerView: View {
     @ViewBuilder
     private var iconGrid: some View {
         if iconTab == .symbol && filteredSymbols.isEmpty {
-            Text("No symbols match")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            ContentUnavailableView("No symbols match", systemImage: "magnifyingglass",
+                                   description: Text("Try a different search."))
                 .frame(maxWidth: .infinity, minHeight: 110)
         } else if iconTab == .emoji && filteredEmojis.isEmpty {
-            Text("No emoji match")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            ContentUnavailableView("No emoji match", systemImage: "magnifyingglass",
+                                   description: Text("Try a different search."))
                 .frame(maxWidth: .infinity, minHeight: 110)
         } else {
             symbolEmojiAppGrid
@@ -129,7 +133,7 @@ struct IconPickerView: View {
                             iconKind = .symbol
                             iconValue = symbol
                         } content: {
-                            Image(systemName: symbol).font(.system(size: 14))
+                            Image(systemName: symbol).font(.callout)
                         }
                         .accessibilityLabel(symbol)
                     }
@@ -140,7 +144,7 @@ struct IconPickerView: View {
                             iconKind = .emoji
                             iconValue = emoji
                         } content: {
-                            Text(emoji).font(.system(size: 15))
+                            Text(emoji).font(.callout)
                         }
                         .accessibilityLabel(pair.name)
                     }
@@ -159,7 +163,7 @@ struct IconPickerView: View {
                                 if let icon = AppIconProvider.shared.icon(forBundleID: bundleID) {
                                     Image(nsImage: icon).resizable().frame(width: 18, height: 18)
                                 } else {
-                                    Image(systemName: "app.dashed").font(.system(size: 14))
+                                    Image(systemName: "app.dashed").font(.callout)
                                 }
                             }
                             .accessibilityLabel(bundleID)
@@ -181,7 +185,7 @@ struct IconPickerView: View {
                 .frame(width: 30, height: 28)
                 .background(
                     selectedBackground(isSelected: isSelected),
-                    in: RoundedRectangle(cornerRadius: ClippyRadius.inset)
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                 )
         }
         .buttonStyle(.plain)
@@ -189,10 +193,7 @@ struct IconPickerView: View {
 
     private func selectedBackground(isSelected: Bool) -> AnyShapeStyle {
         guard isSelected else { return AnyShapeStyle(.clear) }
-        if let hex = accentHex {
-            return AnyShapeStyle(Color(hexString: hex).opacity(0.25))
-        }
-        return AnyShapeStyle(Color.accentColor.opacity(0.25))
+        return AnyShapeStyle(Color.clippyAccent.opacity(0.2))
     }
 }
 

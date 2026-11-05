@@ -6,7 +6,7 @@ import SwiftUI
 /// Usage, on the `ClipListView` body next to its other `.sheet` modifiers:
 /// `.ocrResultSheet(store: store, onPaste: onPaste)`.
 private struct OCRResultSheetModifier: ViewModifier {
-    @ObservedObject var presenter: OCRPresenter
+    var presenter: OCRPresenter
     let store: ClipStore
     let onPaste: (Clip, Bool) -> Void
 

@@ -13,24 +13,25 @@ struct AIActionTestPanel: View {
     let canRun: Bool
     let onRun: () -> Void
     let onStop: () -> Void
-    @Environment(\.clippyTokens) private var tokens
 
     var body: some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Test").font(.headline).foregroundStyle(tokens.textPrimary)
+                Text("Test").font(.headline)
                 Spacer()
                 if isTesting {
-                    Button("Stop", action: onStop).keyboardShortcut(.escape, modifiers: [])
+                    Button("Stop", action: onStop).buttonStyle(.glass).tint(nil).keyboardShortcut(.escape, modifiers: [])
                 } else {
-                    Button("Run test", action: onRun).disabled(!canRun).buttonStyle(.accent)
+                    Button("Run test", action: onRun).disabled(!canRun).buttonStyle(.glassProminent)
                 }
             }
             Picker("Clip", selection: $clipID) {
                 Text("Choose a clip").tag(Int64?.none)
                 ForEach(clips, id: \.id) { clip in Text(clip.displayTitle).lineLimit(1).tag(clip.id) }
             }
-            if showsInstruction { TextField("Instruction for the test", text: $instruction).textFieldStyle(.roundedBorder) }
+            if showsInstruction { TextField("Instruction for the test", text: $instruction).textFieldStyle(.plain)
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous)) }
             outputArea
         }
     }
@@ -39,25 +40,24 @@ struct AIActionTestPanel: View {
         ScrollView {
             Group {
                 if let errorText {
-                    Label(errorText, systemImage: "xmark.octagon.fill").foregroundStyle(tokens.danger)
+                    Label(errorText, systemImage: "xmark.octagon.fill").foregroundStyle(.red)
                 } else if output.isEmpty && isTesting {
                     VStack(alignment: .leading, spacing: 6) { Skeleton(width: 200, height: 10); Skeleton(width: 140, height: 10) }
                         .accessibilityLabel("Waiting for the model")
                 } else if output.isEmpty {
                     Text(AIActionEditorSupport.testPlaceholder(isTesting: isTesting, hasClip: clipID != nil))
-                        .foregroundStyle(tokens.textSecondary)
+                        .foregroundStyle(.secondary)
                 } else {
-                    Text(output).foregroundStyle(tokens.textPrimary)
+                    Text(output)
                 }
             }
             .font(.body)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(tokens.metrics.space.two)
+            .padding(12)
         }
         .frame(maxHeight: .infinity)
-        .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-        .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.stroke, lineWidth: 1))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityLabel("Test output")
         .accessibilityAddTraits(.updatesFrequently)
     }

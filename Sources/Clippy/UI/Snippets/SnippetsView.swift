@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 /// Snippet manager: folder filter, list and editor, with import/export and duplicate.
 struct SnippetsView: View {
-    @Environment(\.clippyTokens) private var tokens
     @FocusState private var searchFocused: Bool
     private let store: SnippetStore
     @State private var snippets: [Snippet] = []
@@ -28,30 +27,48 @@ struct SnippetsView: View {
 
     var body: some View {
         HSplitView {
-            VStack(spacing: tokens.metrics.space.two) {
-                TextField("Search snippets", text: $query).textFieldStyle(.roundedBorder).focused($searchFocused)
-                    .padding(.horizontal, tokens.metrics.space.three)
-                Picker("Folder", selection: $folderFilter) {
-                    Text("All folders").tag("")
-                    ForEach(store.folders, id: \.self) { Text($0).tag($0) }
+            VStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                    TextField("Search snippets", text: $query).textFieldStyle(.plain).focused($searchFocused)
                 }
-                .fixedSize()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, tokens.metrics.space.three)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .glassEffect(.regular, in: Capsule())
+                .padding(.horizontal, 12)
+                if !snippets.isEmpty {
+                    Picker("Folder", selection: $folderFilter) {
+                        Text("All folders").tag("")
+                        ForEach(store.folders, id: \.self) { Text($0).tag($0) }
+                    }
+                    .fixedSize()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                }
                 List(visible, selection: $selection) { item in
-                    VStack(alignment: .leading) {
-                        Text(item.displayName).foregroundStyle(item.isEnabled ? tokens.textPrimary : tokens.textSecondary)
-                        if !item.abbreviation.isEmpty { Text(item.abbreviation).font(.caption.monospaced()).foregroundStyle(tokens.textSecondary) }
-                    }.tag(item.id)
+                    HStack(spacing: 10) {
+                        Image(systemName: "text.badge.plus")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(item.isEnabled ? Color.clippyAccent : Color.secondary)
+                            .frame(width: 30, height: 30)
+                            .background((item.isEnabled ? Color.clippyAccent : Color.secondary).opacity(0.14),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.displayName).foregroundStyle(item.isEnabled ? Color.primary : Color.secondary).lineLimit(1)
+                            if !item.abbreviation.isEmpty { Text(item.abbreviation).font(.caption.monospaced()).foregroundStyle(.secondary) }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                    .tag(item.id)
                 }
+                .scrollContentBackground(.hidden)
                 .onDeleteCommand { if selection != nil { confirmDelete = true } }
                 .overlay {
                     if visible.isEmpty { listEmptyState }
                 }
                 toolbar
-                    .padding(.horizontal, tokens.metrics.space.three)
+                    .padding(.horizontal, 12)
             }
-            .padding(.vertical, tokens.metrics.space.two)
+            .padding(.vertical, 12)
             .frame(minWidth: 220, idealWidth: 260)
             editor.frame(minWidth: 340)
         }
@@ -68,15 +85,31 @@ struct SnippetsView: View {
         } message: { Text(errorMessage ?? "") }
     }
 
+    /// The full empty state when the list column is tall enough, a compact title, message and button when not.
     @ViewBuilder private var listEmptyState: some View {
         if snippets.isEmpty {
-            EmptyState(systemImage: "text.badge.plus", title: "No snippets yet",
-                       message: "Save text you type often and expand it with a short abbreviation.",
-                       actionTitle: "Add Snippet") { addSnippet() }
+            emptyListContent(systemImage: "text.badge.plus", title: "No snippets yet",
+                             message: "Save text you type often and expand it with a short abbreviation.",
+                             actionTitle: "Add Snippet") { addSnippet() }
         } else {
-            EmptyState(systemImage: "magnifyingglass", title: "No snippets match",
-                       message: "Clear the search or choose All folders.",
-                       actionTitle: "Clear Search") { query = ""; folderFilter = "" }
+            emptyListContent(systemImage: "magnifyingglass", title: "No snippets match",
+                             message: "Clear the search or choose All folders.",
+                             actionTitle: "Clear Search") { query = ""; folderFilter = "" }
+        }
+    }
+
+    private func emptyListContent(systemImage: String, title: String, message: String, actionTitle: String,
+                                  action: @escaping () -> Void) -> some View {
+        ViewThatFits(in: .vertical) {
+            PaneEmptyState(systemImage: systemImage, title: title, message: message, actionTitle: actionTitle, action: action)
+            VStack(spacing: 6) {
+                Text(title).font(.headline).foregroundStyle(.primary)
+                Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+                Button(actionTitle, action: action).buttonStyle(.glassProminent).controlSize(.small)
+            }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -85,16 +118,17 @@ struct SnippetsView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: tokens.metrics.space.two) {
+        GlassEffectContainer(spacing: 8) {
+        HStack(spacing: 8) {
             Button { addSnippet() } label: {
                 Image(systemName: "plus")
-            }.accessibilityLabel("New snippet").help("New snippet")
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("New snippet").help("New snippet")
             Button { if let id = selection { perform { selection = try store.duplicate(id: id)?.id } } } label: {
                 Image(systemName: "plus.square.on.square")
-            }.accessibilityLabel("Duplicate").help("Duplicate snippet").disabled(selection == nil)
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("Duplicate").help("Duplicate snippet").disabled(selection == nil)
             Button { confirmDelete = true } label: {
                 Image(systemName: "trash")
-            }.accessibilityLabel("Delete").help("Delete snippet").disabled(selection == nil)
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("Delete").help("Delete snippet").disabled(selection == nil)
             Spacer()
             Menu {
                 Button("Import snippets\u{2026}", action: importJSON)
@@ -104,6 +138,7 @@ struct SnippetsView: View {
                 .fixedSize()
                 .help("Import or export snippets")
                 .accessibilityLabel("Import or export snippets")
+        }
         }
     }
 
@@ -117,7 +152,11 @@ struct SnippetsView: View {
                     scheduleSave(value)
                 }))
         } else {
-            Text("Select a snippet, or press + to create one.").foregroundStyle(tokens.textSecondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            ContentUnavailableView {
+                Label { Text("No snippet selected").foregroundStyle(.primary) } icon: { Image(systemName: "text.badge.plus") }
+            } description: {
+                Text("Select a snippet, or press + to create one.").foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -173,7 +212,6 @@ struct SnippetsView: View {
 /// Editor for one snippet with a placeholder menu and live test expansion.
 struct SnippetEditor: View {
     @Binding var snippet: Snippet
-    @Environment(\.clippyTokens) private var tokens
 
     private static let placeholders: [(String, String)] = [
         ("Date", "{date}"), ("Date (custom)", "{date:yyyy-MM-dd}"), ("Time", "{time}"), ("Clipboard", "{clipboard}"),
@@ -188,19 +226,26 @@ struct SnippetEditor: View {
             TextField("Tags (comma separated)", text: Binding(
                 get: { snippet.tags.joined(separator: ", ") },
                 set: { snippet.tags = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }))
-            Toggle("Enabled", isOn: $snippet.isEnabled).tint(tokens.accent)
-            HStack(spacing: tokens.metrics.space.two) {
-                Text("Body").font(.headline)
-                Spacer()
-                Menu("Insert placeholder") {
-                    ForEach(Self.placeholders, id: \.1) { item in Button(item.0) { snippet.body += item.1 } }
+            Toggle("Enabled", isOn: $snippet.isEnabled)
+            Section {
+                TextEditor(text: $snippet.body).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
+            } header: {
+                HStack {
+                    Text("Body")
+                    Spacer()
+                    Menu("Insert placeholder") {
+                        ForEach(Self.placeholders, id: \.1) { item in Button(item.0) { snippet.body += item.1 } }
+                    }
                 }
             }
-            TextEditor(text: $snippet.body).font(.system(.body, design: .monospaced)).frame(minHeight: 120)
-            Text("Test expansion").font(.headline)
-            Text(preview).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Used \(snippet.useCount == 1 ? "once" : "\(snippet.useCount) times"). Snippets stay on this Mac.").font(.caption).foregroundStyle(tokens.textSecondary)
+            Section {
+                Text(preview).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } header: {
+                Text("Test expansion")
+            } footer: {
+                Text("Used \(snippet.useCount == 1 ? "once" : "\(snippet.useCount) times"). Snippets stay on this Mac.")
+            }
         }
         .formStyle(.grouped)
     }

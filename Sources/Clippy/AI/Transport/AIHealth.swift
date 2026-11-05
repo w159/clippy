@@ -1,12 +1,13 @@
-import Combine
 import Foundation
+import Observation
 
 /// Background AI failures without retaining prompts, clipboard content or response bodies.
 @MainActor
-final class AIHealth: ObservableObject {
+@Observable
+final class AIHealth {
     static let shared = AIHealth()
 
-    @Published private(set) var lastFailure: String?
+    private(set) var lastFailure: String?
 
     func record(_ error: Error) {
         let message: String

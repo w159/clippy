@@ -1,11 +1,13 @@
 import AppKit
 import Foundation
+import Observation
 
 /// One script run as the UI sees it: live streamed output while it works, then
 /// the final result. Shared by the panel and Settings so both surfaces show the
 /// same state, and it survives either view being rebuilt.
 @MainActor
-final class ScriptRun: ObservableObject, Identifiable {
+@Observable
+final class ScriptRun: Identifiable {
     enum Phase: Equatable {
         case running
         case finished(ScriptResult)
@@ -16,14 +18,14 @@ final class ScriptRun: ObservableObject, Identifiable {
     let script: Script
     let startedAt = Date()
 
-    @Published fileprivate(set) var phase: Phase = .running
+    fileprivate(set) var phase: Phase = .running
     /// Output streamed so far, capped to the last `ScriptResult.viewCap` characters.
-    @Published fileprivate(set) var liveStdout = ""
-    @Published fileprivate(set) var liveStderr = ""
+    fileprivate(set) var liveStdout = ""
+    fileprivate(set) var liveStderr = ""
     /// Transient "Saved as clip" / "Could not save clip" feedback.
-    @Published var saveStatus: String?
+    var saveStatus: String?
 
-    fileprivate var task: Task<Void, Never>?
+    @ObservationIgnored fileprivate var task: Task<Void, Never>?
 
     init(script: Script) { self.script = script }
 
@@ -53,15 +55,16 @@ final class ScriptRun: ObservableObject, Identifiable {
 /// running process for UI surfaces, applying the shared post-run behavior:
 /// `outputToClipboard`, run history, and finishing state.
 @MainActor
-final class ScriptRunCenter: ObservableObject {
+@Observable
+final class ScriptRunCenter {
     static let shared = ScriptRunCenter()
 
     /// Latest run per script id (running or finished, until dismissed).
-    @Published private(set) var runs: [UUID: ScriptRun] = [:]
+    private(set) var runs: [UUID: ScriptRun] = [:]
     /// (finished, total) while a batch is running.
-    @Published private(set) var batchProgress: (done: Int, total: Int)?
+    private(set) var batchProgress: (done: Int, total: Int)?
 
-    private var batchTask: Task<Void, Never>?
+    @ObservationIgnored private var batchTask: Task<Void, Never>?
 
     init() {}
 

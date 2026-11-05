@@ -19,13 +19,13 @@ struct EmptyState: View {
     }
 
     var body: some View {
-        VStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: systemImage).font(.system(size: 40, weight: .light)).symbolRenderingMode(.hierarchical).foregroundStyle(tokens.textSecondary)
-            Text(title).font(.title2.weight(.semibold)).foregroundStyle(tokens.textPrimary)
-            if let message { Text(message).font(.body).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center).lineLimit(2) }
-            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.accent) }
+        ContentUnavailableView {
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: systemImage) }
+        } description: {
+            if let message { Text(message).foregroundStyle(.secondary) }
+        } actions: {
+            if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.bordered) }
         }
-        .padding(tokens.metrics.space.six)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
     }
@@ -73,13 +73,13 @@ struct ErrorState: View {
     }
 
     var body: some View {
-        VStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: "exclamationmark.triangle.fill").font(.title2).foregroundStyle(tokens.warning)
-            Text(title).font(.headline).foregroundStyle(tokens.textPrimary)
-            Text(message).font(.body).foregroundStyle(tokens.textSecondary).multilineTextAlignment(.center)
+        ContentUnavailableView {
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
+        } description: {
+            Text(message).foregroundStyle(.secondary)
+        } actions: {
             if let retryTitle, let retry { Button(retryTitle, action: retry).buttonStyle(.bordered) }
         }
-        .padding(tokens.metrics.space.six)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
     }

@@ -2,40 +2,38 @@ import SwiftUI
 
 /// Collapsed item row: category icon, title, category label and an expand chevron.
 struct OnePasswordItemRow: View {
-    @ObservedObject private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let item: OPItem
     let isExpanded: Bool
     let toggle: () -> Void
     @State private var hovered = false
 
-    private var tokens: ThemeTokens { settings.theme }
-
     var body: some View {
         Button(action: toggle) {
-            HStack {
+            HStack(spacing: 12) {
                 Image(systemName: OnePasswordFilter.symbol(forCategory: item.category))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.accent)
+                    .foregroundStyle(Color.clippyAccent)
+                    .frame(width: 34, height: 34)
+                    .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(item.title)
+                    Text(item.title).font(.body.weight(.medium)).lineLimit(1)
                     Text(OnePasswordFilter.displayCategory(item.category))
-                        .font(.caption2).foregroundStyle(tokens.textSecondary)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.caption)
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(.secondary)
                     // One fixed chevron rotated so expand/collapse animates instead of popping.
                     .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: isExpanded)
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .padding(10)
             .background(
-                isExpanded ? tokens.accent.opacity(0.10) : tokens.cardBorder.opacity(hovered ? 0.28 : 0.15),
-                in: RoundedRectangle(cornerRadius: ClippyRadius.inset)
+                isExpanded ? AnyShapeStyle(Color.clippyAccent.opacity(0.12)) : AnyShapeStyle(.quaternary.opacity(hovered ? 0.9 : 0.5)),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
         }
         .buttonStyle(.plain)

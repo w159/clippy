@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct AIMasterSection: View {
-    @ObservedObject var settings: AppSettings
-    @ObservedObject var store: AIProviderStore
+    @Bindable var settings: AppSettings
+    var store: AIProviderStore
 
     var body: some View {
         PaneSection("AI features") {

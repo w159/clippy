@@ -4,10 +4,11 @@ import CoreGraphics
 /// icon rail, one grid card and the chrome still fit (PNL-03). Inputs are
 /// passed in so the derivation is testable without the sidebar or grid types.
 enum PanelLayout {
-    /// Height of the header (search row, chip row and section title).
-    static let headerHeight: CGFloat = 112
+    /// Height of the floating header strip: one row holding the title, the search field and the controls.
+    /// (The filter-chip row appears below it only while searching or filtering.)
+    static let headerHeight: CGFloat = 64
     /// Height of the shortcut footer.
-    static let footerHeight: CGFloat = 32
+    static let footerHeight: CGFloat = 40
     /// Width floor for the panel: the narrowest width at which the header controls
     /// (search field + toggles) stay usable. It is also the historical `minSize.width`,
     /// so `minimumSize` never returns a narrower panel even when rail + card + gutters

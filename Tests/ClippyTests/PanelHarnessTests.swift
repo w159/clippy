@@ -27,7 +27,7 @@ final class PanelHarnessTests: XCTestCase {
         try FileManager.default.createDirectory(at: shotDirectory, withIntermediateDirectories: true)
         print("HARNESS screenshots: \(shotDirectory.path)")
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApp.activate()
+        forceActivate()
     }
 
     override func tearDown() async throws {
@@ -76,12 +76,14 @@ final class PanelHarnessTests: XCTestCase {
             onClose: {},
             onOpenSettings: {}
         )
-        show(view.clippyDesignSystem(), size: NSSize(width: 820, height: 600), appearance: appearance, panelChrome: true)
+        show(view.clippyDesignSystem(), size: NSSize(width: 1000, height: 620), appearance: appearance, panelChrome: true)
         pump(until: "clips loaded") { self.store.clips.count == 8 && !self.store.categories.isEmpty }
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
 
-    func show<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
+    func show<V: View>(_ content: V, size: NSSize, appearance: NSAppearance.Name, panelChrome: Bool = false) {
+        // CI runners cannot always activate the test host, which draws accent controls grey; capture them active.
+        let view = content.environment(\.appearsActive, true)
         NSApp.appearance = NSAppearance(named: appearance)
         let window = PastePanel(contentRect: NSRect(origin: NSPoint(x: 80, y: 80), size: size),
                                  styleMask: PastePanel.chromeStyleMask,
@@ -101,10 +103,30 @@ final class PanelHarnessTests: XCTestCase {
     }
 
     func present(_ window: NSWindow) {
-        window.makeKeyAndOrderFront(nil)
         self.window = window
+        makeKeyInActiveApp(window)
         pump(seconds: 0.5)
-        if !window.isKeyWindow { print("HARNESS warning: window is not key") }
+        if !window.isKeyWindow { print("HARNESS warning: window is not key (appActive=\(NSApp.isActive))") }
+    }
+
+    /// Cooperative `NSApp.activate()` does not take focus from Finder on CI runners. Force it, and fall back to
+    /// `NSRunningApplication.activate(options:)` when the process is still inactive.
+    func forceActivate() {
+        NSApp.activate(ignoringOtherApps: true)
+        if !NSApp.isActive { _ = NSRunningApplication.current.activate(options: [.activateAllWindows]) }
+    }
+
+    /// Accent controls draw grey while the app is inactive or the window is not key. Activate the app, make the
+    /// window key and wait (bounded) for both so captures show the controls as a user sees them.
+    func makeKeyInActiveApp(_ window: NSWindow) {
+        forceActivate()
+        window.makeKeyAndOrderFront(nil)
+        let end = Date().addingTimeInterval(3)
+        while !(window.isKeyWindow && NSApp.isActive), Date() < end {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            if !NSApp.isActive { forceActivate() }
+            if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+        }
     }
 
     // MARK: - Run loop and events
@@ -190,10 +212,12 @@ final class PanelHarnessTests: XCTestCase {
         XCTFail("\"\(fragment)\" is on screen. \(message)", file: file, line: line)
     }
 
-    /// Window-coordinate center of the first recognized line containing `fragment`.
+    /// Window-coordinate center of the leftmost recognized line containing `fragment`. The detail pane on the
+    /// right can repeat the selected clip's text; the list row is always the leftmost match.
     private func centerOfText(_ fragment: String) -> NSPoint? {
         guard let view = window?.contentView,
-              let line = recognizedLines().first(where: { $0.text.localizedCaseInsensitiveContains(fragment) })
+              let line = recognizedLines().filter({ $0.text.localizedCaseInsensitiveContains(fragment) })
+                  .min(by: { $0.box.midX < $1.box.midX })
         else { return nil }
         let bounds = view.bounds
         let y = view.isFlipped ? (1 - line.box.midY) * bounds.height : line.box.midY * bounds.height
@@ -202,24 +226,79 @@ final class PanelHarnessTests: XCTestCase {
 
     // MARK: - Screenshots and diagnostics
 
+    /// Saves `name.png` as the window server composites the window, so Liquid Glass and system materials are
+    /// drawn as a user sees them. Falls back to `cacheDisplay` when the capture fails, and logs which path ran.
+    /// `compositedOnly` is kept for existing call sites; every screenshot now prefers the composited capture.
     func screenshot(_ name: String, compositedOnly: Bool = false) {
         guard let view = window.contentView else { return }
-        pump(seconds: 0.3)
-        if !compositedOnly, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+        if !(window.isKeyWindow && NSApp.isActive) { makeKeyInActiveApp(window) }
+        window.orderFrontRegardless()
+        pump(seconds: 0.4)
+        let target = shotDirectory.appendingPathComponent("\(name).png")
+        if captureWindow(to: target) {
+            print("capture=window \(name)")
+            return
+        }
+        try? FileManager.default.removeItem(at: target)
+        if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: rep)
             if let png = rep.representation(using: .png, properties: [:]) {
-                try? png.write(to: shotDirectory.appendingPathComponent("\(name).png"))
+                try? png.write(to: target)
             }
         }
-        // A composited capture as well: cacheDisplay skips materials and vibrancy.
+        print("capture=cache \(name)")
+    }
+
+    /// `screencapture -x -o -l <window id>`: no sound, no shadow. True when the file exists and is not blank.
+    private func captureWindow(to url: URL) -> Bool {
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        capture.arguments = ["-x", "-o", "-l", "\(window.windowNumber)",
-                             shotDirectory.appendingPathComponent("\(name)-window.png").path]
-        guard (try? capture.run()) != nil else { return }
-        let deadline = Date().addingTimeInterval(5)
+        capture.arguments = ["-x", "-o", "-l", "\(window.windowNumber)", url.path]
+        let errors = Pipe()
+        capture.standardError = errors
+        do { try capture.run() } catch {
+            print("HARNESS screencapture failed to start: \(error)")
+            return false
+        }
+        let deadline = Date().addingTimeInterval(8)
         while capture.isRunning, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
-        if capture.isRunning { capture.terminate() }
+        if capture.isRunning {
+            capture.terminate()
+            print("HARNESS screencapture timed out")
+            return false
+        }
+        guard capture.terminationStatus == 0 else {
+            let message = String(data: errors.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+            print("HARNESS screencapture exit \(capture.terminationStatus): \(message)")
+            return false
+        }
+        guard let image = NSImage(contentsOf: url),
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              !Self.isBlank(cg)
+        else {
+            print("HARNESS screencapture produced a missing or blank image")
+            return false
+        }
+        return true
+    }
+
+    /// True when the image is fully transparent or a single color.
+    private static func isBlank(_ image: CGImage) -> Bool {
+        let width = 64, height = 64
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let drew = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drew else { return true }
+        let first = Array(pixels[0..<4])
+        if first[3] == 0, stride(from: 3, to: pixels.count, by: 4).allSatisfy({ pixels[$0] == 0 }) { return true }
+        for i in stride(from: 4, to: pixels.count, by: 4) where Array(pixels[i..<i + 4]) != first { return false }
+        return true
     }
 
     private func dumpDiagnostics(_ context: String) {
@@ -241,6 +320,7 @@ final class PanelHarnessTests: XCTestCase {
     func testSearchFlowsInTheRealPanel() throws {
         try openPanel(appearance: .aqua)
         screenshot("01-panel-light")
+        screenshot("panel-history-detail")
         assertNotShown("Quarterly invoice", "a filed clip stays out of History while browsing")
 
         // 1. Typing searches, and a filed clip is found from History.
@@ -407,7 +487,8 @@ final class PanelHarnessTests: XCTestCase {
             let defaults = try XCTUnwrap(UserDefaults(suiteName: "clippy.harness.onboarding.\(UUID())"))
             NSApp.appearance = NSAppearance(named: appearance)
             let onboarding = OnboardingWindowController.makeWindow(
-                rootView: OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem())
+                rootView: OnboardingView(viewModel: OnboardingViewModel(defaults: defaults)).clippyDesignSystem()
+                    .environment(\.appearsActive, true))
             onboarding.appearance = NSAppearance(named: appearance)
             present(onboarding)
             pump(seconds: 0.8)

@@ -13,7 +13,7 @@ struct OnePasswordFieldRow: View {
     let autoClearSecs: Int
     let onAutoClear: () -> Void
 
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.clippyTokens) private var designTokens
     private var tokens: ThemeTokens { settings.theme }
 
@@ -85,7 +85,7 @@ struct OnePasswordFieldRow: View {
             if revealing {
                 ProgressView().controlSize(.mini)
             } else {
-                Image(systemName: revealed ? "eye.slash" : "eye").font(.system(size: 12))
+                Image(systemName: revealed ? "eye.slash" : "eye").font(.callout)
             }
         }
         .buttonStyle(.plain)

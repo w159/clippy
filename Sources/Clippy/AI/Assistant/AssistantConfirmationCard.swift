@@ -12,43 +12,39 @@ struct AssistantConfirmationCard: View {
     let onChoose: (AssistantPresentation.ApprovalChoice) -> Void
     /// Skips this call without running it (same effect as Deny for the call).
     let onSkip: () -> Void
-    @Environment(\.clippyTokens) private var tokens
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
+        VStack(alignment: .leading, spacing: 12) {
             Label {
-                Text("Allow \(toolName) to run?").foregroundStyle(tokens.textPrimary)
+                Text("Allow \(toolName) to run?")
             } icon: {
-                Image(systemName: "exclamationmark.shield.fill").foregroundStyle(tokens.warning)
+                Image(systemName: "exclamationmark.shield.fill").foregroundStyle(Color.orange)
             }
             .font(.headline)
             ScrollView([.vertical, .horizontal]) {
                 Text(prompt)
-                    .font(.system(.callout, design: .monospaced))
-                    .foregroundStyle(tokens.textPrimary)
+                    .font(.callout.monospaced())
                     .textSelection(.enabled)
                     .fixedSize(horizontal: true, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 60, maxHeight: 200)
-            .padding(tokens.metrics.space.two)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-            .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm).strokeBorder(tokens.strokeStrong, lineWidth: 1))
+            .padding(10)
+            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .accessibilityLabel("Full call for \(toolName)")
-            VStack(spacing: tokens.metrics.space.one) {
+            VStack(spacing: 6) {
                 ForEach(AssistantPresentation.ApprovalChoice.allCases, id: \.self) { choice in optionRow(choice) }
             }
             HStack {
-                Text("Return or Esc denies").font(.caption).foregroundStyle(tokens.textSecondary)
+                Text("Return or Esc denies").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Skip", action: onSkip).buttonStyle(.plain).foregroundStyle(tokens.textSecondary)
+                Button("Skip", action: onSkip).buttonStyle(.glass).tint(nil).controlSize(.small)
                     .accessibilityHint("Skips this call without running it")
             }
         }
-        .padding(tokens.metrics.space.four)
-        .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.md))
-        .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.md).strokeBorder(tokens.strokeStrong, lineWidth: 1))
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .contain)
         .focusable()
         .focused($focused)
@@ -67,16 +63,16 @@ struct AssistantConfirmationCard: View {
 
     private func optionRow(_ choice: AssistantPresentation.ApprovalChoice) -> some View {
         Button { onChoose(choice) } label: {
-            HStack(spacing: tokens.metrics.space.two) {
+            HStack(spacing: 8) {
                 KeyCap(choice.keyHint)
-                Text(choice.title).font(.callout.weight(.medium)).foregroundStyle(tokens.textPrimary)
-                Text(choice.detail).font(.caption).foregroundStyle(tokens.textSecondary).lineLimit(1)
+                Text(choice.title).font(.callout.weight(.medium))
+                Text(choice.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, tokens.metrics.space.two)
-            .padding(.vertical, tokens.metrics.space.one + 2)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-            .contentShape(Rectangle())
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(choice.title). \(choice.detail). Key \(choice.keyHint)")

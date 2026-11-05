@@ -4,7 +4,7 @@ import SwiftUI
 /// selection, focus ring and drop indicator. Behavior is supplied by the pane.
 struct SidebarRow<Icon: View>: View {
     @Environment(\.clippyTokens) private var tokens
-    @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 32
+    @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 36
     @State private var hovered = false
     @FocusState private var fieldFocused: Bool
     @FocusState.Binding var focus: SidebarRowID?
@@ -50,17 +50,17 @@ struct SidebarRow<Icon: View>: View {
         self.icon = icon()
     }
 
-    private var radius: CGFloat { tokens.metrics.radius.sm }
+    private var radius: CGFloat { 10 }
     private var isFocused: Bool { focus == rowID }
 
     var body: some View {
         HStack(spacing: 8) {
-            icon.symbolRenderingMode(.hierarchical).foregroundStyle(isSelected ? tokens.accentText : tint).frame(width: 18)
+            icon.symbolRenderingMode(.hierarchical).foregroundStyle(isSelected ? tokens.onAccent : tint).frame(width: 20)
             titleView
             Spacer(minLength: 2)
             if let count, count > 0 { countBadge(count) }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .frame(minHeight: minimumHeight)
         .background(rowFill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         .overlay { indicatorOverlay }
@@ -83,8 +83,8 @@ struct SidebarRow<Icon: View>: View {
     }
 
     private var rowFill: Color {
-        if isSelected { return tokens.selection }
-        return hovered ? tokens.surfaceInset : .clear
+        if isSelected { return tokens.accent }
+        return hovered ? Color.primary.opacity(0.08) : .clear
     }
 
     private var dropValue: String {
@@ -101,8 +101,8 @@ struct SidebarRow<Icon: View>: View {
         if renameText != nil {
             TextField("Category name", text: Binding(get: { renameText ?? "" }, set: { renameText = $0 }))
                 .textFieldStyle(.plain)
-                .font(.callout)
-                .foregroundStyle(renameError ? tokens.danger : tokens.textPrimary)
+                .font(.body)
+                .foregroundStyle(renameError ? tokens.danger : (isSelected ? tokens.onAccent : .primary))
                 .focused($fieldFocused)
                 .onAppear { fieldFocused = true }
                 .onChange(of: fieldFocused) { _, isFocused in if !isFocused { (onRenameFocusLost ?? onCommitRename)() } }
@@ -112,20 +112,17 @@ struct SidebarRow<Icon: View>: View {
                 .accessibilityHint(renameError ? "A category with this name already exists" : "Press Return to save")
         } else {
             Text(title)
-                .font(isSelected ? .callout.weight(.semibold) : .callout)
-                .foregroundStyle(tokens.textPrimary)
+                .font(isSelected ? .body.weight(.semibold) : .body)
+                .foregroundStyle(isSelected ? tokens.onAccent : .primary)
                 .lineLimit(2)
         }
     }
 
     private func countBadge(_ value: Int) -> some View {
         Text("\(value)")
-            .font(.caption2)
-            .foregroundStyle(tokens.textSecondary)
+            .font(.callout)
             .monospacedDigit()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(tokens.surfaceInset, in: Capsule())
+            .foregroundStyle(isSelected ? tokens.onAccent.opacity(0.85) : Color.secondary)
     }
 
     @ViewBuilder

@@ -16,8 +16,8 @@ struct ClipListFeatureState {
 
 /// Sheets, geometry and background refresh hooks for the features. Stateless apart from the bindings it receives.
 struct ClipListFeatureModifier: ViewModifier {
-    @ObservedObject var store: ClipStore
-    @ObservedObject var smartCollections: SmartCollectionSelection
+    var store: ClipStore
+    var smartCollections: SmartCollectionSelection
     @Binding var features: ClipListFeatureState
     let selectedClip: Clip?
 
@@ -85,11 +85,13 @@ extension ClipListView {
         }
     }
 
-    /// True when the preview column is on, the panel is wide enough and the pane lists clips.
+    /// True when the preview column is on, the panel is wide enough and the pane lists at least one clip.
     var showsPreviewColumn: Bool {
         guard PreviewColumnPreferences.isVisible(panelWidth: features.panelWidth, enabled: previewColumnEnabled) else { return false }
         switch selection {
-        case .history, .category, .suggestions: return true
+        case .suggestions: return true
+        // An empty list (no clips, no search results) gives its empty state the whole width.
+        case .history, .category: return !visibleClips.isEmpty
         default: return false
         }
     }

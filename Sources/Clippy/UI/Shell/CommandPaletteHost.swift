@@ -29,16 +29,15 @@ struct CommandPaletteHost: View {
                 .ignoresSafeArea()
                 .onTapGesture(perform: onDismiss)
                 .accessibilityHidden(true)
-            GlassSurface(in: RoundedRectangle(cornerRadius: tokens.metrics.radius.lg, style: .continuous)) {
-                VStack(spacing: 0) {
+            GlassSurface(in: RoundedRectangle(cornerRadius: ClippyRadius.xl, style: .continuous)) {
+                VStack(spacing: tokens.metrics.space.two) {
                     searchField
-                    Divider().padding(.vertical, tokens.metrics.space.one)
                     resultList
-                    Divider().padding(.top, tokens.metrics.space.one)
                     hintBar
                 }
             }
-            .frame(maxWidth: 520, maxHeight: 380)
+            .shadow(color: .black.opacity(0.25), radius: 30, y: 12)
+            .frame(maxWidth: 560, maxHeight: 440)
             .padding(tokens.metrics.space.four)
             .accessibilityAddTraits(.isModal)
             .accessibilityLabel("Command palette")
@@ -52,16 +51,18 @@ struct CommandPaletteHost: View {
 
     private var searchField: some View {
         HStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: "command").foregroundStyle(tokens.textSecondary).accessibilityHidden(true)
+            Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.secondary).accessibilityHidden(true)
             TextField("Type a command", text: $query)
                 .textFieldStyle(.plain)
-                .font(.title3)
+                .font(.title2)
                 .focused($fieldFocused)
                 .accessibilityLabel("Command search")
                 .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
             KeyCap("esc")
         }
-        .padding(.horizontal, tokens.metrics.space.two)
+        .padding(.horizontal, tokens.metrics.space.three)
+        .padding(.vertical, tokens.metrics.space.two)
+        .background(Color.primary.opacity(0.06), in: Capsule())
     }
 
     private var resultList: some View {
@@ -70,16 +71,16 @@ struct CommandPaletteHost: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if layout.groups.isEmpty {
-                        Text("No matching commands. Clear the search to see all.")
-                            .foregroundStyle(tokens.textSecondary)
+                        ContentUnavailableView.search
+                            .frame(maxWidth: .infinity)
                             .padding(tokens.metrics.space.three)
                     }
                     ForEach(Array(layout.groups.enumerated()), id: \.offset) { _, group in
                         if let title = group.title {
                             Text(title)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(tokens.textSecondary)
-                                .padding(.horizontal, tokens.metrics.space.two)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, tokens.metrics.space.three)
                                 .padding(.top, tokens.metrics.space.two)
                                 .padding(.bottom, tokens.metrics.space.one)
                                 .accessibilityAddTraits(.isHeader)
@@ -105,17 +106,24 @@ struct CommandPaletteHost: View {
     }
 
     private func row(_ command: any PaletteCommand, selected: Bool, hovered: Bool, showsContext: Bool) -> some View {
-        HStack(spacing: tokens.metrics.space.two) {
-            Image(systemName: command.symbol).frame(width: 20).foregroundStyle(tokens.accentText)
+        HStack(spacing: tokens.metrics.space.three) {
+            Image(systemName: command.symbol)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(selected ? tokens.onAccent : tokens.accentText)
+                .frame(width: 30, height: 30)
+                .background(selected ? Color.white.opacity(0.2) : tokens.accent.opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 0) {
-                Text(command.title).foregroundStyle(tokens.textPrimary)
+                Text(command.title).font(.body).foregroundStyle(selected ? tokens.onAccent : tokens.textPrimary)
                 if let subtitle = command.subtitle {
-                    Text(subtitle).font(.caption).foregroundStyle(tokens.textSecondary).lineLimit(1)
+                    Text(subtitle).font(.caption)
+                        .foregroundStyle(selected ? tokens.onAccent.opacity(0.85) : tokens.textSecondary).lineLimit(1)
                 }
             }
             Spacer(minLength: tokens.metrics.space.two)
             if showsContext {
-                Text(command.section.rawValue).font(.caption).foregroundStyle(tokens.textSecondary)
+                Text(command.section.rawValue).font(.caption)
+                    .foregroundStyle(selected ? tokens.onAccent.opacity(0.85) : tokens.textSecondary)
             }
             if let shortcut = command.shortcut {
                 HStack(spacing: 2) {
@@ -125,12 +133,8 @@ struct CommandPaletteHost: View {
         }
         .padding(.horizontal, tokens.metrics.space.two)
         .padding(.vertical, tokens.metrics.space.one + 2)
-        .background(selected ? tokens.selection : (hovered ? tokens.selection.opacity(0.5) : .clear), in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-        .overlay(alignment: .leading) {
-            if selected {
-                Capsule().fill(tokens.accent).frame(width: 2).padding(.vertical, tokens.metrics.space.one)
-            }
-        }
+        .background(selected ? tokens.accent : (hovered ? Color.primary.opacity(0.08) : .clear),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(command.title)

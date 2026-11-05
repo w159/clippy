@@ -4,7 +4,7 @@ import SwiftUI
 // The Appearance settings tab (theme, colors, cards, typography, panel size), with its color-row and swatch helpers.
 
 struct AppearanceSettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @Environment(\.clippyTokens) private var tokens
 
     /// Only font families that are installed on this machine.
@@ -184,6 +184,7 @@ struct AppearanceSettingsTab: View {
                 Toggle("Remember last panel size", isOn: $settings.rememberPanelSize)
                     .settingsRow("appearance.size")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }
@@ -202,13 +203,13 @@ struct AppearanceSettingsTab: View {
                 .overlay {
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(SettingsTypography.swatchCheck(settings))
+                            .font(.caption2.weight(.bold))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(AccentSwatchContrast.markColor(for: theme.color, isDark: tokens.scheme == .dark))
                     }
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FocusRingButtonStyle(shape: AnyShape(Circle())))
         .help(theme.label)
         .accessibilityLabel("\(theme.label) accent")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])

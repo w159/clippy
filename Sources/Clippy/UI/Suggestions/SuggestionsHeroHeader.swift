@@ -13,12 +13,12 @@ struct SuggestionsHeroHeader: View {
     var body: some View {
         HStack(spacing: tokens.metrics.space.two) {
             Image(systemName: "sparkles")
-                .font(.headline)
-                .foregroundStyle(tokens.accentText)
+                .font(.title3)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.clippyAccent)
                 .accessibilityHidden(true)
             Text("Suggested")
-                .font(.headline)
-                .foregroundStyle(tokens.textPrimary)
+                .font(.title3.weight(.semibold))
             if let contextSummary, !contextSummary.isEmpty {
                 ReasonChip(title: contextSummary, systemImage: "app.dashed", explanation: "Context these suggestions were ranked against")
                     .lineLimit(1)
@@ -28,16 +28,20 @@ struct SuggestionsHeroHeader: View {
             ClippyBadge("On-device")
                 .help("Runs entirely on this Mac. Screen text is never saved or sent anywhere.")
                 .accessibilityLabel("On-device. Runs entirely on this Mac.")
-            IconButton("arrow.clockwise", label: "Refresh suggestions", action: onRefresh)
-            IconButton("stethoscope", label: "Context diagnostics", help: "Diagnostics: last context capture") {
-                showDiagnostics.toggle()
-            }
-            .popover(isPresented: $showDiagnostics, arrowEdge: .bottom) {
-                SuggestionDiagnosticsPopover(diagnostics: .current())
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    IconButton("arrow.clockwise", label: "Refresh suggestions", action: onRefresh)
+                    IconButton("stethoscope", label: "Context diagnostics", help: "Diagnostics: last context capture") {
+                        showDiagnostics.toggle()
+                    }
+                    .popover(isPresented: $showDiagnostics, arrowEdge: .bottom) {
+                        SuggestionDiagnosticsPopover(diagnostics: .current())
+                    }
+                }
             }
         }
-        .padding(.horizontal, tokens.metrics.space.three)
-        .padding(.vertical, tokens.metrics.space.two)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .accessibilityElement(children: .contain)
     }
 }
@@ -63,6 +67,7 @@ struct SuggestionDiagnosticsPopover: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(diagnostics.copyText, forType: .string)
             }
+            .buttonStyle(.glass).tint(nil)
             .help("Copies counts and timings only, never screen text")
         }
         .padding(tokens.metrics.space.three)

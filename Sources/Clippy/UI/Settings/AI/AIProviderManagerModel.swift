@@ -1,20 +1,21 @@
 import Foundation
-import Combine
+import Observation
 
 /// Editing operations and per-session state for the AI provider manager. All persistence
 /// goes through `AIProviderStore`; this type only adds selection, test results and the
 /// rules the store does not have (duplicate, secret-header blanking after save).
 @MainActor
-final class AIProviderManagerModel: ObservableObject {
+@Observable
+final class AIProviderManagerModel {
     enum KeyStatus: Equatable {
         case stored, missing, denied(Int32)
     }
 
     let store: AIProviderStore
-    @Published var selectedID: UUID?
-    @Published var keyDrafts: [UUID: String] = [:]
-    @Published private(set) var results: [UUID: AIConnectionOutcome] = [:]
-    @Published private(set) var testing: Set<UUID> = []
+    var selectedID: UUID?
+    var keyDrafts: [UUID: String] = [:]
+    private(set) var results: [UUID: AIConnectionOutcome] = [:]
+    private(set) var testing: Set<UUID> = []
 
     init(store: AIProviderStore = .shared) {
         self.store = store

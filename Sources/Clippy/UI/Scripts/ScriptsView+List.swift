@@ -9,8 +9,7 @@ extension ScriptsView {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Text(CopyFormat.counted(store.scripts.count, "script"))
-                    .font(.caption)
-                    .foregroundStyle(tokens.textSecondary)
+                    .font(.headline)
                 Spacer()
                 Button { showBadgeLegend.toggle() } label: { Image(systemName: "questionmark.circle") }
                     .buttonStyle(.plain)
@@ -33,30 +32,28 @@ extension ScriptsView {
                     .help("Import, export and history options")
                     .accessibilityLabel("More Options")
             }
-            .padding(10)
-            Divider()
+            .padding(.horizontal, 12).padding(.vertical, 10)
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 TextField("Search names and bodies", text: $searchQuery)
                     .textFieldStyle(.plain)
-                    .font(.subheadline)
                 if !searchQuery.isEmpty {
                     Button { searchQuery = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(tokens.textSecondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                     .help("Clear search")
                     .accessibilityLabel("Clear Search")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            Divider()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .glassEffect(.regular, in: Capsule())
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
             if let quarantine = store.quarantineNotice {
                 bannerRow(quarantine, icon: "exclamationmark.triangle", dismiss: { store.quarantineNotice = nil })
             }
@@ -66,7 +63,6 @@ extension ScriptsView {
             scriptRows
             if selection.count > 1 { batchBar }
         }
-        .background(tokens.sidebar)
     }
 
     /// Narrow layout: a script picker plus new/legend/menu actions in one row.
@@ -100,8 +96,7 @@ extension ScriptsView {
                 .fixedSize()
                 .accessibilityLabel("More Options")
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(tokens.sidebar)
+        .padding(.horizontal, 12).padding(.vertical, 8)
     }
 
     func bannerRow(_ text: String, icon: String, dismiss: @escaping () -> Void) -> some View {
@@ -113,35 +108,32 @@ extension ScriptsView {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
         }
-        .foregroundStyle(tokens.textSecondary)
-        .padding(8)
+        .foregroundStyle(.secondary)
+        .padding(10)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
     }
 
     var scriptRows: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
+            LazyVStack(spacing: 4) {
                 if filteredScripts.isEmpty && !isDraft && !(searchQuery.isEmpty && store.scripts.isEmpty) {
                     // With no scripts at all the detail pane already shows the empty state.
-                    Text("No scripts match")
-                        .font(.caption)
-                        .foregroundStyle(tokens.textSecondary)
-                        .padding(.vertical, 16)
+                    ContentUnavailableView.search(text: searchQuery)
                 }
                 ForEach(filteredScripts) { script in row(for: script) }
                 // The unsaved draft sits where Save will put it: at the end of the
                 // list. On Save the row is replaced in place by the stored script.
                 if isDraft, let editing { draftRow(editing) }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
     }
 
     func rowBackground(selected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: ClippyRadius.inset)
-            .fill(selected ? tokens.cardSurface : Color.clear)
-            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset)
-                .strokeBorder(selected ? designTokens.stroke : Color.clear, lineWidth: 1))
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(selected ? AnyShapeStyle(Color.clippyAccent.opacity(0.16)) : AnyShapeStyle(.quaternary.opacity(0.35)))
     }
 
     func row(for script: Script) -> some View {
@@ -152,29 +144,29 @@ extension ScriptsView {
         return Button { click(script.id) } label: {
             HStack(spacing: 6) {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 9))
-                    .foregroundStyle(tokens.textSecondary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                     .reorderDraggable(id: script.id.uuidString)
                     .help("Drag to reorder")
                 if center.isRunning(script.id) { ProgressView().controlSize(.mini) }
                 Text(displayName(script.name))
                     .font(.body)
-                    .foregroundStyle(open ? tokens.accent : tokens.textPrimary)
+                    .foregroundStyle(open ? Color.clippyAccent : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                if bodyOnly { Text("in body").font(.caption2).foregroundStyle(tokens.textSecondary) }
+                if bodyOnly { Text("in body").font(.caption2).foregroundStyle(.secondary) }
                 ForEach(ScriptBadge.allCases.filter { $0.applies(to: script) }, id: \.title) { badge in
                     Image(systemName: badge.icon)
-                        .font(.system(size: 9))
-                        .foregroundStyle(tokens.textSecondary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                         .help("\(badge.title). \(badge.detail)")
                 }
                 Text(script.interpreter.displayName)
                     .font(.caption2)
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .background(rowBackground(selected: selected || open))
         }
         .buttonStyle(.plain)
@@ -190,13 +182,13 @@ extension ScriptsView {
         HStack {
             Text(draft.name.isEmpty ? "New script" : draft.name)
                 .font(.body.italic())
-                .foregroundStyle(tokens.accent)
+                .foregroundStyle(Color.clippyAccent)
                 .lineLimit(1)
             Spacer()
-            Text("unsaved").font(.caption2).foregroundStyle(tokens.textSecondary)
+            Text("unsaved").font(.caption2).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(rowBackground(selected: true))
     }
 
@@ -205,19 +197,19 @@ extension ScriptsView {
             if let progress = center.batchProgress {
                 ProgressView(value: Double(progress.done), total: Double(max(1, progress.total)))
                     .frame(maxWidth: .infinity)
-                Button("Stop") { center.cancelBatch() }.controlSize(.small)
+                Button("Stop") { center.cancelBatch() }.buttonStyle(.glass).tint(nil).controlSize(.small)
             } else {
-                Text("\(selection.count) selected").font(.caption).foregroundStyle(tokens.textSecondary)
+                Text("\(selection.count) selected").font(.caption).foregroundStyle(.secondary)
                 Button("Select all") { batchSelection.selectAll(filteredScripts.map(\.id)) }
-                    .controlSize(.small)
+                    .buttonStyle(.glass).tint(nil).controlSize(.small)
                 Button("Clear") { batchSelection.clear() }
-                    .controlSize(.small)
+                    .buttonStyle(.glass).tint(nil).controlSize(.small)
                 Button("Run Selected") { activeDialog = .batch }
-                    .controlSize(.small)
+                    .buttonStyle(.glassProminent).controlSize(.small)
                     .disabled(selectedScripts.isEmpty)
             }
         }
-        .padding(8)
-        .background(tokens.headerBar)
+        .padding(10)
+        .background(.bar)
     }
 }

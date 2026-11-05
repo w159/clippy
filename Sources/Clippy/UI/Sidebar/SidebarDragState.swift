@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 
 /// Identity of a focusable sidebar row.
 enum SidebarRowID: Hashable {
@@ -28,10 +29,11 @@ enum SidebarNavigation {
 /// Tracks whether the drag in flight is a category row, so hover indicators can
 /// tell reordering from clip filing (SBR-05). SwiftUI's `isTargeted` does not
 /// expose the payload, so category rows report drag start through `.onDrag`.
-final class SidebarDragState: ObservableObject {
+@Observable
+final class SidebarDragState {
     /// Category currently being dragged from this pane, if any.
-    @Published private(set) var draggingCategoryID: Int64?
-    private var watchdog: Timer?
+    private(set) var draggingCategoryID: Int64?
+    @ObservationIgnored private var watchdog: Timer?
 
     /// Drag token for a category row; matches `routeCategoryRowDrop`.
     static func token(forCategory id: Int64) -> String { "reorder:cat:\(id)" }

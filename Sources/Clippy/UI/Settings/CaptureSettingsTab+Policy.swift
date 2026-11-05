@@ -25,7 +25,7 @@ struct CapturePolicySnapshot: Equatable {
 
 /// Capture-on-launch toggle.
 struct CaptureLaunchRow: View {
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var captureOnLaunch = CapturePreferences.captureOnLaunch
 
     var body: some View {
@@ -33,7 +33,7 @@ struct CaptureLaunchRow: View {
             .settingsRow("capture.onLaunch")
             .onChange(of: captureOnLaunch) { _, value in CapturePreferences.captureOnLaunch = value }
             // reloadFromDefaults() announces after a reset or import, once storage is final.
-            .onReceive(settings.objectWillChange) { _ in
+            .onChange(of: settings.storageRevision) { _, _ in
                 let stored = CapturePreferences.captureOnLaunch
                 if stored != captureOnLaunch { captureOnLaunch = stored }
             }
@@ -44,7 +44,7 @@ struct CaptureLaunchRow: View {
 /// Sensitive auto-clear, type blocklist and per-app paste profiles.
 struct CapturePolicySections: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var clearSeconds = CapturePreferences.sensitiveAutoClearSeconds
     @State private var deletesHistory = CapturePreferences.autoClearDeletesHistory
     @State private var blocklist = CapturePreferences.typeBlocklist
@@ -104,7 +104,7 @@ struct CapturePolicySections: View {
             SettingsNote("Terminals and code editors paste plain text by default. Overrides here win over that built-in list.")
         }
         .settingsRow("capture.pasteProfiles")
-        .onReceive(settings.objectWillChange) { _ in refreshFromStorage() }
+        .onChange(of: settings.storageRevision) { _, _ in refreshFromStorage() }
     }
 
     /// Pulls storage back into the local copies after a reset or import.

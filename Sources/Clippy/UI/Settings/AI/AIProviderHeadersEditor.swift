@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AIProviderHeadersEditor: View {
-    @ObservedObject var model: AIProviderManagerModel
+    var model: AIProviderManagerModel
     @Binding var draft: ProviderInstance
     let descriptor: ProviderDescriptor
     @State private var secretDrafts: [UUID: String] = [:]

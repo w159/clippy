@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+- About pane links ("Clippy on GitHub", "Report an issue") now use the Clippy accent color instead of system blue.
+- Onboarding buttons now draw in the accent color when the window is active; snippets empty state text wraps inside the list column; the category icon picker uses the app accent for the selected symbol and has a single full-width search field.
+- Panel redesign for macOS 26 Liquid Glass: the header is a floating glass strip with the section title, a large capsule search field and round glass icon buttons grouped together; the hairline rules and opaque bars are gone and the panel sits on a system material.
+- Sidebar is a source-list column: larger rows with an SF Symbol per collection, counts trailing in secondary text, and a solid accent highlight on the selected row.
+- Clip rows are rounded cards (12 pt) with a 38 pt colored kind or app tile, a medium-weight title over a caption line, and an accent wash on hover and selection.
+- Detail pane is an inset rounded card with a large kind tile, headline title, a calm content well, a metadata grid, a prominent glass Paste button and a glass Quick Look button.
+- Footer key hints are small glass capsules; the multi-select bar floats as a glass capsule.
+- Command palette is a larger glass panel with a capsule search field, grouped results with tinted symbol tiles and an accent selection; empty and no-results states use the system unavailable-content layout.
+- Settings window rebuilt to look like System Settings on macOS 26: the sidebar shows a colored rounded-square symbol tile for every pane with the system selection highlight and a search field on top, every pane is a grouped Form (rounded inset groups, section headers and footers, system toggles, pickers and steppers; no custom card borders), the pane title sits in the window toolbar, and Reset this pane, Export and Import sit in a final section at the end of each pane.
+- Built with Swift 6.3; app state uses the Observation framework (`@Observable`) instead of Combine `ObservableObject`.
+- Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
+- Clippy follows the system light or dark appearance by default; Clean Light and the other themes are still in Appearance settings.
+- Clippy now backs up the clip database before applying a database upgrade, and logs how long the upgrade took. The backup appears in Settings under Backups.
+- Pasting a clip logs a message when its formatting cannot be read and the clip is pasted as plain text.
+- Live detail pane on by default: the preview column now shows next to the clip list from 760pt panel width, the default panel size is 920x560, and a one-time bump raises a saved smaller size to that on first run (a larger saved size is kept). When space is tight the sidebar collapses to its rail first. The pane has a header (40pt tile tinted with the clip's kind color, the title in 15pt semibold over up to two lines, and "App · time" below), the content in a rounded card that fills the available height (13pt text, monospaced code, link card, images on the checkerboard), a two-column metadata grid, and a bottom bar with an accent-filled Paste button and a bordered Quick Look button. Sensitive clips stay masked.
+- Richer two-line rows by default: comfortable density is the default when none is stored, each row has a 32pt tile (source app icon with a kind badge, or a kind symbol on a tile tinted with that kind's own color; the tile fills with the kind color when the row is selected; images keep a 32pt thumbnail) and a second line of source app, time and kind. Kinds come from the same classifier as the detail pane, so code shows a code tile and "Code" (also JSON and markdown as Rich text, email and links), and plain text has its own blue instead of gray. Page Up/Down uses the real row height.
+- One merged header: the 36pt title row and the separate search bar are now a single 44pt row with the section title and count, a large search field and the sidebar, pin, more and close buttons. Filter chips and search notices appear below it only when needed.
+- Welcome tour rebuilt as a full-window hero per step: a large animated symbol, a large title and body text, progress dots, a prominent glass Continue button and glass Back, Skip and Grant buttons. The animation stops under Reduce Motion.
+- Clip editor: title, tool row and Save bar float on glass over a calm window, the text or image sits in a rounded inset card, and Cancel and Save are glass buttons. The conflict banner, staged AI actions, AI instruction sheet and compare sheet use the same rounded cards and grouped forms.
+- Category sheet and icon picker are grouped forms with a segmented Symbols, Emoji and Apps picker, a checkmark on the chosen color, and glass Cancel and Create buttons.
+- Scripts, Snippets, Suggestions, Paste Stack, 1Password, AI Actions and the Assistant share one pane look: a large header with a capsule glass search field, rounded rows with a colored kind tile and two lines of text, and glass action buttons. The AI action editor and AI action sheet follow it.
+- Empty, error and no-results states in these panes, the lock screen and the 1Password recovery states use the system unavailable-content layout with a symbol, a title, a description and a glass action. The lock screen pulses its padlock while it waits for Touch ID.
+- Settings no longer shows New badges.
+- One accent everywhere: switches, links, pickers and buttons in Settings, onboarding, editors, sheets and every pane use the theme accent instead of system blue.
+- Panel header buttons are neutral glass circles; only the pin button takes the accent while the panel is pinned. In the detail pane only Paste is prominent and Quick Look is a plain glass button.
+- Settings: Reset this pane, Export and Import moved from a bottom bar into a last section of each pane, so they no longer cover the last rows.
+- Welcome tour: Continue and Get started are the accent-colored primary button.
+- Empty states: titles are primary text over a secondary description, the Snippets list shows its full empty state in a short window, the detail pane is hidden while the clip list is empty, and a failed search shows the Search failed state.
+
 ## v2.3.0 - 2026-11-03 - UI and UX overhaul
 
 Built and tested on macOS in CI ([run 41638763966](https://github.com/w159/clippy/actions/runs/41638763966), commit `1fc24b6`): `swift build`, 1388 XCTests (9 skipped, 0 failures; the suite ran 1233 tests before this branch), a UI harness that drives the real panel with synthetic key and mouse events and reads the rendered window with Vision OCR, an app-bundle build with a launch smoke test, and screenshots of every Settings pane, every panel pane, the clip editor, every sheet, the palette, onboarding and the real first launch in light and dark (`clippy-screenshots` and `clippy-contact-sheet.png` artifacts of that run).

@@ -14,13 +14,13 @@ struct ScriptRunResultView: View {
         case fill
     }
 
-    @ObservedObject var run: ScriptRun
+    var run: ScriptRun
     var layout: Layout
     /// Inserts text as a new clip; returns whether it was saved.
     var saveClip: (String) -> Bool
     var onDismiss: (() -> Void)?
 
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var shownStream: ScriptOutputStream?
     @State private var saveTask: Task<Void, Never>?
     private var tokens: ThemeTokens { settings.theme }
@@ -71,7 +71,7 @@ struct ScriptRunResultView: View {
             if run.isRunning {
                 Button("Stop") { run.cancel() }
                     .controlSize(.small)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass).tint(nil)
             }
         }
         .accessibilityElement(children: .combine)
@@ -137,11 +137,11 @@ struct ScriptRunResultView: View {
             HStack(spacing: 8) {
                 if !stdout.isEmpty {
                     Button("Copy output") { copy(stdout) }
-                        .controlSize(.small).buttonStyle(.bordered)
+                        .controlSize(.small).buttonStyle(.glass).tint(nil)
                 }
                 if !stderr.isEmpty {
                     Button("Copy stderr") { copy(stderr) }
-                        .controlSize(.small).buttonStyle(.bordered)
+                        .controlSize(.small).buttonStyle(.glass).tint(nil)
                 }
                 if run.result != nil, !stdout.isEmpty || !stderr.isEmpty { saveMenu }
                 Spacer()

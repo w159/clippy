@@ -11,9 +11,9 @@ import UniformTypeIdentifiers
 /// here, so a per-run prompt is acceptable); the panel asks once per session
 /// unless the script sets `confirmBeforeRun`.
 struct ScriptsView: View {
-    @ObservedObject var store = ScriptStore.shared
-    @ObservedObject var center = ScriptRunCenter.shared
-    @ObservedObject var settings = AppSettings.shared
+    var store = ScriptStore.shared
+    var center = ScriptRunCenter.shared
+    var settings = AppSettings.shared
     var tokens: ThemeTokens { settings.theme }
     @Environment(\.clippyTokens) var designTokens
 

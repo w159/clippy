@@ -3,8 +3,8 @@ import SwiftUI
 /// The configured provider instances: active radio, status dot, duplicate and remove,
 /// plus the "+ Add provider" menu.
 struct AIProviderListSection: View {
-    @ObservedObject var model: AIProviderManagerModel
-    @ObservedObject var store: AIProviderStore
+    var model: AIProviderManagerModel
+    var store: AIProviderStore
     @Environment(\.clippyTokens) private var tokens
     @State private var pendingRemoval: ProviderInstance?
     private let gate = AIProviderSettingsLogic.ForcedGate()
@@ -50,15 +50,22 @@ struct AIProviderListSection: View {
             .help(isActive ? "Active provider" : "Make active")
             .accessibilityLabel(isActive ? "Active provider" : "Make \(instance.name) active")
             statusDot(model.status(for: instance.id))
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(instance.name).fontWeight(isSelected ? .semibold : .regular)
-                    if let descriptor { badge(descriptor.family.displayLabel) }
+            Button { model.selectedID = instance.id } label: {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(instance.name).fontWeight(isSelected ? .semibold : .regular)
+                            if let descriptor { badge(descriptor.family.displayLabel) }
+                        }
+                        Text(hostText(instance, descriptor))
+                            .font(.caption).foregroundStyle(tokens.textSecondary).lineLimit(1)
+                    }
+                    Spacer()
                 }
-                Text(hostText(instance, descriptor))
-                    .font(.caption).foregroundStyle(tokens.textSecondary).lineLimit(1)
+                .contentShape(Rectangle())
             }
-            Spacer()
+            .buttonStyle(FocusRingButtonStyle())
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             Button { _ = model.duplicate(instance.id) } label: { Image(systemName: "plus.square.on.square") }
                 .buttonStyle(.plain).help("Duplicate \(instance.name)").accessibilityLabel("Duplicate \(instance.name)")
             Button { pendingRemoval = instance } label: { Image(systemName: "trash") }
@@ -66,7 +73,6 @@ struct AIProviderListSection: View {
                 .disabled(gate.providerLocked && isActive)
         }
         .contentShape(Rectangle())
-        .onTapGesture { model.selectedID = instance.id }
         .padding(.vertical, 8)
     }
 

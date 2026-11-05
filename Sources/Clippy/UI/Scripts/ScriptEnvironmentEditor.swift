@@ -3,7 +3,6 @@ import SwiftUI
 /// Editable KEY/value rows for script process environment overrides. Values are
 /// local process settings; they are neither copied to the clipboard nor logged.
 struct ScriptEnvironmentEditor: View {
-    @Environment(\.clippyTokens) private var tokens
     @Binding var environment: [String: String]
     @State private var rows: [Row]
 
@@ -21,39 +20,43 @@ struct ScriptEnvironmentEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Environment").font(.caption).foregroundStyle(tokens.textSecondary)
+                Text("Environment").font(.headline)
                 Spacer()
                 Button { rows.append(Row(key: "", value: "")) } label: {
                     Label("Add row", systemImage: "plus")
                 }
                 .labelStyle(.iconOnly)
+                .buttonStyle(.glass).tint(nil)
                 .accessibilityLabel("Add environment variable")
                 .help("Add environment variable")
             }
             ForEach($rows) { $row in
-                HStack(spacing: tokens.metrics.space.one) {
+                HStack(spacing: 8) {
                     TextField("KEY", text: $row.key)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.caption, design: .monospaced))
+                        .textFieldStyle(.plain)
+                        .font(.callout.monospaced())
                         .accessibilityLabel("Environment variable name")
                     TextField("Value", text: $row.value)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.caption, design: .monospaced))
+                        .textFieldStyle(.plain)
+                        .font(.callout.monospaced())
                         .accessibilityLabel("Environment variable value")
                     Button(role: .destructive) { remove(row.id) } label: {
                         Image(systemName: "minus.circle")
                     }
                     .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     .accessibilityLabel("Remove environment variable")
                     .help("Remove row")
                 }
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .onChange(of: row.key) { _, _ in sync() }
                 .onChange(of: row.value) { _, _ in sync() }
             }
             if rows.isEmpty {
-                Text("No environment overrides").font(.caption).foregroundStyle(tokens.textTertiary)
+                Text("No environment overrides").font(.caption).foregroundStyle(.tertiary)
             }
         }
         .onChange(of: rows) { _, _ in sync() }

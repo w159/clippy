@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AIProviderAdvancedSection: View {
-    @ObservedObject var model: AIProviderManagerModel
+    var model: AIProviderManagerModel
     @Binding var draft: ProviderInstance
     let descriptor: ProviderDescriptor
     @Environment(\.clippyTokens) private var tokens

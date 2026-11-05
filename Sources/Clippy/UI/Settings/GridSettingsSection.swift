@@ -26,7 +26,7 @@ enum GridColumnMigration {
 }
 
 struct GridSettingsSection: View {
-    @ObservedObject private var grid = GridPreferences.shared
+    @Bindable private var grid = GridPreferences.shared
 
     /// Picker tags: 0 is Auto, 1...6 are fixed counts.
     private var columnTag: Binding<Int> {

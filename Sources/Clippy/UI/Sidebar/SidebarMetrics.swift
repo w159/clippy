@@ -15,6 +15,16 @@ enum SidebarMetrics {
     /// Hit strip width of the resize grabber.
     static let grabberWidth: CGFloat = 6
 
+    /// Narrowest the clip list may get while the preview column is showing; below
+    /// this the sidebar collapses to its rail instead of squeezing the list.
+    static let minListWidthWithPreview: CGFloat = 360
+
+    /// True when an expanded sidebar of `sidebarWidth` would leave the list less than
+    /// `minListWidthWithPreview` after `reservedWidth` (the preview column) is taken.
+    static func collapsesForPreview(panelWidth: CGFloat, reservedWidth: CGFloat, sidebarWidth: CGFloat) -> Bool {
+        reservedWidth > 0 && panelWidth - reservedWidth - sidebarWidth - 1 < minListWidthWithPreview
+    }
+
     /// Clamps a requested expanded width to
     /// `expandedMinWidth ... min(expandedMaxFraction * panelWidth, panelWidth - minContentWidth)`.
     /// The minimum always wins when the panel is too small to honor the maximum.

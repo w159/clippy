@@ -8,7 +8,7 @@ import SwiftUI
 /// Rendered markdown beside the source. Reuses the assistant's MarkdownUI theme.
 struct MarkdownPreviewPane: View {
     let markdown: String
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
 
     var body: some View {
         ScrollView {
@@ -27,7 +27,7 @@ struct MarkdownPreviewPane: View {
 /// their content (capped), rows capped by `CSVTable`.
 struct CSVTablePreview: View {
     let table: CSVTable
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
 
     var body: some View {
         let tokens = settings.theme
@@ -68,7 +68,7 @@ struct CSVTablePreview: View {
 /// A strip of swatches for color literals found in the text.
 struct ColorSwatchStrip: View {
     let colors: [ColorValue]
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
 
     var body: some View {
         let tokens = settings.theme
@@ -81,7 +81,7 @@ struct ColorSwatchStrip: View {
                             .frame(width: 22, height: 22)
                             .overlay(RoundedRectangle(cornerRadius: ClippyRadius.xs).stroke(tokens.textSecondary.opacity(0.4), lineWidth: 1))
                         Text(value.hex)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.caption.monospaced())
                             .foregroundStyle(tokens.textSecondary)
                     }
                     .accessibilityElement(children: .combine)
@@ -99,7 +99,7 @@ struct ColorSwatchStrip: View {
 /// original formatting is shown while the source is edited as plain text.
 struct RichPreviewView: NSViewRepresentable {
     let content: NSAttributedString
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()

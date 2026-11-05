@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 
 /// Store operations `CategoryUndo` needs; a fake conforms in tests.
 protocol CategoryUndoBackend: AnyObject {
@@ -14,7 +14,8 @@ protocol CategoryUndoBackend: AnyObject {
 /// Undo stack for sidebar category delete and reorder (SBR-06). Categories are
 /// not clips, so this is separate from `ClipUndoBuffer`.
 @MainActor
-final class CategoryUndo: ObservableObject {
+@Observable
+final class CategoryUndo {
     /// One undoable category change.
     enum Entry: Equatable {
         /// A category was deleted: its record, the full order before deletion, and member clips.
@@ -24,10 +25,10 @@ final class CategoryUndo: ObservableObject {
     }
 
     /// Most recent last.
-    @Published private(set) var entries: [Entry] = []
+    private(set) var entries: [Entry] = []
     private let backend: CategoryUndoBackend
     /// Optional window undo manager; set once the view appears.
-    var undoManager: UndoManager?
+    @ObservationIgnored var undoManager: UndoManager?
     private let limit = 20
 
     /// Creates an undo stack; entries are also registered with `undoManager` when given.

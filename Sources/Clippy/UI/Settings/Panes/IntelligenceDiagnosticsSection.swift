@@ -15,7 +15,6 @@ struct IntelligenceDiagnosticsSection: View {
             } else {
                 header
                 ForEach(rows) { row in
-                    Divider()
                     HStack {
                         Text(row.bundleID).font(.callout).foregroundStyle(tokens.textPrimary).lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 8)
@@ -28,7 +27,6 @@ struct IntelligenceDiagnosticsSection: View {
                     .accessibilityLabel("\(row.bundleID), average \(row.averageText), \(row.timeoutsText) timeouts, skipped \(row.skippedText)")
                 }
             }
-            Divider()
             SettingsRow(title: "Reset diagnostics") {
                 Button("Reset") {
                     ContextReaderStats.shared.reset()

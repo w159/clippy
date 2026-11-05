@@ -10,10 +10,12 @@ extension TextClipEditor {
             fullOptionsRow
             compactOptionsRow
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(dsTokens.surfaceElevated)
+        .glassEffect(.regular, in: Capsule())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
     }
 
     private var fullOptionsRow: some View {

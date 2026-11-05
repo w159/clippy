@@ -2,12 +2,19 @@ import AppKit
 import SwiftUI
 
 /// The settings window: a sidebar of panes with search (SET-09), or a pushing list when
-/// the window is compact. Each pane footer offers reset, export and import.
+/// the window is compact. Each pane ends with a section offering reset, export and import.
 struct SettingsView: View {
-    @ObservedObject private var settings = AppSettings.shared
-    @StateObject private var model = SettingsShellModel()
+    private let settings = AppSettings.shared
+    @State private var model: SettingsShellModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
+    @State private var hostWindow: NSWindow?
+    @State private var highlightedHit = 0
+    @State private var searchFocusToken = 0
+
+    /// `model` is injectable so tests can assert on selection and search state.
+    init(model: SettingsShellModel? = nil) {
+        _model = State(initialValue: model ?? SettingsShellModel())
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -15,13 +22,17 @@ struct SettingsView: View {
                 if proxy.size.width < SettingsShellModel.compactBreakpoint { compactLayout } else { regularLayout }
             }
         }
-        .frame(minWidth: 640, minHeight: 480)
+        .frame(minWidth: 680, minHeight: 500)
         .clippyDesignSystem()
-        .tint(ClippyTokens.resolve(from: settings.theme).accentInk)
-        .toggleStyle(AccentToggleStyle())
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
+        .background(SettingsWindowReader { hostWindow = $0 })
+        .background(PaneShortcutButtons { paneSelection.wrappedValue = $0 })
+        // Inside the sidebar search field, Esc is handled by the field's delegate, which clears the
+        // query and then closes the window; `.onExitCommand` covers Esc from other focused controls.
+        .onExitCommand { closeOrClearSearch() }
+        .task { await focusSearchField() }
         .confirmationDialog("Reset \(model.selection.title) settings?", isPresented: $model.showResetConfirmation,
                             titleVisibility: .visible) {
             Button("Reset this pane", role: .destructive) { model.resetSelectedPane() }
@@ -65,35 +76,79 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var paneList: some View {
+        // The field sits beside the list, not inside it: swapping the pane list for the results list
+        // while typing must not rebuild the field, or it loses focus after the first character.
+        VStack(spacing: 0) {
+            SettingsSearchField(text: $model.query, focusToken: searchFocusToken, onMove: handleMove,
+                                onSubmit: openHighlightedHit, onCancel: closeOrClearSearch)
+                .padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 4)
+            paneListBody
+        }
+        .onChange(of: model.query) { _, _ in highlightedHit = 0 }
+    }
+
+    @ViewBuilder
+    private var paneListBody: some View {
         Group {
             if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
                 ScrollViewReader { proxy in
-                    List {
+                    // System selection highlight. The search field above owns the keyboard and moves the
+                    // selection (Up/Down) or the search highlight (Return opens it).
+                    List(selection: paneSelection) {
                         ForEach(SettingsPaneSection.all) { section in
-                            Section(section.title) {
+                            Section {
                                 ForEach(section.panes) { pane in
-                                    PaneRow(pane: pane, isSelected: pane == model.selection) { paneSelection.wrappedValue = pane }
-                                        .id(pane.id)
+                                    PaneRow(pane: pane).tag(pane).id(pane.id)
                                 }
                             }
                         }
                     }
-                    // No `selection:` binding: the system sidebar highlight is blue and ignores tint, so
-                    // rows draw `tokens.selection` themselves and arrows move the selection here.
-                    .focusable()
-                    .focusEffectDisabled()
-                    .onMoveCommand { moveSelection($0) }
                     .onAppear { proxy.scrollTo(model.selection.id) }
-                    .onChange(of: model.selection) { _, pane in proxy.scrollTo(pane.id) }
+                    .onChange(of: model.selection) { _, pane in
+                        proxy.scrollTo(pane.id)
+                        searchFocusToken += 1
+                    }
                 }
             } else {
                 resultsList
             }
         }
         .listStyle(.sidebar)
-        .environment(\.sidebarRowSize, .small)
-        .controlSize(.small)
-        .searchable(text: $model.query, placement: .sidebar, prompt: "Search settings")
+    }
+
+    private func closeOrClearSearch() {
+        if model.query.isEmpty { hostWindow?.close() } else { model.query = "" }
+    }
+
+    /// Puts keyboard focus on the search field once the window is up, so arrows move panes at once.
+    private func focusSearchField() async {
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        searchFocusToken += 1
+    }
+
+    /// Up/Down move the pane selection, or the highlighted hit while a search is active.
+    private func handleMove(_ direction: MoveCommandDirection) {
+        if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
+            moveSelection(direction)
+        } else {
+            moveHighlight(direction)
+        }
+    }
+
+    private func moveHighlight(_ direction: MoveCommandDirection) {
+        guard !model.query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let last = model.results.count - 1
+        switch direction {
+        case .up: highlightedHit = max(highlightedHit - 1, 0)
+        case .down: highlightedHit = min(highlightedHit + 1, max(last, 0))
+        default: break
+        }
+    }
+
+    private func openHighlightedHit() {
+        let hits = model.results
+        guard hits.indices.contains(highlightedHit) else { return }
+        model.jump(to: hits[highlightedHit])
     }
 
     private func moveSelection(_ direction: MoveCommandDirection) {
@@ -111,7 +166,6 @@ struct SettingsView: View {
             guard let newValue else { return }
             model.selection = newValue
             model.compactShowsPane = true
-            seenPanes = SettingsSeenPanes.marking(newValue, in: seenPanes)
         })
     }
 
@@ -122,15 +176,14 @@ struct SettingsView: View {
             ContentUnavailableView.search(text: model.query)
         } else {
             List(hits) { hit in
-                Button { model.jump(to: hit) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(hit.entry.title)
-                        Text(SettingsPaneID(rawValue: hit.entry.pane)?.title ?? hit.entry.pane)
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
+                SearchHitRow(hit: hit, isHighlighted: hit.id == hits[safe: highlightedHit]?.id) { model.jump(to: hit) }
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(hit.id == hits[safe: highlightedHit]?.id ? Color.clippyAccent.opacity(0.18) : Color.clear)
+                            .padding(.horizontal, 6)
+                    )
             }
+            .listStyle(.sidebar)
         }
     }
 
@@ -138,106 +191,112 @@ struct SettingsView: View {
 
     private var detail: some View {
         // Scripts is a full editor (its own list, toolbar and output drawer): give it the whole
-        // detail area instead of the title bar, footer and scroller that would clip it.
+        // detail area instead of the action section.
         if model.selection == .scripts {
-            return AnyView(SettingsPaneRegistry.view(for: .scripts).background(settings.theme.panel).navigationTitle("Scripts"))
+            return AnyView(SettingsPaneRegistry.view(for: .scripts).navigationTitle("Scripts"))
         }
         return AnyView(paneDetail)
     }
 
     private var paneDetail: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                SettingsPaneRegistry.view(for: model.selection)
-                    .buttonStyle(.bordered)
-                    .task(id: model.selection) { await clearInitialTextFocus() }
-                    .scrollContentBackground(.hidden)
-                    .frame(maxWidth: model.selection.usesFormColumn ? SettingsPaneID.columnMaxWidth : .infinity, maxHeight: .infinity)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onChange(of: model.jumpToken) { _, _ in
-                        if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
-                    }
-            }
-            Divider()
-            footer
+        ScrollViewReader { proxy in
+            SettingsPaneRegistry.view(for: model.selection)
+                .task(id: model.selection) { await clearInitialTextFocus() }
+                .onChange(of: model.jumpToken) { _, _ in
+                    if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
+                }
         }
-        .background(settings.theme.panel)
-        // The pane title lives in the window's title bar instead of a second header row, which
-        // gives the content the vertical space the old row and dead title-bar band wasted.
+        .environment(\.settingsShell, model)
+        // The pane title lives in the window toolbar, the same for every pane.
         .navigationTitle(model.selection.title)
     }
 
     /// A pane's first text field would otherwise grab focus with its text selected when the pane
-    /// opens. Drops that initial first responder once the pane has laid out (only when a text
-    /// editor holds it and the sidebar search is idle), so focus follows the user's own click.
+    /// opens. Once the pane has laid out, focus moves back to the sidebar search field, unless the
+    /// search field already holds focus.
     @MainActor
     private func clearInitialTextFocus() async {
         try? await Task.sleep(for: .milliseconds(60))
-        guard model.query.isEmpty, let window = NSApp.keyWindow, window.firstResponder is NSText else { return }
-        window.makeFirstResponder(nil)
-    }
-
-    private var footer: some View {
-        HStack(spacing: 10) {
-            Button("Reset this pane") { model.showResetConfirmation = true }
-                .disabled(!model.selection.isResettable)
-            Button("Export\u{2026}") { model.exportPreferences() }
-            Button("Import\u{2026}") { model.beginImport() }
-            Spacer(minLength: 8)
-            if let status = model.status { StatusOutcomeLabel(outcome: status, successColor: settings.theme.success) }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .tint(.secondary)
-        .lineLimit(1)
-        .padding(.horizontal, 22).padding(.vertical, 8)
+        guard model.query.isEmpty, let window = hostWindow ?? NSApp.keyWindow else { return }
+        // Swapping panes can leave the window itself as first responder when the focused view goes away.
+        guard window.firstResponder is NSText || window.firstResponder === window else { return }
+        if let editor = window.firstResponder as? NSTextView,
+           (editor.delegate as? NSView)?.identifier == SettingsSearchField.identifier { return }
+        searchFocusToken += 1
     }
 }
 
-/// Sidebar row: title in the primary text token so labels stay legible (>= 4.5:1) on every
-/// theme preset instead of the dimmed system sidebar secondary style.
-private struct PaneRow: View {
-    @Environment(\.clippyTokens) private var tokens
-    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
-    let pane: SettingsPaneID
-    let isSelected: Bool
-    let action: () -> Void
+/// One search result: opens its pane; the keyboard-highlighted row is tinted by the list row background.
+private struct SearchHitRow: View {
+    let hit: SettingsSearchHit
+    let isHighlighted: Bool
+    let open: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Label {
-                HStack(spacing: tokens.metrics.space.two) {
-                    Text(pane.title).foregroundStyle(tokens.textPrimary)
-                    if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
+        let pane = SettingsPaneID(rawValue: hit.entry.pane)
+        Button(action: open) {
+            HStack(spacing: 10) {
+                if let pane { SettingsSidebarTile(pane: pane) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(hit.entry.title).font(.body)
+                    Text(pane?.title ?? hit.entry.pane)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-            } icon: {
-                Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
+                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowBackground(
-            RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous)
-                .fill(isSelected ? tokens.selection : Color.clear)
-                .padding(.horizontal, 6)
-        )
-        .accessibilityLabel(pane.title)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
     }
 }
 
-/// Small "NEW" marker on recently added panes.
-private struct NewPill: View {
-    @Environment(\.clippyTokens) private var tokens
+/// Hidden buttons that give Cmd-1 through Cmd-9 to the first nine panes, in sidebar order.
+private struct PaneShortcutButtons: View {
+    let select: (SettingsPaneID) -> Void
 
     var body: some View {
-        Text("NEW")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(tokens.accentText)
-            .padding(.horizontal, tokens.metrics.space.one + 1).padding(.vertical, 1)
-            .background(tokens.selection, in: Capsule())
-            .accessibilityLabel("New")
+        let panes = Array(SettingsPaneSection.all.flatMap(\.panes).prefix(9))
+        ZStack {
+            ForEach(Array(panes.enumerated()), id: \.offset) { index, pane in
+                Button(pane.title) { select(pane) }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Hands the hosting window to `onWindow` (used to close it on Esc).
+private struct SettingsWindowReader: NSViewRepresentable {
+    let onWindow: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        Task { @MainActor in onWindow(view.window) }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+/// Sidebar row: colored symbol tile and pane name.
+private struct PaneRow: View {
+    let pane: SettingsPaneID
+
+    var body: some View {
+        Label {
+            Text(pane.title).font(.body)
+        } icon: {
+            SettingsSidebarTile(pane: pane)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(pane.title)
     }
 }
 

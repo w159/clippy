@@ -7,10 +7,21 @@ import AppKit
 extension ClipListView {
     // MARK: - Header
 
-    /// Search field, warning notice and filter chips stacked under the header.
+    /// The search field with the panel-focus wiring, shown in the merged header row.
+    var headerSearchField: some View {
+        searchField
+            .onAppear { focusTarget = .search }
+            // PNL-04: an already-visible panel focuses the field instead of rebuilding.
+            .onChange(of: PanelFocusRequest.shared.token) { _, _ in focusTarget = .search }
+            .onChange(of: PanelFocusRequest.shared.listToken) { _, _ in focusList() }
+    }
+
+    /// True when the warning notice or the chip row needs space under the header.
+    var showsSearchExtras: Bool { !searchWarnings.isEmpty || showsFilterRow }
+
+    /// Warning notice and filter chips stacked under the header.
     var searchBar: some View {
         VStack(alignment: .leading, spacing: 4) {
-            searchField
             if !searchWarnings.isEmpty { searchNotice }
             if showsFilterRow {
                 SearchChipsRow(query: $store.query, categories: store.categories, appNames: knownAppNames)
@@ -19,32 +30,27 @@ extension ClipListView {
             }
         }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsFilterRow)
-        .padding(.horizontal, designTokens.metrics.space.three)
-        .padding(.vertical, designTokens.metrics.space.two)
-        .background(tokens.headerBar.opacity(settings.panelOpacity))
-        .onAppear { focusTarget = .search }
-        // PNL-04: an already-visible panel focuses the field instead of rebuilding.
-        .onReceive(PanelFocusRequest.shared.$token.dropFirst()) { _ in focusTarget = .search }
-        .onReceive(PanelFocusRequest.shared.$listToken.dropFirst()) { _ in focusList() }
+        .padding(.horizontal, designTokens.metrics.space.four)
+        .padding(.bottom, designTokens.metrics.space.two)
     }
 
     /// The text field with a search glyph, grammar help and a clear button.
     var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(.body.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tokens.textSecondary)
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             // Explicit prompt color: the system placeholder follows the window
             // appearance, not the theme, and vanishes when the two disagree.
             TextField(text: $store.query, selection: $searchSelection,
-                      prompt: Text("Search clips").foregroundStyle(tokens.textSecondary)) {
+                      prompt: Text("Search clips").foregroundStyle(.secondary)) {
                 Text("Search clips")
             }
                 .textFieldStyle(.plain)
-                .font(PanelTypography.body(settings))
-                .foregroundStyle(tokens.textPrimary)
+                .font(.title3)
+                .foregroundStyle(.primary)
                 .focused($focusTarget, equals: .search)
                 .accessibilityLabel("Search clips")
                 .accessibilityHint("Supports quotes, minus to exclude, and kind, app, in, before, after, on and size filters.")
@@ -56,6 +62,7 @@ extension ClipListView {
                     .font(.caption)
                     .foregroundStyle(tokens.textSecondary)
                     .lineLimit(1)
+                    .layoutPriority(-1)
                     .accessibilityHidden(true)
             } else if !store.query.isEmpty {
                 IconButton("xmark.circle.fill", label: "Clear search", help: "Clear search") { store.query = "" }

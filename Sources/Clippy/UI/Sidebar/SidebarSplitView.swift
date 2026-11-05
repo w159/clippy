@@ -7,23 +7,26 @@ import SwiftUI
 /// auto-collapsed below `SidebarMetrics.collapseBreakpoint`. Width and collapse
 /// state persist through `SidebarPreferences.shared`.
 struct SidebarSplitView<Sidebar: View, Content: View>: View {
-    @ObservedObject private var preferences = SidebarPreferences.shared
+    private let preferences = SidebarPreferences.shared
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragStartWidth: CGFloat?
     @State private var grabberHovered = false
 
     private let minContentWidth: CGFloat
+    private let reservedTrailingWidth: CGFloat
     private let sidebar: (_ isRail: Bool) -> Sidebar
     private let content: Content
 
     /// Creates the split; `minContentWidth` reserves room for at least one card.
     init(
         minContentWidth: CGFloat,
+        reservedTrailingWidth: CGFloat = 0,
         @ViewBuilder sidebar: @escaping (_ isRail: Bool) -> Sidebar,
         @ViewBuilder content: () -> Content
     ) {
         self.minContentWidth = minContentWidth
+        self.reservedTrailingWidth = reservedTrailingWidth
         self.sidebar = sidebar
         self.content = content()
     }
@@ -32,6 +35,9 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
         GeometryReader { proxy in
             let panelWidth = proxy.size.width
             let isRail = SidebarMetrics.showsRail(isCollapsed: preferences.isCollapsed, panelWidth: panelWidth)
+                || SidebarMetrics.collapsesForPreview(
+                    panelWidth: panelWidth, reservedWidth: reservedTrailingWidth,
+                    sidebarWidth: currentWidth(panelWidth: panelWidth))
             let width = displayWidth(isRail: isRail, panelWidth: panelWidth)
             HStack(spacing: 0) {
                 sidebar(isRail)
@@ -40,7 +46,7 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
                     .clipped()
                     .focusSection()
                 if isRail {
-                    Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
+                    Color.clear.frame(width: 4)
                 } else {
                     grabber(panelWidth: panelWidth)
                 }
@@ -75,8 +81,10 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
     private func grabber(panelWidth: CGFloat) -> some View {
         ZStack {
             Rectangle().fill(.clear)
-            Rectangle().fill(grabberHovered || dragStartWidth != nil ? tokens.accent : Color(nsColor: .separatorColor))
-                .frame(width: grabberHovered || dragStartWidth != nil ? 2 : 1)
+            Capsule().fill(tokens.accent)
+                .frame(width: 3)
+                .padding(.vertical, 24)
+                .opacity(grabberHovered || dragStartWidth != nil ? 1 : 0)
         }
         .frame(width: SidebarMetrics.grabberWidth)
         .frame(maxHeight: .infinity)

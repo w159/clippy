@@ -5,7 +5,7 @@ import SwiftUI
 // Launch capture, blocklist, sensitive auto-clear and paste profiles live in CaptureSettingsTab+Policy.swift.
 
 struct CaptureSettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @Environment(\.clippyTokens) private var tokens
     @State private var soundVolumeSlider: Double = Double(AppSettings.shared.captureSoundVolume)
 
@@ -42,6 +42,7 @@ struct CaptureSettingsTab: View {
                 SettingsNote("Lower is more responsive; higher uses less idle CPU.")
                 SettingsNote("Concealed items (password managers) and transient clipboard writes are always skipped.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .onChange(of: settings.captureSoundVolume) { _, newValue in
@@ -80,12 +81,9 @@ struct CaptureSettingsTab: View {
                     .onChange(of: settings.captureSoundID) { _, id in
                         SoundPlayer.play(id: id, volume: SoundPlayer.sliderToVolume(settings.captureSoundVolume))
                     }
-                    Button {
+                    IconButton("play.circle", label: "Preview selected sound") {
                         SoundPlayer.play(id: settings.captureSoundID, volume: SoundPlayer.sliderToVolume(settings.captureSoundVolume))
-                    } label: { Image(systemName: "play.circle").symbolRenderingMode(.hierarchical) }
-                        .buttonStyle(.plain)
-                        .help("Preview selected sound")
-                        .accessibilityLabel("Preview selected sound")
+                    }
                 }
             }
             .disabled(!settings.captureSoundEnabled)

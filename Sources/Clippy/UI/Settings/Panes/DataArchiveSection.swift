@@ -15,7 +15,6 @@ struct DataArchiveSection: View {
             SettingsRow(title: "Export archive", detail: Text(summary ?? "Saves categories and clips as a .\(ClippyArchive.packageExtension) package.")) {
                 Button("Export\u{2026}") { exportArchive() }.disabled(busy)
             }
-            Divider()
             SettingsRow(title: "Import archive") {
                 HStack {
                     if busy { ProgressView().controlSize(.small) }

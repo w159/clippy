@@ -121,15 +121,6 @@ enum SettingsPaneID: String, CaseIterable, Identifiable {
     /// Every key exportable through preferences export/import.
     static var allExportableKeys: Set<String> { Set(allCases.flatMap(\.keys)) }
 
-    /// Panes added recently; the sidebar marks them with a NEW pill until first opened
-    /// (`SettingsSeenPanes`).
-    var isNew: Bool {
-        switch self {
-        case .pasteStack, .snippets, .preview, .semantic, .automation: return true
-        default: return false
-        }
-    }
-
     /// True for the grouped-Form panes, which the shell constrains to the centered settings column.
     var usesFormColumn: Bool {
         switch self {

@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 /// Owns the popup panel: creates it, positions it per the user's position
@@ -33,7 +32,6 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var focusObserver: NSObjectProtocol?
     /// PNL-07: observes other Clippy windows taking key status to drop the panel level.
     var keyObserver: NSObjectProtocol?
-    var lockCancellable: AnyCancellable?
     /// True while the panel's content is the lock view rather than the clip list.
     var showsLockView = false
     private var panelInteractionGeneration = 0

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import Observation
 
 // State and actions behind the settings window: selection, search, pane reset,
 // preferences export/import (SET-09). SwiftUI-free logic lives in the pure types.
@@ -13,29 +14,32 @@ struct PendingSettingsImport: Identifiable {
 }
 
 @MainActor
-final class SettingsShellModel: ObservableObject {
+@Observable
+final class SettingsShellModel {
     /// Below this width the window shows a list that pushes panes.
     static let compactBreakpoint: CGFloat = 560
 
-    @Published var selection: SettingsPaneID
-    @Published var query = ""
-    @Published private(set) var flashRow: String?
-    @Published private(set) var jumpToken = UUID()
-    @Published var compactShowsPane = false
-    @Published var showResetConfirmation = false
-    @Published var pendingImport: PendingSettingsImport?
-    @Published private(set) var status: StatusOutcome?
+    /// The visible pane.
+    var selection: SettingsPaneID
+    var query = ""
+    private(set) var flashRow: String?
+    private(set) var jumpToken = UUID()
+    var compactShowsPane = false
+    var showResetConfirmation = false
+    var pendingImport: PendingSettingsImport?
+    private(set) var status: StatusOutcome?
     /// Security-relevant keys the user explicitly ticked in the import sheet.
-    @Published var confirmedKeys: Set<String> = []
+    var confirmedKeys: Set<String> = []
 
     private let settings: AppSettings
     private let porter = SettingsPreferencesPorter(knownKeys: SettingsPaneID.allExportableKeys)
-    private var flashTask: Task<Void, Never>?
+    @ObservationIgnored private var flashTask: Task<Void, Never>?
 
-    init(settings: AppSettings = .shared) {
+    init(settings: AppSettings = .shared,
+         requestedSection: String = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_SECTION"] ?? "") {
         self.settings = settings
-        let requested = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_SECTION"] ?? ""
-        selection = SettingsPaneID(rawValue: requested) ?? .general
+        let initial = SettingsPaneID(rawValue: requestedSection) ?? .general
+        selection = initial
         query = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_QUERY"] ?? ""
     }
 

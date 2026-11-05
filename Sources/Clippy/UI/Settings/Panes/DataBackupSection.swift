@@ -31,11 +31,9 @@ struct DataBackupSection: View {
                 }
             }
             if rows.isEmpty {
-                Divider()
                 SettingsRow(title: "No backups yet") { EmptyView() }
             }
             ForEach(rows) { row in
-                Divider()
                 SettingsRow(title: LocalizedStringKey(row.title), detail: Text(row.sizeText)) {
                     HStack {
                         Button { pendingDeleteID = row.id } label: { Image(systemName: "trash") }

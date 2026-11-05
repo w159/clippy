@@ -3,8 +3,8 @@ import SwiftUI
 /// Storage ceiling with current usage, plus a read-only iCloud sync summary.
 struct DataStorageSection: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var cloud = ICloudSyncService.shared
+    private let settings = AppSettings.shared
+    private let cloud = ICloudSyncService.shared
     @State private var ceiling = StorageCeiling.current
     @State private var usage: StorageUsage?
 
@@ -18,7 +18,6 @@ struct DataStorageSection: View {
                     Stepper("Clip limit", value: $ceiling, in: StorageCeiling.minimum...1_000_000, step: 500).labelsHidden()
                         .onChange(of: ceiling) { _, value in StorageCeiling.current = value; reloadUsage() }
                 }
-                Divider()
                 SettingsRow(title: "Current usage", detail: Text(usageDetail)) {
                     if usage?.isNearCeiling == true {
                         Label("Near limit", systemImage: "exclamationmark.triangle.fill").foregroundStyle(tokens.warning)

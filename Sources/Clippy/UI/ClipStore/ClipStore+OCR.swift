@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 
 #if canImport(AppKit)
     import AppKit
@@ -29,8 +29,9 @@ enum OCRExtractOutcome: Equatable {
 /// observes only its own `OCRProgress` re-renders when ITS extraction starts or
 /// finishes, not every card in the list (which is what the store-wide
 /// `ocrInFlightClipIDs` set forces).
-final class OCRProgress: ObservableObject {
-    @Published fileprivate(set) var isRunning = false
+@Observable
+final class OCRProgress {
+    fileprivate(set) var isRunning = false
 }
 
 extension ClipStore {

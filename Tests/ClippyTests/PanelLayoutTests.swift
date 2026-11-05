@@ -15,9 +15,9 @@ final class PanelLayoutTests: XCTestCase {
     /// Width is rail + divider + card + gutters; height is header + rows + footer.
     func testMinimumSizeTable() {
         let cases = [
-            SizeCase(rail: 52, card: 180, gutters: 20, rowHeight: 32, expected: CGSize(width: 280, height: 240)),
-            SizeCase(rail: 52, card: 240, gutters: 20, rowHeight: 40, expected: CGSize(width: 313, height: 264)),
-            SizeCase(rail: 0, card: 300, gutters: 0, rowHeight: 10, expected: CGSize(width: 301, height: 174))
+            SizeCase(rail: 52, card: 180, gutters: 20, rowHeight: 32, expected: CGSize(width: 280, height: 200)),
+            SizeCase(rail: 52, card: 240, gutters: 20, rowHeight: 40, expected: CGSize(width: 313, height: 224)),
+            SizeCase(rail: 0, card: 300, gutters: 0, rowHeight: 10, expected: CGSize(width: 301, height: 134))
         ]
         for item in cases {
             let size = PanelLayout.minimumSize(

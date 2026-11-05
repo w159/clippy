@@ -30,10 +30,28 @@ struct IconButton: View {
     @ViewBuilder
     var body: some View {
         if glass {
-            button.buttonStyle(.glass)
+            glassButton
         } else {
             button.buttonStyle(.plain)
         }
+    }
+
+    /// Toolbar variant: a circular Liquid Glass button; the system supplies hover, press and focus.
+    private var glassButton: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.medium))
+                .frame(width: 20, height: 20)
+                .foregroundStyle(state == .selected ? tokens.accentText : tokens.textPrimary)
+        }
+        .buttonStyle(.glass)
+        // Neutral glass; only an active toggle (pinned) takes the accent.
+        .tint(state == .selected ? tokens.accent : nil)
+        .buttonBorderShape(.circle)
+        .controlSize(.large)
+        .disabled(state == .disabled)
+        .help(help)
+        .accessibilityLabel(label)
     }
 
     private var button: some View {

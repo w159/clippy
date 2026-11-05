@@ -1,4 +1,5 @@
 import SwiftUI
+import Observation
 
 /// How many columns the clip grid uses in the `cards` density.
 enum GridColumnMode: Codable, Equatable {
@@ -57,9 +58,10 @@ enum ClipDensity: String, CaseIterable {
 ///
 /// UserDefaults keys (all prefixed `grid.`): `grid.columnMode` (`auto` or
 /// `fixed:N`, default `auto`) and `grid.density` (`compact`, `comfortable`,
-/// `cards`, default `compact`).
+/// `cards`, default `comfortable` when nothing is stored).
 @MainActor
-final class GridPreferences: ObservableObject {
+@Observable
+final class GridPreferences {
     /// Process-wide instance used by the panel.
     static let shared = GridPreferences()
 
@@ -71,12 +73,12 @@ final class GridPreferences: ObservableObject {
     private let defaults: UserDefaults
 
     /// Column selection used in the cards density.
-    @Published var columnMode: GridColumnMode {
+    var columnMode: GridColumnMode {
         didSet { defaults.set(columnMode.storageValue, forKey: Self.columnModeKey) }
     }
 
     /// Row density.
-    @Published var density: ClipDensity {
+    var density: ClipDensity {
         didSet { defaults.set(density.rawValue, forKey: Self.densityKey) }
     }
 
@@ -84,6 +86,6 @@ final class GridPreferences: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         columnMode = GridColumnMode(storageValue: defaults.string(forKey: Self.columnModeKey))
-        density = defaults.string(forKey: Self.densityKey).flatMap(ClipDensity.init(rawValue:)) ?? .compact
+        density = defaults.string(forKey: Self.densityKey).flatMap(ClipDensity.init(rawValue:)) ?? .comfortable
     }
 }

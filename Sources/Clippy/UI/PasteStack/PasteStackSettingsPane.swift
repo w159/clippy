@@ -13,7 +13,7 @@ struct PasteStackSettingsPane: View {
 
     var body: some View {
         Form {
-            Section("Paste stack") {
+            Section {
                 Picker("Paste order", selection: $order) {
                     ForEach(PasteStackOrder.allCases) { Text($0.label).tag($0) }
                 }
@@ -21,10 +21,12 @@ struct PasteStackSettingsPane: View {
                     AppendPreferences.stackOrder = value
                     PasteStack.shared.order = value
                 }
+            } header: {
+                Label("Paste stack", systemImage: "square.stack.3d.up")
+            } footer: {
                 Text("The stack lives in memory only and is cleared when Clippy quits. Sensitive clips are never added.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Copy twice to append") {
+            Section {
                 Toggle("Append a second copy to the first", isOn: $appendEnabled)
                     .onChange(of: appendEnabled) { _, value in AppendPreferences.isEnabled = value }
                 HStack {
@@ -39,8 +41,10 @@ struct PasteStackSettingsPane: View {
                 }
                 .onChange(of: separator) { _, value in AppendPreferences.separator = value }
                 .disabled(!appendEnabled)
+            } header: {
+                Label("Copy twice to append", systemImage: "plus.square.on.square")
+            } footer: {
                 Text("Two copies from the same app inside the window become one clip. Sensitive copies are never appended.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Merge selected clips") {
                 Picker("Separator", selection: $mergeSeparator) {
@@ -48,6 +52,7 @@ struct PasteStackSettingsPane: View {
                 }
                 .onChange(of: mergeSeparator) { _, value in AppendPreferences.mergeSeparator = value }
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

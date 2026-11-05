@@ -73,7 +73,7 @@ jobs:
                   node-version: "22"
 
             # Drives the real panel in a real window with real key and mouse
-            # events (PanelHarnessTests): search, Return mid-typing, typing from
+            # events (PanelHarnessTests, SettingsKeyboardHarnessTests): search, Return mid-typing, typing from
             # the list, no results; and saves light and dark screenshots of the
             # panel, Settings and onboarding.
             - name: UI harness
@@ -83,7 +83,7 @@ jobs:
               run: |
                   set -o pipefail
                   status=0
-                  swift test --filter PanelHarnessTests 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
+                  swift test --filter 'PanelHarnessTests|SettingsKeyboardHarnessTests' 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
                   grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/harness.log" | tail -1 || true
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -100 || true
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
@@ -98,6 +98,8 @@ jobs:
                   mkdir -p "$RUNNER_TEMP/screenshots"
                   open build/Clippy.app
                   sleep 8
+                  open build/Clippy.app
+                  sleep 2
                   pgrep -x Clippy
                   /usr/sbin/screencapture -x "$RUNNER_TEMP/screenshots/09-first-launch.png" || true
                   pkill -x Clippy || true
@@ -161,6 +163,100 @@ jobs:
               uses: actions/upload-artifact@v7
               with:
                   path: ${{ runner.temp }}/clippy-contact-sheet.png
+                  archive: false
+                  if-no-files-found: warn
+
+    # Every screen of Clippy 2.2.0 (b8aa9a0), 2.3.0 (dfc8ea3, tag v2.3.0) and this
+    # commit side by side, light and dark, so the redesign can be judged at a glance.
+    # This commit's shots are the app job's clippy-screenshots artifact. 2.3.0 has
+    # the same UI harness, so its own tests run unchanged and already shoot dark.
+    # 2.2.0 has no harness: ci/before-2.2.0/BeforeScreenshotTests.swift is dropped
+    # into its checkout. ci/compare/compose.py maps each version's file names to
+    # one screen key and tiles them. Nothing depends on this job and it never
+    # fails the run (continue-on-error): it is a reviewer's aid, not a gate.
+    compare:
+        name: Version comparison
+        needs: app
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v6.0.3
+
+            - uses: actions/checkout@v6.0.3
+              with:
+                  ref: dfc8ea3a8fbfef82345492d6a3413f18e36bbd34
+                  path: v230
+
+            - uses: actions/checkout@v6.0.3
+              with:
+                  ref: b8aa9a0d9b375f490deb937c0ee420fba2ddfb89
+                  path: v220
+
+            # The screenshot tests that exist at dfc8ea3 (PanelHarnessTests and its
+            # +Screens extension); testKeyboardOnlyJourneys is left out, it takes
+            # no screenshots. A test that fails still leaves the shots it took.
+            - name: Render the 2.3.0 screens
+              env:
+                  CLIPPY_UI_HARNESS: "1"
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/v230-shots
+              run: |
+                  cd v230
+                  swift test --filter 'PanelHarnessTests/test(SearchFlowsInTheRealPanel|DarkPanelScreenshots|SettingsAndOnboardingScreenshots|SettingsPaneScreenshots|PanelPaneScreenshots|EditorAndSheetScreenshots|EmptyAndErrorStateScreenshots)' || echo "::warning::2.3.0 screenshot tests reported failures"
+                  ls "$CLIPPY_SCREENSHOT_DIR" | wc -l
+
+            - name: Render the 2.2.0 screens
+              env:
+                  CLIPPY_UI_HARNESS: "1"
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/v220-shots
+              run: |
+                  cp ci/before-2.2.0/BeforeScreenshotTests.swift v220/Tests/ClippyTests/
+                  cd v220
+                  # One process per test: 2.2.0's onboarding view model calls
+                  # UNUserNotificationCenter.current(), which raises an
+                  # NSInternalInconsistencyException without an app bundle and would kill
+                  # every other test. testOnboardingScreenshots is skipped for 2.2.0 (the
+                  # comparison then shows the placeholder in that column).
+                  for t in testPanelScreenshots testSettingsPaneScreenshots testClipEditorScreenshots testPaletteScreenshots; do
+                      swift test --filter "BeforeScreenshotTests/$t" || echo "::warning::2.2.0 $t reported failures"
+                  done
+                  count=$(ls "$CLIPPY_SCREENSHOT_DIR" | wc -l)
+                  echo "$count"
+                  if [ "$count" -lt 30 ]; then echo "::warning::only $count 2.2.0 screenshots were written"; fi
+
+            - name: Download current screenshots
+              uses: actions/download-artifact@v8
+              with:
+                  name: clippy-screenshots
+                  path: ${{ runner.temp }}/screenshots
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Compose the comparison
+              run: |
+                  python3 -m pip install --quiet pillow
+                  python3 ci/compare/compose.py \
+                      --v220 "$RUNNER_TEMP/v220-shots" \
+                      --v230 "$RUNNER_TEMP/v230-shots" \
+                      --new "$RUNNER_TEMP/screenshots" \
+                      --out "$RUNNER_TEMP/compare"
+
+            - name: Upload comparison
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: clippy-compare
+                  path: ${{ runner.temp }}/compare
+                  if-no-files-found: warn
+
+            # One unzipped PNG, so a reviewer can open it straight from the run page.
+            - name: Upload comparison overview
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  path: ${{ runner.temp }}/compare/compare-overview.png
                   archive: false
                   if-no-files-found: warn
 

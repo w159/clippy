@@ -1,4 +1,3 @@
-import Combine
 import XCTest
 @testable import Clippy
 
@@ -93,15 +92,14 @@ final class SearchStorePipelineTests: XCTestCase {
         let matches = store.semanticMatches
         XCTAssertFalse(matches.isEmpty)
 
-        var emissions: [[Clip]] = []
-        let clipsSink = store.$clips.dropFirst().sink { emissions.append($0) }
+        let clipsRecorder = ChangeRecorder(tracking: { _ = store.clips })
         let assignsBefore = store.semanticMatchesAssignCount
         let before = store.semanticCompletedRunID
         store.retrySearch()
         waitFor("refreshed merge finished") { store.semanticCompletedRunID > before }
-        clipsSink.cancel()
+        clipsRecorder.cancel()
 
-        XCTAssertTrue(emissions.isEmpty, "the list must not be republished for an unchanged result")
+        XCTAssertEqual(clipsRecorder.count, 0, "the list must not be republished for an unchanged result")
         XCTAssertEqual(store.semanticMatchesAssignCount, assignsBefore, "badges must not be cleared and restored")
         XCTAssertEqual(store.clips, fused)
         XCTAssertEqual(store.semanticMatches, matches)
@@ -117,8 +115,7 @@ final class SearchStorePipelineTests: XCTestCase {
         waitFor("initial") { store.clips.count == 2 }
         let keywordClip = try XCTUnwrap(store.clips.first { $0.contentText.hasPrefix("quartz") })
 
-        var emissions: [[Clip]] = []
-        let sink = store.$clips.dropFirst().sink { emissions.append($0) }
+        let recorder = ChangeRecorder(tracking: { _ = store.clips })
         let token = store.refilterToken
         for run in 1...5 {
             var marked = keywordClip
@@ -126,9 +123,9 @@ final class SearchStorePipelineTests: XCTestCase {
             store.scheduleSemanticMerge(query: "quartz marble", token: token, keyword: [marked])
         }
         waitFor("last merge finished") { store.semanticCompletedRunID == 5 }
-        sink.cancel()
+        recorder.cancel()
 
-        XCTAssertEqual(emissions.count, 1, "stale merges must not publish")
+        XCTAssertEqual(recorder.count, 1, "stale merges must not publish")
         XCTAssertEqual(store.clips.first { $0.id == keywordClip.id }?.userTitle, "run 5")
     }
 

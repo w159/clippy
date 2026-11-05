@@ -15,10 +15,10 @@ extension CategorySidePane {
                         .font(.system(size: 8, weight: .bold))
                         .rotationEffect(.degrees(open ? 90 : 0))
                     Text(title)
-                        .font(.caption.weight(.medium))
+                        .font(.footnote.weight(.semibold))
                     if let count {
                         Text("\(count)")
-                            .font(.caption2)
+                            .font(.footnote)
                             .monospacedDigit()
                             .foregroundStyle(tokens.textSecondary)
                     }
@@ -43,10 +43,10 @@ extension CategorySidePane {
                 .accessibilityLabel(addLabel ?? "Add")
             }
         }
-        .foregroundStyle(tokens.textSecondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
     }
 
     func indicator(for row: SidebarDropRow) -> SidebarDropIndicator {
@@ -58,7 +58,7 @@ extension CategorySidePane {
     func categoryIcon(_ category: Category) -> some View {
         switch category.iconKind {
         case .symbol:
-            Image(systemName: category.iconValue).font(.system(size: 12, weight: .semibold))
+            Image(systemName: category.iconValue).font(.body.weight(.medium))
         case .emoji:
             Text(category.iconValue).font(.system(size: 13))
         case .appLogo:
@@ -80,7 +80,7 @@ extension CategorySidePane {
             isSelected: selection == .history, help: "All history (\u{2318}1)",
             accessibilityText: "History, \(CopyFormat.counted(count, "clip"))", indicator: indicator(for: .history)
         ) {
-            Image(systemName: "clock").font(.system(size: 12, weight: .semibold))
+            Image(systemName: "clock").font(.body.weight(.medium))
         }
         .onTapGesture(perform: activate)
         .accessibilityAction(.default, activate)
@@ -145,7 +145,7 @@ extension CategorySidePane {
             rowID: tool.rowID, focus: $focus, title: tool.title, tint: tool.tint, count: count,
             isSelected: selection == tool.selection, help: tool.help, accessibilityText: tool.accessibilityText
         ) {
-            Image(systemName: tool.symbol).font(.system(size: 12, weight: .semibold))
+            Image(systemName: tool.symbol).font(.body.weight(.medium))
         }
         .onTapGesture(perform: activate)
         .accessibilityAction(.default, activate)
@@ -156,7 +156,7 @@ extension CategorySidePane {
             rowID: .newCategory, focus: $focus, title: "New Category", tint: tokens.textSecondary, count: nil,
             isSelected: false, help: "Create a category", accessibilityText: "New Category"
         ) {
-            Image(systemName: "plus").font(.system(size: 12, weight: .semibold))
+            Image(systemName: "plus").font(.body.weight(.medium))
         }
         .onTapGesture { isCreating = true }
         .accessibilityAction(.default) { isCreating = true }

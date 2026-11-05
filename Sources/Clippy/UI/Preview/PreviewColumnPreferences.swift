@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 /// Persisted state of the optional preview column (LAY-11).
-/// UserDefaults keys: `preview.column.enabled` (Bool, default false) and `preview.column.width` (Double, default 300).
+/// UserDefaults keys: `preview.column.enabled` (Bool, default true) and `preview.column.width` (Double, default 300).
 enum PreviewColumnPreferences {
     /// Narrowest column.
     static let minWidth: CGFloat = 240
@@ -11,7 +11,9 @@ enum PreviewColumnPreferences {
     /// Default column width.
     static let defaultWidth: CGFloat = 300
     /// Panel width from which the column may appear.
-    static let minPanelWidth: CGFloat = 1100
+    static let minPanelWidth: CGFloat = 760
+    /// The column is on until the user turns it off.
+    static let defaultEnabled = true
     /// Defaults key: column on/off.
     static let enabledKey = "preview.column.enabled"
     /// Defaults key: column width.
@@ -28,8 +30,11 @@ enum PreviewColumnPreferences {
         enabled && panelWidth >= minPanelWidth
     }
 
-    /// Whether the user turned the column on.
-    static func isEnabled(_ defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: enabledKey) }
+    /// Whether the column is on (default on).
+    /// On unless the user turned it off: an absent key counts as enabled.
+    static func isEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: enabledKey) == nil ? defaultEnabled : defaults.bool(forKey: enabledKey)
+    }
 
     /// Sets the column on/off.
     static func setEnabled(_ value: Bool, defaults: UserDefaults = .standard) { defaults.set(value, forKey: enabledKey) }

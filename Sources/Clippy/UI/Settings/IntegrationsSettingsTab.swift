@@ -5,9 +5,9 @@ import UniformTypeIdentifiers
 // The Integrations settings tab (1Password, iCloud, MCP, archive).
 
 struct IntegrationsSettingsTab: View {
-    @ObservedObject var settings = AppSettings.shared
-    @ObservedObject var cloud = ICloudSyncService.shared
-    @ObservedObject var mcpController = McpServerController.shared
+    @Bindable var settings = AppSettings.shared
+    var cloud = ICloudSyncService.shared
+    var mcpController = McpServerController.shared
     @Environment(\.clippyTokens) var tokens
     @State var exportResult: String?
     @State var archiveResult: String?
@@ -132,6 +132,7 @@ struct IntegrationsSettingsTab: View {
             iCloudSection
 
             mcpSection
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         // SET-10: every state write happens in a task after the view update, never in body/onAppear.

@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Sparkle
 
 extension AppDelegate {
@@ -25,13 +24,13 @@ extension AppDelegate {
             }
         }
         // The icon shows the locked state too.
-        AppLock.shared.$isLocked.receive(on: DispatchQueue.main).sink { [weak self] _ in
+        observeChanges(of: { AppLock.shared.isLocked }) { [weak self] _ in
             self?.updateStatusIcon()
-        }.store(in: &statusIconObservers)
+        }
         // The badge shows how many items remain in the paste stack (FEAT-06).
-        PasteStack.shared.$items.receive(on: DispatchQueue.main).sink { [weak self] _ in
+        observeChanges(of: { PasteStack.shared.count }) { [weak self] _ in
             self?.updateStatusIcon()
-        }.store(in: &statusIconObservers)
+        }
     }
 
     /// Current icon state: locked beats paused beats capturing.

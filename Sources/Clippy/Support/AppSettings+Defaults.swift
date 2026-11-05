@@ -3,14 +3,31 @@ import Foundation
 // UserDefaults default registration and sound-id migration for AppSettings.
 
 extension AppSettings {
+    /// Default panel size; wide enough for the list and the detail pane.
+    nonisolated static let defaultPanelWidth = 920.0
+    nonisolated static let defaultPanelHeight = 560.0
+    /// One-time flag for `bumpSavedPanelSize`.
+    nonisolated static let panelSizeBumpKey = "panel.sizeBump.v24"
+
+    /// First run of this version: raises a saved panel size to at least the new default so
+    /// existing users (often 640 wide) see the detail pane. Never shrinks a larger size;
+    /// guarded by `panelSizeBumpKey`, so a later manual resize is left alone.
+    static func bumpSavedPanelSize(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: panelSizeBumpKey) else { return }
+        defaults.set(max(defaults.double(forKey: Keys.panelWidth), defaultPanelWidth), forKey: Keys.panelWidth)
+        defaults.set(max(defaults.double(forKey: Keys.panelHeight), defaultPanelHeight), forKey: Keys.panelHeight)
+        defaults.set(true, forKey: panelSizeBumpKey)
+    }
+
     /// Register every default so UserDefaults returns correct values before the user touches a setting.
     /// Must run before any @AppDefault wrapper is read.
     static func registerDefaults(_ defaults: UserDefaults) {
         defaults.register(defaults: [
                 Keys.positionMode: PanelPositionMode.caret.rawValue,
-                Keys.panelWidth: 640.0,
-                Keys.panelHeight: 480.0,
+                Keys.panelWidth: defaultPanelWidth,
+                Keys.panelHeight: defaultPanelHeight,
                 Keys.rememberPanelSize: true,
+                PreviewColumnPreferences.enabledKey: PreviewColumnPreferences.defaultEnabled,
                 Keys.pollingIntervalMs: 200.0,
                 Keys.maxHistoryItems: 500,
                 Keys.movePastedItemToTop: false,
@@ -33,7 +50,7 @@ extension AppSettings {
                 Keys.highContrastCardText: false,
                 Keys.fontFamily: PanelFontFamily.systemDefault.rawValue,
                 Keys.fontSizeBase: 13,
-                // Clean Light in light mode, its GitHub Dark counterpart in dark mode.
+                // Clean Light. "Automatic" (Clean Light / GitHub Dark by system appearance) stays selectable.
                 Keys.themePreset: ThemePreset.automatic.rawValue,
                 Keys.panelOpacity: 1.0,
                 Keys.customIsDark: false,

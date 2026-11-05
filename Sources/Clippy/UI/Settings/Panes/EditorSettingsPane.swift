@@ -3,7 +3,7 @@ import SwiftUI
 /// Editor settings: font size, line numbers, and code/prose behavior, with a live sample.
 struct EditorSettingsPane: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var preferences = EditorPreferences.shared
+    @Bindable private var preferences = EditorPreferences.shared
     @State private var notice: PaneNotice?
 
     /// Creates the pane.
@@ -17,16 +17,13 @@ struct EditorSettingsPane: View {
                 SettingsRow(title: "Follow app font size", detail: Text("Off lets you pick an editor-only size.")) {
                     Toggle("Follow app font size", isOn: followBinding).labelsHidden()
                 }
-                Divider()
                 SettingsRow(title: "Font size", detail: Text("\(Int(effectiveSize)) pt"), enabled: preferences.fontSize != nil) {
                     Stepper("Font size", value: sizeBinding, in: EditorPreferences.minFontSize...EditorPreferences.maxFontSize, step: EditorPreferences.fontStep)
                         .labelsHidden()
                 }
-                Divider()
                 SettingsRow(title: "Line numbers") {
                     Toggle("Line numbers", isOn: $preferences.showsLineNumbers).labelsHidden()
                 }
-                Divider()
                 SettingsRow(title: "Show preview", detail: Text("Split preview for Markdown, CSV and rich source.")) {
                     Toggle("Show preview", isOn: $preferences.previewVisible).labelsHidden()
                 }
@@ -56,11 +53,9 @@ struct EditorSettingsPane: View {
             SettingsRow(title: "Word wrap") {
                 Toggle("Word wrap", isOn: Binding(get: { preferences.wraps(category) }, set: { preferences.setWraps($0, for: category) })).labelsHidden()
             }
-            Divider()
             SettingsRow(title: "Check spelling") {
                 Toggle("Check spelling", isOn: Binding(get: { preferences.checksSpelling(category) }, set: { preferences.setChecksSpelling($0, for: category) })).labelsHidden()
             }
-            Divider()
             SettingsRow(title: "Smart quotes and dashes") {
                 Toggle("Smart quotes and dashes", isOn: Binding(
                     get: { preferences.usesSmartSubstitutions(category) },

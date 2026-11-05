@@ -64,7 +64,7 @@ struct TransformPickerView: View {
                         Text("This replaces the source clip. Save as a new clip to keep the original.")
                     }
                 Button("Save as new clip") { request(sink.saveAsNewClip) }
-                    .buttonStyle(.accent)
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction).disabled(!canApply(preview))
             }
         }

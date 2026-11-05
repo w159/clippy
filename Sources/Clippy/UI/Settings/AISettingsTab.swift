@@ -4,9 +4,9 @@ import SwiftUI
 // The AI settings tab.
 
 struct AISettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var store = AIProviderStore.shared
-    @StateObject private var model = AIProviderManagerModel()
+    @Bindable private var settings = AppSettings.shared
+    private let store = AIProviderStore.shared
+    @State private var model = AIProviderManagerModel()
     @State private var showActions = false
 
     var body: some View {
@@ -52,6 +52,7 @@ struct AISettingsTab: View {
                     .disabled(!settings.aiEnabled).settingsManaged(AppSettings.Keys.aiAgentAllowCodeExecution).settingsRow("ai.code")
                 SettingsNote("Runs as you with a 30-second timeout. You see the code and confirm each run. Off by default.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showActions) {

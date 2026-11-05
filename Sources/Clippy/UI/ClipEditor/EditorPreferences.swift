@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Observation
 
 /// How the editor treats a document for defaults: prose is spell-checked and
 /// wrapped, code is neither.
@@ -19,7 +20,8 @@ enum EditorContentCategory: String {
 /// on each accessor until the user toggles them. Observable so the toolbar
 /// re-renders on change. The defaults store is injectable for tests.
 @MainActor
-final class EditorPreferences: ObservableObject {
+@Observable
+final class EditorPreferences {
     static let shared = EditorPreferences()
 
     static let minFontSize = 8.0
@@ -27,6 +29,8 @@ final class EditorPreferences: ObservableObject {
     static let fontStep = 1.0
 
     private let defaults: UserDefaults
+    /// Bumped on every write so views that read the UserDefaults-backed accessors re-render.
+    private var revision = 0
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
@@ -40,12 +44,13 @@ final class EditorPreferences: ObservableObject {
     }
 
     private func bool(_ key: String, default value: Bool) -> Bool {
-        defaults.object(forKey: key) == nil ? value : defaults.bool(forKey: key)
+        _ = revision
+        return defaults.object(forKey: key) == nil ? value : defaults.bool(forKey: key)
     }
 
     private func set(_ value: Bool, _ key: String) {
         defaults.set(value, forKey: key)
-        objectWillChange.send()
+        revision &+= 1
     }
 
     // MARK: Font zoom
@@ -53,6 +58,7 @@ final class EditorPreferences: ObservableObject {
     /// The zoomed point size, or nil when the user never zoomed (follow the
     /// app font size). Always within `minFontSize...maxFontSize`.
     var fontSize: Double? {
+        _ = revision
         guard defaults.object(forKey: Key.fontSize) != nil else { return nil }
         return Self.clamp(defaults.double(forKey: Key.fontSize))
     }
@@ -64,12 +70,12 @@ final class EditorPreferences: ObservableObject {
     /// Cmd+0: forget the zoom and follow the app font size again.
     func resetZoom() {
         defaults.removeObject(forKey: Key.fontSize)
-        objectWillChange.send()
+        revision &+= 1
     }
 
     private func setFontSize(_ value: Double) {
         defaults.set(Self.clamp(value), forKey: Key.fontSize)
-        objectWillChange.send()
+        revision &+= 1
     }
 
     static func clamp(_ size: Double) -> Double { min(maxFontSize, max(minFontSize, size)) }

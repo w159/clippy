@@ -4,7 +4,7 @@ import SwiftUI
 // The General settings pane (hotkey, pasting, history, behavior, logging, startup, external editor).
 
 struct GeneralSettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @Environment(\.clippyTokens) private var tokens
     @State private var launchStatus = LaunchAtLogin.status
     @State private var launchError: String?
@@ -38,6 +38,7 @@ struct GeneralSettingsTab: View {
                     .settingsRow("general.reset")
                 SettingsNote("Restores every setting to its default. API keys in the keychain and your clip history are not affected.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .task {
@@ -45,7 +46,7 @@ struct GeneralSettingsTab: View {
             launchStatus = LaunchAtLogin.status
         }
         // A pane reset or import only rewrites storage; re-read the cached picker value.
-        .onReceive(settings.objectWillChange) { _ in
+        .onChange(of: settings.storageRevision) { _, _ in
             let stored = ExternalEditorPreference.bundleID() ?? ""
             if stored != editorID { editorID = stored }
         }

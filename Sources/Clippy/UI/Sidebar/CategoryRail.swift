@@ -4,9 +4,9 @@ import SwiftUI
 /// `SidebarRailItem` with tooltip, count in the tooltip and selection state.
 struct CategoryRail: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject var store: ClipStore
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var scriptStore = ScriptStore.shared
+    var store: ClipStore
+    private let settings = AppSettings.shared
+    private let scriptStore = ScriptStore.shared
     @Binding var selection: PanelSelection
     @Binding var hover: SidebarDropRow?
     let historyCount: Int
@@ -34,7 +34,6 @@ struct CategoryRail: View {
         .padding(.bottom, 6)
         .frame(maxHeight: .infinity, alignment: .top)
         // Same transparency as the expanded pane, so collapsing the sidebar doesn't change it.
-        .background(tokens.surfaceSidebar.opacity(settings.panelOpacity))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Categories")
     }

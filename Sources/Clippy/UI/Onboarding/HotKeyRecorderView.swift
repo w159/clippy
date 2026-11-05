@@ -1,12 +1,14 @@
 import AppKit
 import Carbon.HIToolbox
 import SwiftUI
+import Observation
 
 /// Only one recorder may capture keys at a time; a second click hands capture over.
 @MainActor
-private final class ActiveHotKeyRecorder: ObservableObject {
+@Observable
+private final class ActiveHotKeyRecorder {
     static let shared = ActiveHotKeyRecorder()
-    @Published var action: HotKeyAction?
+    var action: HotKeyAction?
 }
 
 /// Reusable recorder for one `HotKeyAction`. Click the field, press a chord;
@@ -15,9 +17,9 @@ private final class ActiveHotKeyRecorder: ObservableObject {
 struct HotKeyRecorderView: View {
     /// The action being bound.
     let action: HotKeyAction
-    @ObservedObject private var center = HotKeyCenter.shared
+    private let center = HotKeyCenter.shared
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var recorder = ActiveHotKeyRecorder.shared
+    private let recorder = ActiveHotKeyRecorder.shared
     @State private var isHovered = false
     @State private var warning: String?
     @FocusState private var fieldFocused: Bool
@@ -66,7 +68,7 @@ struct HotKeyRecorderView: View {
 
     private var fieldLabel: some View {
         Text(isRecording ? "Press shortcut\u{2026}" : (center.chords[action]?.displayString ?? "Not set"))
-            .font(.system(size: 12, weight: .medium, design: .rounded).monospaced())
+            .font(.callout.weight(.medium).monospaced())
             .foregroundStyle(isRecording ? tokens.accentText : tokens.textPrimary)
             .lineLimit(1)
             .frame(minWidth: 96)
@@ -92,11 +94,12 @@ private struct HotKeyRecorderButtonStyle: ButtonStyle {
     let tokens: ClippyTokens
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: ClippyRadius.control)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        let active = isFocused || isRecording
         return configuration.label
-            .background(shape.fill(configuration.isPressed ? tokens.selection : (isHovered ? tokens.surfaceElevated : tokens.surfaceInset)))
-            .overlay(shape.stroke(isFocused || isRecording ? tokens.focusRing : tokens.stroke,
-                                  lineWidth: isFocused || isRecording ? 2 : 1))
+            .background(shape.fill(active ? AnyShapeStyle(Color.clippyAccent.opacity(0.14))
+                                          : AnyShapeStyle(.quaternary.opacity(configuration.isPressed ? 1 : (isHovered ? 0.8 : 0.5)))))
+            .overlay { if active { shape.stroke(Color.clippyAccent, lineWidth: 2) } }
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .contentShape(shape)
     }

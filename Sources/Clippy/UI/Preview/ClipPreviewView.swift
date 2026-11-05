@@ -6,16 +6,21 @@ struct ClipPreviewView: View {
     let item: ClipPreviewItem
     /// Lines kept for code/text; nil = unlimited (large sheet).
     var lineLimit: Int?
+    /// Point size for text, JSON and code; nil keeps the system text styles.
+    var contentFontSize: CGFloat?
+
+    private var bodyFont: Font { contentFontSize.map { .system(size: $0) } ?? .body }
+    private var monoFont: Font { .system(size: contentFontSize ?? 12, design: .monospaced) }
 
     var body: some View {
         switch item {
         case .masked:
             MaskedText("", sensitive: true)
         case .text(let text), .markdown(let text):
-            Text(limited(text)).font(.body).foregroundStyle(tokens.textPrimary).textSelection(.enabled)
+            Text(limited(text)).font(bodyFont).foregroundStyle(tokens.textPrimary).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         case .json(let text):
-            Text(limited(Self.prettyJSON(text))).font(.system(.body, design: .monospaced))
+            Text(limited(Self.prettyJSON(text))).font(contentFontSize == nil ? .system(.body, design: .monospaced) : monoFont)
                 .foregroundStyle(tokens.textPrimary).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         case .code(let text, let language, let dropped):
             codeView(text, language: language, dropped: dropped)
@@ -48,7 +53,7 @@ struct ClipPreviewView: View {
     private func codeView(_ text: String, language: CodeLanguage, dropped: Int) -> some View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
             Text(CodePreviewStyler.attributed(text, language: language, tokens: tokens))
-                .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                .font(contentFontSize == nil ? .system(.callout, design: .monospaced) : monoFont).textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if dropped > 0 {
                 Text("\u{2026} \(dropped) more \(dropped == 1 ? "line" : "lines")").font(.caption).foregroundStyle(tokens.textSecondary)
@@ -60,7 +65,7 @@ struct ClipPreviewView: View {
     private func imageView(_ url: URL?) -> some View {
         if let url, let image = NSImage(contentsOf: url) {
             PreviewCheckerboard(tileSize: 12) { Image(nsImage: image).resizable().scaledToFit() }
-                .frame(maxWidth: .infinity, maxHeight: 360)
+                .frame(maxWidth: .infinity, maxHeight: contentFontSize == nil ? 360 : 480)
         } else {
             Label("Image unavailable", systemImage: "photo").foregroundStyle(tokens.textSecondary)
         }

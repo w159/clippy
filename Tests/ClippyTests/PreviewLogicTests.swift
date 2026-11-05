@@ -66,9 +66,49 @@ final class PreviewLogicTests: XCTestCase {
         XCTAssertEqual(PreviewColumnPreferences.clamp(10), PreviewColumnPreferences.minWidth)
         XCTAssertEqual(PreviewColumnPreferences.clamp(9000), PreviewColumnPreferences.maxWidth)
         XCTAssertEqual(PreviewColumnPreferences.clamp(.nan), PreviewColumnPreferences.defaultWidth)
-        XCTAssertTrue(PreviewColumnPreferences.isVisible(panelWidth: 1100, enabled: true))
-        XCTAssertFalse(PreviewColumnPreferences.isVisible(panelWidth: 1099, enabled: true))
+        XCTAssertTrue(PreviewColumnPreferences.isVisible(panelWidth: 760, enabled: true))
+        XCTAssertFalse(PreviewColumnPreferences.isVisible(panelWidth: 759, enabled: true))
+        XCTAssertTrue(PreviewColumnPreferences.isVisible(panelWidth: 920, enabled: true), "visible at the new default panel width")
         XCTAssertFalse(PreviewColumnPreferences.isVisible(panelWidth: 2000, enabled: false))
+    }
+
+    func testColumnIsOnByDefaultButHonorsAnExplicitOff() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "PreviewLogicTests.\(UUID().uuidString)"))
+        XCTAssertTrue(PreviewColumnPreferences.isEnabled(defaults))
+        PreviewColumnPreferences.setEnabled(false, defaults: defaults)
+        XCTAssertFalse(PreviewColumnPreferences.isEnabled(defaults))
+    }
+
+    /// Tight space collapses the sidebar to its rail instead of squeezing the list.
+    func testSidebarCollapsesForPreviewBeforeListGetsTooNarrow() {
+        XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 920, reservedWidth: 300, sidebarWidth: 176))
+        XCTAssertTrue(SidebarMetrics.collapsesForPreview(panelWidth: 760, reservedWidth: 300, sidebarWidth: 176))
+        XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 760, reservedWidth: 300, sidebarWidth: SidebarMetrics.railWidth))
+        XCTAssertFalse(SidebarMetrics.collapsesForPreview(panelWidth: 300, reservedWidth: 0, sidebarWidth: 176), "no preview, no forced rail")
+    }
+
+    @MainActor
+    func testSavedPanelSizeBumpRunsOnceAndNeverShrinks() throws {
+        let suite = "PanelBump.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(640.0, forKey: AppSettings.Keys.panelWidth)
+        defaults.set(480.0, forKey: AppSettings.Keys.panelHeight)
+        AppSettings.bumpSavedPanelSize(defaults)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 920)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelHeight), 560)
+        defaults.set(700.0, forKey: AppSettings.Keys.panelWidth)  // the user shrinks it afterwards
+        AppSettings.bumpSavedPanelSize(defaults)
+        XCTAssertEqual(defaults.double(forKey: AppSettings.Keys.panelWidth), 700, "second run changes nothing")
+
+        let large = "PanelBump.large.\(UUID().uuidString)"
+        let bigDefaults = try XCTUnwrap(UserDefaults(suiteName: large))
+        defer { bigDefaults.removePersistentDomain(forName: large) }
+        bigDefaults.set(1200.0, forKey: AppSettings.Keys.panelWidth)
+        bigDefaults.set(900.0, forKey: AppSettings.Keys.panelHeight)
+        AppSettings.bumpSavedPanelSize(bigDefaults)
+        XCTAssertEqual(bigDefaults.double(forKey: AppSettings.Keys.panelWidth), 1200)
+        XCTAssertEqual(bigDefaults.double(forKey: AppSettings.Keys.panelHeight), 900)
     }
 
     func testColumnWidthPersistence() throws {

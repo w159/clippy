@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Observation
 
 /// Drives one AI action through its lifecycle (running -> proposal -> applied or
 /// failed) and publishes state for a sheet. Building the service from settings,
@@ -7,7 +8,8 @@ import AppKit
 /// a one-liner. The actual write happens in the caller's `onApply`, after the
 /// user approves: the preview + confirm contract.
 @MainActor
-final class AIActionRunner: ObservableObject {
+@Observable
+final class AIActionRunner {
     enum Phase: Equatable {
         case idle
         case running
@@ -15,14 +17,14 @@ final class AIActionRunner: ObservableObject {
         case failed(String)
     }
 
-    @Published var phase: Phase = .idle
+    var phase: Phase = .idle
     /// Text streamed so far by `run(action:on:instruction:)`, shown while running.
-    @Published private(set) var partialText = ""
+    private(set) var partialText = ""
 
     /// The in-flight action task so a user can cancel a long run (audit [MEDIUM]).
-    private var runningTask: Task<Void, Never>?
+    @ObservationIgnored private var runningTask: Task<Void, Never>?
     /// The last work closure, kept so the failed phase can offer Retry.
-    private var lastWork: ((AIService) async throws -> AIProposal?)?
+    @ObservationIgnored private var lastWork: ((AIService) async throws -> AIProposal?)?
 
     var isPresenting: Bool {
         switch phase { case .idle: return false; default: return true }
@@ -89,9 +91,9 @@ final class AIActionRunner: ObservableObject {
 /// The preview + confirm surface. Shows progress, the proposed change (with a
 /// before/after when the action edits existing content), and Apply / Cancel.
 struct AIActionSheet: View {
-    @ObservedObject var runner: AIActionRunner
+    var runner: AIActionRunner
     // Theme tokens so the sheet's surfaces/text track a theme switch like the panel.
-    @ObservedObject private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     private var tokens: ThemeTokens { settings.theme }
     /// Called with the approved text when the user taps Apply.
     let onApply: (AIProposal) -> Void
@@ -101,7 +103,7 @@ struct AIActionSheet: View {
             content
         }
         .foregroundStyle(tokens.textPrimary)
-        .padding(20)
+        .padding(24)
         .frame(minWidth: 460, idealWidth: 480)
     }
 
@@ -120,23 +122,25 @@ struct AIActionSheet: View {
                 // Audit [MEDIUM]: let the user abandon a long run instead of
                 // waiting on a stuck request.
                 Button("Stop") { runner.cancel() }
+                    .buttonStyle(.glass).tint(nil)
                     .keyboardShortcut(.cancelAction)
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 24)
         case .failed(let message):
-            Label("AI action failed", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-            Text(message)
-                .font(.callout)
-                .foregroundStyle(tokens.textSecondary)
-                .textSelection(.enabled)
-            HStack {
-                // Audit [MEDIUM]: retry from the failed phase instead of closing
-                // and re-triggering the action from the source view.
-                Button("Retry") { runner.retry() }
-                Spacer()
-                Button("Close") { runner.reset() }.keyboardShortcut(.cancelAction)
+            ContentUnavailableView {
+                Label("AI action failed", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message).textSelection(.enabled)
+            }
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    // Audit [MEDIUM]: retry from the failed phase instead of closing
+                    // and re-triggering the action from the source view.
+                    Button("Retry") { runner.retry() }.buttonStyle(.glass).tint(nil)
+                    Spacer()
+                    Button("Close") { runner.reset() }.buttonStyle(.glassProminent).keyboardShortcut(.cancelAction)
+                }
             }
         case .proposal(let proposal):
             Text(proposal.label)
@@ -146,16 +150,20 @@ struct AIActionSheet: View {
             } else {
                 box(proposal.proposed)
             }
-            HStack {
-                Spacer()
-                Button("Cancel") { runner.reset() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Apply") {
-                    onApply(proposal)
-                    runner.reset()
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button("Cancel") { runner.reset() }
+                        .buttonStyle(.glass).tint(nil)
+                        .keyboardShortcut(.cancelAction)
+                    Button("Apply") {
+                        onApply(proposal)
+                        runner.reset()
+                    }
+                    .buttonStyle(.glassProminent)
+                    .keyboardShortcut(.defaultAction)
                 }
-                .buttonStyle(.accent)
-                .keyboardShortcut(.defaultAction)
+                .controlSize(.large)
             }
         }
     }
@@ -170,9 +178,8 @@ struct AIActionSheet: View {
                     .textSelection(.enabled)
             }
             .frame(minHeight: minHeight, maxHeight: 220)
-            .padding(8)
-            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
-            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset).stroke(tokens.cardBorder))
+            .padding(12)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             // Audit [POLISH]: copy-button overlay on each diff/proposal box.
             if !text.isEmpty {
                 ClipboardCopyButton(text: text, tokens: tokens)
@@ -194,9 +201,8 @@ struct AIActionSheet: View {
                     .textSelection(.enabled)
             }
             .frame(maxHeight: 180)
-            .padding(8)
-            .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.inset))
-            .overlay(RoundedRectangle(cornerRadius: ClippyRadius.inset).stroke(tokens.cardBorder))
+            .padding(12)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             Text("Result").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
             box(proposed)
         }
@@ -246,9 +252,9 @@ private struct ClipboardCopyButton: View {
             }
         } label: {
             Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                .font(.system(size: 11))
+                .font(.caption)
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tokens.textSecondary)
+                .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .help("Copy")

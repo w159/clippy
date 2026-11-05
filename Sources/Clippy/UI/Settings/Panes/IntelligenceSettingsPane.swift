@@ -4,7 +4,7 @@ import SwiftUI
 /// Smart Suggestions settings: behavior, Accessibility, on-device model, dismissals, diagnostics, cache.
 struct IntelligenceSettingsPane: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @State private var notice: PaneNotice?
     @State private var accessibilityTrusted = CaretLocator.isTrusted
     @State private var useFoundationModels = SuggestionTuning.useFoundationModels
@@ -45,16 +45,13 @@ struct IntelligenceSettingsPane: View {
             SettingsRow(title: "Smart Suggestions", enabled: !AppSettings.isForced(AppSettings.Keys.suggestionsEnabled)) {
                 Toggle("Smart Suggestions", isOn: $settings.suggestionsEnabled).labelsHidden()
             }
-            Divider()
             SettingsRow(title: "Use text from the focused field", detail: Text("Off: only the app name and window title are used."),
                         enabled: settings.suggestionsEnabled && !AppSettings.isForced(AppSettings.Keys.suggestionsUseWindowText)) {
                 Toggle("Use text from the focused field", isOn: $settings.suggestionsUseWindowText).labelsHidden()
             }
-            Divider()
             SettingsRow(title: "Suggestions shown", detail: Text("\(settings.suggestionsLimit)"), enabled: settings.suggestionsEnabled) {
                 Stepper("Suggestions shown", value: $settings.suggestionsLimit, in: 3...20).labelsHidden()
             }
-            Divider()
             SettingsRow(title: "Open Suggestions with the panel", enabled: settings.suggestionsEnabled) {
                 Toggle("Open Suggestions with the panel", isOn: $settings.suggestionsAutoOpen).labelsHidden()
             }

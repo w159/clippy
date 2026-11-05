@@ -1,18 +1,40 @@
-import Combine
 import Foundation
+import Observation
+
+// MARK: - Observation bridge
+//
+// `@Observable` classes cannot apply their macro to a stored property that
+// carries a property wrapper, so every wrapped setting is declared
+// `@ObservationIgnored @AppDefault(...)`. The wrapper then reports reads and
+// writes to the owning class's registrar itself, through the `access` and
+// `withMutation` members that `@Observable` generates. This protocol is how the
+// wrapper reaches them without knowing the concrete class.
+
+@MainActor
+protocol ObservationNotifying: AnyObject, Observable {
+    /// Bumped by bulk operations (reset, import) that rewrite UserDefaults behind
+    /// the wrappers' backs. Wrapped reads depend on it, so bumping re-renders
+    /// every observer of every wrapped setting.
+    var storageRevision: Int { get }
+
+    func access<Member>(keyPath: KeyPath<Self, Member>)
+    func withMutation<Member, MutationResult>(
+        keyPath: KeyPath<Self, Member>, _ mutation: () throws -> MutationResult
+    ) rethrows -> MutationResult
+}
 
 // MARK: - AppDefault property wrapper
 //
-// Collapses the repetitive @Published + didSet + UserDefaults.set pattern
+// Collapses the repetitive stored property + didSet + UserDefaults.set pattern
 // used throughout AppSettings into a single declaration line.
 //
 // Why the enclosing-instance subscript matters:
-//   A plain property wrapper cannot reach the enclosing ObservableObject to
-//   fire objectWillChange. Swift exposes a static subscript hook (SE-0258)
-//   that the compiler calls instead of the wrappedValue accessor when the
-//   wrapper is used inside a class. That hook receives the instance, so we
-//   can call objectWillChange.send() *before* storing the new value, which
-//   is the same timing @Published uses.
+//   A plain property wrapper cannot reach the enclosing @Observable class to
+//   tell its registrar about reads and writes. Swift exposes a static subscript
+//   hook (SE-0258) that the compiler calls instead of the wrappedValue accessor
+//   when the wrapper is used inside a class. That hook receives the instance, so
+//   we can call `access` on reads and wrap writes in `withMutation`, which is
+//   exactly what the @Observable macro generates for a plain stored property.
 //
 // Two storage strategies (via overloaded inits, not conditional conformance
 // -- Swift does not allow conditional conformance on property wrappers):
@@ -78,42 +100,28 @@ struct AppDefault<Value> {
 
     // MARK: Enclosing-instance subscript
     //
-    // This is the load-bearing path for ObservableObject observation.
-    // Called by the compiler instead of `wrappedValue` when the wrapper
-    // is declared inside a reference type. Fires objectWillChange *before*
-    // writing so SwiftUI sees the change in the same runloop turn as
-    // @Published does.
-    //
-    // Why the where clause:
-    //   The ObservableObject protocol declares `objectWillChange` with an
-    //   associated type (ObjectWillChangePublisher). Without the constraint
-    //   below, the only way to call .send() here is via a conditional cast
-    //   (as? ObservableObjectPublisher), which silently does nothing if the
-    //   enclosing type ever uses a custom publisher. Constraining
-    //   ObjectWillChangePublisher == ObservableObjectPublisher lets the
-    //   compiler prove the assignment statically: no cast, no silent failure.
-    //   Any type that violates the constraint gets a compile error rather
-    //   than a runtime no-op. AppSettings and FixtureSettings both satisfy
-    //   the constraint because Swift synthesizes ObservableObjectPublisher
-    //   when no explicit objectWillChange is declared.
-    static subscript<EnclosingSelf: ObservableObject>(
+    // This is the load-bearing path for observation. Called by the compiler
+    // instead of `wrappedValue` when the wrapper is declared inside a reference
+    // type. Reads register with the registrar (plus the shared storage revision,
+    // so bulk resets re-render); writes go through `withMutation` so observers
+    // are told before the value changes, matching what @Observable generates.
+    @MainActor
+    static subscript<EnclosingSelf: ObservationNotifying>(
         _enclosingInstance instance: EnclosingSelf,
         wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
         storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
-    ) -> Value where EnclosingSelf.ObjectWillChangePublisher == ObservableObjectPublisher {
+    ) -> Value {
         get {
+            instance.access(keyPath: wrappedKeyPath)
+            _ = instance.storageRevision
             let wrapper = instance[keyPath: storageKeyPath]
             return wrapper.read(.standard)
         }
         set {
-            // Fire objectWillChange before persisting so SwiftUI observers
-            // are notified in the willChange pass, matching @Published semantics.
-            // The where clause above proves ObjectWillChangePublisher is
-            // ObservableObjectPublisher at compile time, so .send() is called
-            // directly with no cast.
-            instance.objectWillChange.send()
-            let wrapper = instance[keyPath: storageKeyPath]
-            wrapper.write(.standard, newValue)
+            instance.withMutation(keyPath: wrappedKeyPath) {
+                let wrapper = instance[keyPath: storageKeyPath]
+                wrapper.write(.standard, newValue)
+            }
         }
     }
 }

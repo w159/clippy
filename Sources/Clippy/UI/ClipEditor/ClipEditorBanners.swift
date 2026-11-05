@@ -35,11 +35,12 @@ struct EditorConflictBanner: View {
             Button(EditorConflictCopy.keepMine, action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
             Button("Compare\u{2026}", action: onCompare).help("Show both versions side by side").fixedSize()
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass).tint(nil)
         .controlSize(.small)
-        .padding(tokens.metrics.space.two)
-        .background(tokens.warning.opacity(0.10))
-        .overlay(alignment: .bottom) { Rectangle().fill(tokens.warning.opacity(0.35)).frame(height: 1) }
+        .padding(12)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Conflict: this clip changed elsewhere")
     }
@@ -81,8 +82,9 @@ struct EditorPendingBar: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(tokens.metrics.space.two)
-        .background(tokens.surfaceInset)
+        .padding(12)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Staged AI actions")
     }
