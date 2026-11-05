@@ -35,20 +35,22 @@ struct SnippetsView: View {
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .glassEffect(.regular, in: Capsule())
                 .padding(.horizontal, 12)
-                Picker("Folder", selection: $folderFilter) {
-                    Text("All folders").tag("")
-                    ForEach(store.folders, id: \.self) { Text($0).tag($0) }
+                if !snippets.isEmpty {
+                    Picker("Folder", selection: $folderFilter) {
+                        Text("All folders").tag("")
+                        ForEach(store.folders, id: \.self) { Text($0).tag($0) }
+                    }
+                    .fixedSize()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
                 }
-                .fixedSize()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
                 List(visible, selection: $selection) { item in
                     HStack(spacing: 10) {
                         Image(systemName: "text.badge.plus")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(item.isEnabled ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(item.isEnabled ? Color.clippyAccent : Color.secondary)
                             .frame(width: 30, height: 30)
-                            .background((item.isEnabled ? Color.accentColor : Color.secondary).opacity(0.14),
+                            .background((item.isEnabled ? Color.clippyAccent : Color.secondary).opacity(0.14),
                                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.displayName).foregroundStyle(item.isEnabled ? Color.primary : Color.secondary).lineLimit(1)
@@ -83,15 +85,30 @@ struct SnippetsView: View {
         } message: { Text(errorMessage ?? "") }
     }
 
+    /// The full empty state when the list column is tall enough, a compact title, message and button when not.
     @ViewBuilder private var listEmptyState: some View {
         if snippets.isEmpty {
-            PaneEmptyState(systemImage: "text.badge.plus", title: "No snippets yet",
-                       message: "Save text you type often and expand it with a short abbreviation.",
-                       actionTitle: "Add Snippet") { addSnippet() }
+            emptyListContent(systemImage: "text.badge.plus", title: "No snippets yet",
+                             message: "Save text you type often and expand it with a short abbreviation.",
+                             actionTitle: "Add Snippet") { addSnippet() }
         } else {
-            PaneEmptyState(systemImage: "magnifyingglass", title: "No snippets match",
-                       message: "Clear the search or choose All folders.",
-                       actionTitle: "Clear Search") { query = ""; folderFilter = "" }
+            emptyListContent(systemImage: "magnifyingglass", title: "No snippets match",
+                             message: "Clear the search or choose All folders.",
+                             actionTitle: "Clear Search") { query = ""; folderFilter = "" }
+        }
+    }
+
+    private func emptyListContent(systemImage: String, title: String, message: String, actionTitle: String,
+                                  action: @escaping () -> Void) -> some View {
+        ViewThatFits(in: .vertical) {
+            PaneEmptyState(systemImage: systemImage, title: title, message: message, actionTitle: actionTitle, action: action)
+            VStack(spacing: 6) {
+                Text(title).font(.headline).foregroundStyle(.primary)
+                Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Button(actionTitle, action: action).buttonStyle(.glassProminent).controlSize(.small)
+            }
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -104,13 +121,13 @@ struct SnippetsView: View {
         HStack(spacing: 8) {
             Button { addSnippet() } label: {
                 Image(systemName: "plus")
-            }.buttonStyle(.glass).accessibilityLabel("New snippet").help("New snippet")
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("New snippet").help("New snippet")
             Button { if let id = selection { perform { selection = try store.duplicate(id: id)?.id } } } label: {
                 Image(systemName: "plus.square.on.square")
-            }.buttonStyle(.glass).accessibilityLabel("Duplicate").help("Duplicate snippet").disabled(selection == nil)
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("Duplicate").help("Duplicate snippet").disabled(selection == nil)
             Button { confirmDelete = true } label: {
                 Image(systemName: "trash")
-            }.buttonStyle(.glass).accessibilityLabel("Delete").help("Delete snippet").disabled(selection == nil)
+            }.buttonStyle(.glass).tint(nil).accessibilityLabel("Delete").help("Delete snippet").disabled(selection == nil)
             Spacer()
             Menu {
                 Button("Import snippets\u{2026}", action: importJSON)
@@ -134,8 +151,11 @@ struct SnippetsView: View {
                     scheduleSave(value)
                 }))
         } else {
-            ContentUnavailableView("No snippet selected", systemImage: "text.badge.plus",
-                                   description: Text("Select a snippet, or press + to create one."))
+            ContentUnavailableView {
+                Label { Text("No snippet selected").foregroundStyle(.primary) } icon: { Image(systemName: "text.badge.plus") }
+            } description: {
+                Text("Select a snippet, or press + to create one.").foregroundStyle(.secondary)
+            }
         }
     }
 

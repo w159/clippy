@@ -36,7 +36,7 @@ extension TextClipEditor {
                             onClose()
                         }
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glass).tint(nil)
                     .keyboardShortcut(.cancelAction)
                     .fixedSize()
                     Button("Save") { if save() { onClose() } }
@@ -69,7 +69,7 @@ extension TextClipEditor {
                 .accessibilityLabel("Clip title")
             if isDirty {
                 HStack(spacing: 4) {
-                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Circle().fill(Color.clippyAccent).frame(width: 8, height: 8)
                     Text("unsaved").font(.caption).foregroundStyle(.secondary)
                 }
                 .fixedSize()

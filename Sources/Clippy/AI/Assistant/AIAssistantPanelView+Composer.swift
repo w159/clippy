@@ -58,7 +58,7 @@ extension AssistantPanelBody {
                         Image(systemName: streaming ? "stop.circle.fill" : "arrow.up.circle.fill")
                             .font(.title)
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(streaming || canSend ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(streaming || canSend ? Color.clippyAccent : Color.secondary)
                             .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                             .frame(minWidth: 28, minHeight: 28)
                     }

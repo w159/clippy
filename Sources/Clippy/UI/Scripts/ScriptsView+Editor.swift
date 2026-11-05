@@ -80,28 +80,28 @@ extension ScriptsView {
                         .id(script.id)
                 }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.glass).tint(nil)
             .help("Arguments, working directory, environment, timeout, interpreter path, stdin")
             .accessibilityLabel("Options")
             Button { showRunHistory.toggle() } label: {
                 if compact { Image(systemName: "clock.arrow.circlepath") }
                 else { Label("History", systemImage: "clock.arrow.circlepath") }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.glass).tint(nil)
             .disabled(currentHistory.isEmpty)
             .popover(isPresented: $showRunHistory, arrowEdge: .bottom) { historyPopover }
             .help("Run history")
             .accessibilityLabel("History")
             Spacer(minLength: 4)
             Button("Save") { save() }
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled((editing?.name.trimmingCharacters(in: .whitespaces).isEmpty ?? true) || (!isDirty && !isDraft))
             if currentRun?.isRunning == true {
                 Button { currentRun?.cancel() } label: {
                     if compact { Image(systemName: "stop.fill") } else { Label("Stop", systemImage: "stop.fill") }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
                 .help("Stop").accessibilityLabel("Stop")
             } else {
                 Button { activeDialog = .run } label: {
@@ -185,7 +185,7 @@ extension ScriptsView {
                 } else {
                     Label("Could not save script", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                    Button("Try Again") { save() }.buttonStyle(.glass).controlSize(.small)
+                    Button("Try Again") { save() }.buttonStyle(.glass).tint(nil).controlSize(.small)
                 }
             }
             .font(.caption)

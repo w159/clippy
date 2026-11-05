@@ -69,7 +69,7 @@ struct InstructionSheet: View {
                 HStack(spacing: 10) {
                     Spacer()
                     Button("Cancel", role: .cancel) { dismiss() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                     Button("Run", action: run)
                         .buttonStyle(.glassProminent)
@@ -109,13 +109,13 @@ struct EditorCompareSheet: View {
                 HStack(spacing: 10) {
                     Spacer()
                     Button("Use Stored Version", action: onReload)
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .help("Discard your edits and load the stored text")
                     Button("Keep My Version", action: onKeepMine)
                         .buttonStyle(.glassProminent)
                         .help("Keep your edits; Save overwrites the stored text")
                     Button("Close", role: .cancel, action: onClose)
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                 }
             }

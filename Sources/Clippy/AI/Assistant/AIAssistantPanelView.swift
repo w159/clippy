@@ -109,7 +109,7 @@ struct AssistantPanelBody: View {
     private var aiOffHeader: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles").font(.title3).symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor).accessibilityHidden(true)
+                .foregroundStyle(Color.clippyAccent).accessibilityHidden(true)
             Text("AI Assistant").font(.title3.weight(.semibold)).lineLimit(1)
             Spacer(minLength: 0)
         }

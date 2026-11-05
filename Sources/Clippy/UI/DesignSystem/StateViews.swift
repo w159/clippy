@@ -20,9 +20,9 @@ struct EmptyState: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: systemImage) }
         } description: {
-            if let message { Text(message) }
+            if let message { Text(message).foregroundStyle(.secondary) }
         } actions: {
             if let actionTitle, let action { Button(actionTitle, action: action).buttonStyle(.bordered) }
         }
@@ -74,9 +74,9 @@ struct ErrorState: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: "exclamationmark.triangle.fill")
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
         } description: {
-            Text(message)
+            Text(message).foregroundStyle(.secondary)
         } actions: {
             if let retryTitle, let retry { Button(retryTitle, action: retry).buttonStyle(.bordered) }
         }

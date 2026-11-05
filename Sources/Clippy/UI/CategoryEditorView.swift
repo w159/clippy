@@ -101,7 +101,7 @@ struct CategoryEditorView: View {
                 HStack(spacing: 10) {
                     Spacer()
                     Button("Cancel", role: .cancel) { dismiss() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                     Button(category == nil ? "Create" : "Save") {
                         onSave(

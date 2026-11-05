@@ -45,6 +45,8 @@ struct IconButton: View {
                 .foregroundStyle(state == .selected ? tokens.accentText : tokens.textPrimary)
         }
         .buttonStyle(.glass)
+        // Neutral glass; only an active toggle (pinned) takes the accent.
+        .tint(state == .selected ? tokens.accent : nil)
         .buttonBorderShape(.circle)
         .controlSize(.large)
         .disabled(state == .disabled)

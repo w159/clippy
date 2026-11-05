@@ -122,7 +122,7 @@ struct AIActionSheet: View {
                 // Audit [MEDIUM]: let the user abandon a long run instead of
                 // waiting on a stuck request.
                 Button("Stop") { runner.cancel() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glass).tint(nil)
                     .keyboardShortcut(.cancelAction)
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -137,7 +137,7 @@ struct AIActionSheet: View {
                 HStack(spacing: 10) {
                     // Audit [MEDIUM]: retry from the failed phase instead of closing
                     // and re-triggering the action from the source view.
-                    Button("Retry") { runner.retry() }.buttonStyle(.glass)
+                    Button("Retry") { runner.retry() }.buttonStyle(.glass).tint(nil)
                     Spacer()
                     Button("Close") { runner.reset() }.buttonStyle(.glassProminent).keyboardShortcut(.cancelAction)
                 }
@@ -154,7 +154,7 @@ struct AIActionSheet: View {
                 HStack(spacing: 10) {
                     Spacer()
                     Button("Cancel") { runner.reset() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                     Button("Apply") {
                         onApply(proposal)

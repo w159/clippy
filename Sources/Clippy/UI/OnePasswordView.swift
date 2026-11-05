@@ -83,7 +83,7 @@ struct OnePasswordView: View {
             } icon: {
                 Image(systemName: "key.fill")
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.clippyAccent)
             }
             .font(.title3.weight(.semibold))
             HStack(spacing: 6) {
@@ -178,7 +178,7 @@ struct OnePasswordView: View {
                 HStack(spacing: 10) {
                     Spacer()
                     Button("Cancel") { creating = false; newTitle = ""; newValue = "" }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                         .disabled(isCreating)
                     Button("Create") { create() }

@@ -70,7 +70,7 @@ struct AIActionEditorView: View {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
                     Button("Cancel") { testTask?.cancel(); onCancel() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                     Button("Save") { testTask?.cancel(); onSave(draft()) }
                         .keyboardShortcut("s", modifiers: .command)

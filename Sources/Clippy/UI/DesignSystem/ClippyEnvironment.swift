@@ -60,9 +60,11 @@ private struct ClippyDesignSystemEnvironment: ViewModifier {
         // tokens at once; views that read `settings.theme` directly follow via
         // the shared value and the re-render below.
         settings.hostColorSchemeChanged(isDark: colorScheme == .dark)
+        let tokens = ClippyTokens.resolve(from: settings.theme, contrast: contrast)
         return content
+            .tint(tokens.accent)
             .onChange(of: colorScheme) { _, _ in settings.hostColorSchemeDidChange() }
-            .environment(\.clippyTokens, ClippyTokens.resolve(from: settings.theme, contrast: contrast))
+            .environment(\.clippyTokens, tokens)
             .environment(\.clippyTextScale, ClippyTextScale.multiplier)
             .environment(\.clippyFontFamily, settings.fontFamily)
     }

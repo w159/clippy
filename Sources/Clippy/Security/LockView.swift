@@ -32,7 +32,7 @@ struct LockView: View {
             GlassEffectContainer(spacing: 12) {
                 HStack(spacing: 12) {
                     Button("Close", action: onClose)
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                     Button("Unlock") { lock.unlock() }
                         .buttonStyle(.glassProminent)

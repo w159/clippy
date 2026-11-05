@@ -21,3 +21,9 @@ extension View {
     /// Tints a control (slider, checkbox) with the bright `accent` instead of the window's `accentInk`.
     func accentTint() -> some View { modifier(AccentTintModifier()) }
 }
+
+extension Color {
+    /// The theme accent (gold by default). Use instead of `Color.accentColor`, which is the system blue
+    /// and ignores the app theme.
+    static var clippyAccent: Color { ClippyTokens.resolve(from: AppSettings.shared.theme).accent }
+}

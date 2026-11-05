@@ -161,12 +161,14 @@ extension PanelHarnessTests {
                                   pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
             capture("40-empty-history-\(suffix)", emptyList(empty), size: size, appearance: appearance)
 
-            // A search error only exists alongside a query: the store clears it when
-            // the query is empty, so run a real search to completion first.
-            empty.query = "invoice"
-            pump(until: "the empty-store search to complete", { empty.completedQuery == "invoice" })
-            empty.searchError = "The search index could not be read."
-            capture("41-search-error-\(suffix)", emptyList(empty), size: size, appearance: appearance)
+            // A real failed search: the store's runner throws, so `searchError` is set by the store itself and
+            // survives any re-search the freshly shown view triggers (a re-run fails the same way).
+            let failing = ClipStore(database: try makeTestDatabase(self),
+                                    pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
+            failing.searchRunner = { _, _, _ in throw HarnessSearchFailure() }
+            failing.query = "invoice"
+            pump(until: "the failing search to publish its error", { failing.searchError != nil })
+            capture("41-search-error-\(suffix)", emptyList(failing), size: size, appearance: appearance)
 
             capture("42-snippets-empty-\(suffix)", SnippetsView(store: emptySnippets).clippyDesignSystem(),
                     size: NSSize(width: 620, height: 600), appearance: appearance)
@@ -196,4 +198,9 @@ private struct SnippetEditorHarness: View {
         tags: ["mail", "work"], useCount: 12)
 
     var body: some View { SnippetEditor(snippet: $snippet) }
+}
+
+/// Stand-in for an unreadable search index.
+private struct HarnessSearchFailure: LocalizedError {
+    var errorDescription: String? { "The search index could not be read." }
 }

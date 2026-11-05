@@ -19,9 +19,9 @@ struct PaneEmptyState: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: systemImage) }
         } description: {
-            if let message { Text(message) }
+            if let message { Text(message).foregroundStyle(.secondary) }
         } actions: {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)

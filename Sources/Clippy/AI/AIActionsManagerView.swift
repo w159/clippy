@@ -162,9 +162,9 @@ struct AIActionsManagerView: View {
     private func actionRow(_ action: AIAction) -> some View {
         HStack(spacing: 12) {
             ActionIconView(kind: action.iconKind, value: action.symbolName)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .frame(width: 34, height: 34)
-                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
@@ -178,11 +178,11 @@ struct AIActionsManagerView: View {
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
                     Button("Edit") { editingAction = action }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .accessibilityLabel("Edit \(action.name)")
                     if !action.isBuiltIn {
                         Button("Delete", role: .destructive) { deletingAction = action }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.glass).tint(nil)
                             .tint(.red)
                             .accessibilityLabel("Delete \(action.name)")
                     } else if action.isModifiedFromDefault {
@@ -195,7 +195,7 @@ struct AIActionsManagerView: View {
                                 store.update(original)
                             }
                         }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .accessibilityLabel("Restore \(action.name) to its default")
                     }
                 }

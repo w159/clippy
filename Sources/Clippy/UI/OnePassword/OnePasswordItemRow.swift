@@ -13,9 +13,9 @@ struct OnePasswordItemRow: View {
             HStack(spacing: 12) {
                 Image(systemName: OnePasswordFilter.symbol(forCategory: item.category))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.clippyAccent)
                     .frame(width: 34, height: 34)
-                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title).font(.body.weight(.medium)).lineLimit(1)
                     Text(OnePasswordFilter.displayCategory(item.category))
@@ -32,7 +32,7 @@ struct OnePasswordItemRow: View {
             }
             .padding(10)
             .background(
-                isExpanded ? AnyShapeStyle(Color.accentColor.opacity(0.12)) : AnyShapeStyle(.quaternary.opacity(hovered ? 0.9 : 0.5)),
+                isExpanded ? AnyShapeStyle(Color.clippyAccent.opacity(0.12)) : AnyShapeStyle(.quaternary.opacity(hovered ? 0.9 : 0.5)),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
         }

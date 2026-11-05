@@ -104,7 +104,7 @@ struct ScriptsPanelView: View {
             .padding(.horizontal, 12).padding(.vertical, 7)
             .glassEffect(.regular, in: Capsule())
             Button("Manage\u{2026}") { onOpenSettings() }
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -198,9 +198,9 @@ private struct ScriptRowView: View {
         HStack(spacing: 12) {
             Image(systemName: "terminal")
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .frame(width: 34, height: 34)
-                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(script.name.isEmpty ? "Untitled" : script.name)
@@ -209,7 +209,7 @@ private struct ScriptRowView: View {
                 HStack(spacing: 6) {
                     Text(script.interpreter.displayName)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.clippyAccent)
                     ForEach(ScriptBadge.allCases.filter { $0.applies(to: script) }, id: \.title) { badge in
                         Image(systemName: badge.icon)
                             .font(.caption2.weight(.semibold))
@@ -234,7 +234,7 @@ private struct ScriptRowView: View {
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 24, height: 24)
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.glass).tint(nil)
         .disabled(!script.isEnabled && !isRunning)
         .help(script.isEnabled
               ? (isRunning ? "Stop script" : "Run script")

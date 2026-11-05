@@ -35,7 +35,7 @@ struct EditorConflictBanner: View {
             Button(EditorConflictCopy.keepMine, action: onKeepMine).help("Keep your edits; Save overwrites the stored text").fixedSize()
             Button("Compare\u{2026}", action: onCompare).help("Show both versions side by side").fixedSize()
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.glass).tint(nil)
         .controlSize(.small)
         .padding(12)
         .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))

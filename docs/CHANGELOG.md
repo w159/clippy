@@ -8,10 +8,9 @@
 - Detail pane is an inset rounded card with a large kind tile, headline title, a calm content well, a metadata grid, a prominent glass Paste button and a glass Quick Look button.
 - Footer key hints are small glass capsules; the multi-select bar floats as a glass capsule.
 - Command palette is a larger glass panel with a capsule search field, grouped results with tinted symbol tiles and an accent selection; empty and no-results states use the system unavailable-content layout.
-- Settings window rebuilt to look like System Settings on macOS 26: the sidebar shows a colored rounded-square symbol tile for every pane with the system selection highlight and a search field on top, every pane is a grouped Form (rounded inset groups, section headers and footers, system toggles, pickers and steppers; no custom card borders), the pane title sits in the window toolbar, and Reset, Export and Import float on glass buttons at the bottom. The New pill is now a small accent capsule.
+- Settings window rebuilt to look like System Settings on macOS 26: the sidebar shows a colored rounded-square symbol tile for every pane with the system selection highlight and a search field on top, every pane is a grouped Form (rounded inset groups, section headers and footers, system toggles, pickers and steppers; no custom card borders), the pane title sits in the window toolbar, and Reset this pane, Export and Import sit in a final section at the end of each pane.
 - Built with Swift 6.3; app state uses the Observation framework (`@Observable`) instead of Combine `ObservableObject`.
 - Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
-- The New pill on a Settings pane now clears as soon as that pane is shown, including from search, and stays cleared after relaunch.
 - Clippy follows the system light or dark appearance by default; Clean Light and the other themes are still in Appearance settings.
 - Clippy now backs up the clip database before applying a database upgrade, and logs how long the upgrade took. The backup appears in Settings under Backups.
 - Pasting a clip logs a message when its formatting cannot be read and the clip is pasted as plain text.
@@ -23,6 +22,12 @@
 - Category sheet and icon picker are grouped forms with a segmented Symbols, Emoji and Apps picker, a checkmark on the chosen color, and glass Cancel and Create buttons.
 - Scripts, Snippets, Suggestions, Paste Stack, 1Password, AI Actions and the Assistant share one pane look: a large header with a capsule glass search field, rounded rows with a colored kind tile and two lines of text, and glass action buttons. The AI action editor and AI action sheet follow it.
 - Empty, error and no-results states in these panes, the lock screen and the 1Password recovery states use the system unavailable-content layout with a symbol, a title, a description and a glass action. The lock screen pulses its padlock while it waits for Touch ID.
+- Settings no longer shows New badges.
+- One accent everywhere: switches, links, pickers and buttons in Settings, onboarding, editors, sheets and every pane use the theme accent instead of system blue.
+- Panel header buttons are neutral glass circles; only the pin button takes the accent while the panel is pinned. In the detail pane only Paste is prominent and Quick Look is a plain glass button.
+- Settings: Reset this pane, Export and Import moved from a bottom bar into a last section of each pane, so they no longer cover the last rows.
+- Welcome tour: Continue and Get started are the accent-colored primary button.
+- Empty states: titles are primary text over a secondary description, the Snippets list shows its full empty state in a short window, the detail pane is hidden while the clip list is empty, and a failed search shows the Search failed state.
 
 ## v2.3.0 - 2026-11-03 - UI and UX overhaul
 

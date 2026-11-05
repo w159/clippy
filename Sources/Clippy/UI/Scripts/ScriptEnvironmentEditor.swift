@@ -28,7 +28,7 @@ struct ScriptEnvironmentEditor: View {
                     Label("Add row", systemImage: "plus")
                 }
                 .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
                 .accessibilityLabel("Add environment variable")
                 .help("Add environment variable")
             }

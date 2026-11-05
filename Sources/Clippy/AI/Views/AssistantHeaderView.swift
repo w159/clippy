@@ -17,7 +17,7 @@ struct AssistantHeaderView: View {
                 Image(systemName: "sparkles")
                     .font(.title3)
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.clippyAccent)
                     .symbolEffect(.variableColor, isActive: !reduceMotion && viewModel.state == .streaming)
                     .accessibilityHidden(true)
                 Text("AI Assistant").font(.title3.weight(.semibold)).lineLimit(1)
@@ -75,7 +75,7 @@ struct AssistantEmptyView: View {
         ScrollView {
             VStack(spacing: tokens.metrics.space.four) {
                 Image(systemName: "sparkles").resizable().scaledToFit().frame(width: 44, height: 44)
-                    .symbolRenderingMode(.hierarchical).foregroundStyle(Color.accentColor).accessibilityHidden(true)
+                    .symbolRenderingMode(.hierarchical).foregroundStyle(Color.clippyAccent).accessibilityHidden(true)
                 Text("Ask the assistant about your clips").font(.title3.weight(.semibold)).foregroundStyle(tokens.textPrimary)
                 Text("Try one of these, or type your own.").font(.callout).foregroundStyle(tokens.textSecondary)
                 VStack(spacing: tokens.metrics.space.two) {

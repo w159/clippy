@@ -152,7 +152,7 @@ struct ImageClipEditor: View {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
                     Button("Save a copy\u{2026}") { saveCopy() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .fixedSize()
                         .disabled(model.working == nil)
                     Spacer(minLength: 0)
@@ -166,7 +166,7 @@ struct ImageClipEditor: View {
                             onClose()
                         }
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glass).tint(nil)
                     .keyboardShortcut(.cancelAction)
                     .fixedSize()
                     Button("Save") { save { if $0 { onClose() } } }

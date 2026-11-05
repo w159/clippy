@@ -11,7 +11,7 @@ extension ImageClipEditor {
                 .accessibilityLabel("Clip title")
             if isDirty {
                 HStack(spacing: 4) {
-                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Circle().fill(Color.clippyAccent).frame(width: 8, height: 8)
                     Text("unsaved").font(.caption).foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .ignore)
@@ -85,7 +85,7 @@ extension ImageClipEditor {
             .labelsHidden().pickerStyle(.menu).fixedSize()
             .accessibilityLabel("Crop aspect ratio")
             Button("Apply crop") { applyCrop() }
-                .buttonStyle(.glass).controlSize(.small)
+                .buttonStyle(.glass).tint(nil).controlSize(.small)
                 .disabled(selection == nil)
                 .keyboardShortcut(.return, modifiers: .command)
                 .help("Apply crop (Cmd Return)")

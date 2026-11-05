@@ -15,7 +15,7 @@ struct SuggestionsHeroHeader: View {
             Image(systemName: "sparkles")
                 .font(.title3)
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .accessibilityHidden(true)
             Text("Suggested")
                 .font(.title3.weight(.semibold))
@@ -67,7 +67,7 @@ struct SuggestionDiagnosticsPopover: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(diagnostics.copyText, forType: .string)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.glass).tint(nil)
             .help("Copies counts and timings only, never screen text")
         }
         .padding(tokens.metrics.space.three)

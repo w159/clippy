@@ -192,7 +192,7 @@ struct IconPickerView: View {
         if let hex = accentHex {
             return AnyShapeStyle(Color(hexString: hex).opacity(0.25))
         }
-        return AnyShapeStyle(Color.accentColor.opacity(0.25))
+        return AnyShapeStyle(Color.clippyAccent.opacity(0.25))
     }
 }
 

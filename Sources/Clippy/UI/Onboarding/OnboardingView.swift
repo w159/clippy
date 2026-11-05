@@ -5,6 +5,7 @@ import SwiftUI
 struct OnboardingView: View {
     var viewModel: OnboardingViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.clippyTokens) private var tokens
 
     private let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
 
@@ -28,7 +29,7 @@ struct OnboardingView: View {
         .background {
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
-                LinearGradient(colors: [Color.accentColor.opacity(0.16), .clear], startPoint: .top, endPoint: .center)
+                LinearGradient(colors: [Color.clippyAccent.opacity(0.16), .clear], startPoint: .top, endPoint: .center)
             }
         }
         .clipShape(shape)
@@ -40,7 +41,7 @@ struct OnboardingView: View {
         HStack(spacing: 7) {
             ForEach(OnboardingStep.allCases) { step in
                 Capsule()
-                    .fill(step == viewModel.model.current ? Color.accentColor : Color.secondary.opacity(0.3))
+                    .fill(step == viewModel.model.current ? Color.clippyAccent : Color.secondary.opacity(0.3))
                     .frame(width: step == viewModel.model.current ? 18 : 7, height: 7)
             }
         }
@@ -55,20 +56,21 @@ struct OnboardingView: View {
             GlassEffectContainer(spacing: 12) {
                 HStack(spacing: 12) {
                     Button("Back") { viewModel.back() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .disabled(viewModel.model.isFirst)
                         .keyboardShortcut(.leftArrow, modifiers: .command)
                     Button("Skip for now") { viewModel.skipAll() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                         .keyboardShortcut(.cancelAction)
                         .accessibilityHint("Closes the walkthrough; reopen it from Help, Show Welcome")
                     Spacer()
                     if viewModel.model.current.isSkippable && !viewModel.model.isFirst {
                         Button(viewModel.model.current.isPermission ? "Continue without granting" : "Skip this step") { viewModel.skipStep() }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.glass).tint(nil)
                     }
                     Button(viewModel.model.isLast ? "Get started" : "Continue") { viewModel.advance() }
                         .buttonStyle(.glassProminent)
+                        .tint(tokens.accent)
                         .keyboardShortcut(.defaultAction)
                 }
             }

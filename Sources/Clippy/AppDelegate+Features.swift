@@ -136,7 +136,7 @@ enum SnippetFillPresenter {
         panel.title = "Snippet"
         panel.isFloatingPanel = true
         panel.isReleasedWhenClosed = false
-        panel.contentView = NSHostingView(rootView: SnippetFillView(snippetName: name, labels: labels, onFinish: { session.finish($0) }))
+        panel.contentView = NSHostingView(rootView: SnippetFillView(snippetName: name, labels: labels, onFinish: { session.finish($0) }).clippyDesignSystem())
         session.closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: panel,
                                                                        queue: .main) { _ in MainActor.assumeIsolated { session.finish(nil) } }
         window = panel

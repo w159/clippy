@@ -97,9 +97,9 @@ private struct HotKeyRecorderButtonStyle: ButtonStyle {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         let active = isFocused || isRecording
         return configuration.label
-            .background(shape.fill(active ? AnyShapeStyle(Color.accentColor.opacity(0.14))
+            .background(shape.fill(active ? AnyShapeStyle(Color.clippyAccent.opacity(0.14))
                                           : AnyShapeStyle(.quaternary.opacity(configuration.isPressed ? 1 : (isHovered ? 0.8 : 0.5)))))
-            .overlay { if active { shape.stroke(Color.accentColor, lineWidth: 2) } }
+            .overlay { if active { shape.stroke(Color.clippyAccent, lineWidth: 2) } }
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .contentShape(shape)
     }

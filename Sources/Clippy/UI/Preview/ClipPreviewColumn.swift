@@ -59,8 +59,11 @@ struct ClipPreviewColumn: View {
                 .transition(.opacity)
                 .id(clip.id)
         } else {
-            ContentUnavailableView("No Clip Selected", systemImage: "doc.on.clipboard",
-                                   description: Text("Select a clip to preview it here."))
+            ContentUnavailableView {
+                Label { Text("No Clip Selected").foregroundStyle(.primary) } icon: { Image(systemName: "doc.on.clipboard") }
+            } description: {
+                Text("Select a clip to preview it here.").foregroundStyle(.secondary)
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -163,7 +166,7 @@ struct ClipPreviewColumn: View {
                 Button(action: onQuickLook) {
                     Label("Quick Look", systemImage: "eye").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
                 .controlSize(.large)
                 .accessibilityLabel("Quick Look selected clip")
             }

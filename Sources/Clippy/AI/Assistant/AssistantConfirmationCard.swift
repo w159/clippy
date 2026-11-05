@@ -39,7 +39,7 @@ struct AssistantConfirmationCard: View {
             HStack {
                 Text("Return or Esc denies").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Skip", action: onSkip).buttonStyle(.glass).controlSize(.small)
+                Button("Skip", action: onSkip).buttonStyle(.glass).tint(nil).controlSize(.small)
                     .accessibilityHint("Skips this call without running it")
             }
         }

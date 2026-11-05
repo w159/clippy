@@ -32,7 +32,7 @@ struct SuggestionRowChrome<Card: View>: View {
             .padding(.horizontal, tokens.metrics.space.one)
         }
         .padding(6)
-        .background(isTop ? Color.accentColor.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(isTop ? Color.clippyAccent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onHover { hovered = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Paste") { onPaste(false) }
@@ -44,7 +44,7 @@ struct SuggestionRowChrome<Card: View>: View {
     private var scoreBar: some View {
         ZStack(alignment: .leading) {
             Capsule().fill(.quaternary)
-            Capsule().fill(Color.accentColor).frame(width: 28 * CGFloat(min(max(suggestion.score, 0), 1)))
+            Capsule().fill(Color.clippyAccent).frame(width: 28 * CGFloat(min(max(suggestion.score, 0), 1)))
         }
         .frame(width: 28, height: 4)
         .help("Relevance \(suggestion.scorePercent)%")

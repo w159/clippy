@@ -117,7 +117,7 @@ struct PanelHeaderView<Search: View>: View {
                 .frame(width: 20, height: 20)
         }
         .menuStyle(.button)
-        .buttonStyle(.glass)
+        .buttonStyle(.glass).tint(nil)
         .buttonBorderShape(.circle)
         .controlSize(.large)
         .menuIndicator(.hidden)

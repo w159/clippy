@@ -266,12 +266,10 @@ final class SettingsShellLogicTests: XCTestCase {
         XCTAssertEqual(persisted(defaults, GridColumnMigration.migratedKey) as? Bool, true)
     }
 
-    func testSidebarSectionsCoverEveryPaneOnceAndNewPanesAreMarked() {
+    func testSidebarSectionsCoverEveryPaneOnce() {
         let listed = SettingsPaneSection.all.flatMap(\.panes)
         XCTAssertEqual(listed.count, Set(listed).count)
         XCTAssertEqual(Set(listed), Set(SettingsPaneID.allCases))
-        XCTAssertTrue(SettingsPaneID.pasteStack.isNew)
-        XCTAssertFalse(SettingsPaneID.general.isNew)
     }
 
     func testSecretPlaceholderNeverLeaksValueOrLength() {

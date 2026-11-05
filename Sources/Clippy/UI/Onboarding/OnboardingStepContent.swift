@@ -32,7 +32,7 @@ struct OnboardingStepContent: View {
                 .scaledToFit()
                 .frame(width: 56, height: 56)
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .symbolEffect(.bounce, options: .nonRepeating, value: heroTick)
                 .padding(.bottom, 6)
                 .accessibilityHidden(true)
@@ -101,7 +101,7 @@ struct OnboardingStepContent: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: symbol)
                 .font(.body.weight(.medium))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
@@ -122,7 +122,7 @@ struct OnboardingStepContent: View {
             benefits(.accessibility)
             if !viewModel.accessibilityTrusted {
                 Button("Grant Access") { viewModel.grantAccessibility() }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glass).tint(nil)
                     .controlSize(.large)
                 note("This updates automatically when you return from System Settings.")
             }
@@ -176,7 +176,7 @@ struct OnboardingStepContent: View {
                 case .requiresApproval:
                     status("Waiting for approval in System Settings", ok: false)
                     Button("Open Login Items") { LaunchAtLogin.openSystemSettings() }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.glass).tint(nil)
                 case .notFound:
                     Text("Not available in this build (run the packaged app).").font(.caption).foregroundStyle(.secondary)
                 default: EmptyView()
@@ -218,7 +218,7 @@ struct OnboardingStepContent: View {
                         Text("Allow notifications")
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.glass).tint(nil)
                 .controlSize(.large)
                 .disabled(viewModel.requestingNotifications)
             }

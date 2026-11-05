@@ -133,7 +133,7 @@ extension ScriptsView {
 
     func rowBackground(selected: Bool) -> some View {
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(selected ? AnyShapeStyle(Color.accentColor.opacity(0.16)) : AnyShapeStyle(.quaternary.opacity(0.35)))
+            .fill(selected ? AnyShapeStyle(Color.clippyAccent.opacity(0.16)) : AnyShapeStyle(.quaternary.opacity(0.35)))
     }
 
     func row(for script: Script) -> some View {
@@ -151,7 +151,7 @@ extension ScriptsView {
                 if center.isRunning(script.id) { ProgressView().controlSize(.mini) }
                 Text(displayName(script.name))
                     .font(.body)
-                    .foregroundStyle(open ? Color.accentColor : Color.primary)
+                    .foregroundStyle(open ? Color.clippyAccent : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if bodyOnly { Text("in body").font(.caption2).foregroundStyle(.secondary) }
@@ -182,7 +182,7 @@ extension ScriptsView {
         HStack {
             Text(draft.name.isEmpty ? "New script" : draft.name)
                 .font(.body.italic())
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.clippyAccent)
                 .lineLimit(1)
             Spacer()
             Text("unsaved").font(.caption2).foregroundStyle(.secondary)
@@ -197,13 +197,13 @@ extension ScriptsView {
             if let progress = center.batchProgress {
                 ProgressView(value: Double(progress.done), total: Double(max(1, progress.total)))
                     .frame(maxWidth: .infinity)
-                Button("Stop") { center.cancelBatch() }.buttonStyle(.glass).controlSize(.small)
+                Button("Stop") { center.cancelBatch() }.buttonStyle(.glass).tint(nil).controlSize(.small)
             } else {
                 Text("\(selection.count) selected").font(.caption).foregroundStyle(.secondary)
                 Button("Select all") { batchSelection.selectAll(filteredScripts.map(\.id)) }
-                    .buttonStyle(.glass).controlSize(.small)
+                    .buttonStyle(.glass).tint(nil).controlSize(.small)
                 Button("Clear") { batchSelection.clear() }
-                    .buttonStyle(.glass).controlSize(.small)
+                    .buttonStyle(.glass).tint(nil).controlSize(.small)
                 Button("Run Selected") { activeDialog = .batch }
                     .buttonStyle(.glassProminent).controlSize(.small)
                     .disabled(selectedScripts.isEmpty)

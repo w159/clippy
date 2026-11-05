@@ -153,7 +153,7 @@ struct ReorderDropDestinationModifier<ID: LosslessStringConvertible & Equatable>
             .overlay(alignment: .top) {
                 if draggingOver == id {
                     Rectangle()
-                        .fill(Color.accentColor)
+                        .fill(Color.clippyAccent)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
                         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: draggingOver)
@@ -217,7 +217,7 @@ struct ReorderTrailingDropDestinationModifier<ID: LosslessStringConvertible & Eq
             .overlay(alignment: .top) {
                 if isTargeted {
                     Rectangle()
-                        .fill(Color.accentColor)
+                        .fill(Color.clippyAccent)
                         .frame(height: 2)
                         .padding(.horizontal, 4)
                         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: isTargeted)

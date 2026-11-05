@@ -84,13 +84,13 @@ struct PasteStackTray: View {
         let isNext = stack.upcomingIndex == index
         return HStack(spacing: 10) {
             Image(systemName: Self.symbol(for: item.clip))
-                .foregroundStyle(isNext ? Color.accentColor : Color.secondary)
+                .foregroundStyle(isNext ? Color.clippyAccent : Color.secondary)
                 .frame(width: 30, height: 30)
-                .background((isNext ? Color.accentColor : Color.secondary).opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background((isNext ? Color.clippyAccent : Color.secondary).opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(Self.title(for: item.clip)).lineLimit(2).truncationMode(.tail)
                 Text(isNext ? "Next to paste" : "Item \(index + 1)").font(.caption)
-                    .foregroundStyle(isNext ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(isNext ? Color.clippyAccent : Color.secondary)
             }
             Spacer(minLength: 0)
             IconButton("xmark", label: "Remove from stack") {

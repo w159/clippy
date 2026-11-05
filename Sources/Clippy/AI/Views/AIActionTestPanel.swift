@@ -20,7 +20,7 @@ struct AIActionTestPanel: View {
                 Text("Test").font(.headline)
                 Spacer()
                 if isTesting {
-                    Button("Stop", action: onStop).buttonStyle(.glass).keyboardShortcut(.escape, modifiers: [])
+                    Button("Stop", action: onStop).buttonStyle(.glass).tint(nil).keyboardShortcut(.escape, modifiers: [])
                 } else {
                     Button("Run test", action: onRun).disabled(!canRun).buttonStyle(.glassProminent)
                 }
