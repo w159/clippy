@@ -55,8 +55,10 @@ extension ClipDatabase {
     static let snapshotDatabaseName = "clippy.sqlite"
 
     /// Where snapshots live: `Backups/` next to the database file.
-    var backupsDirectory: URL {
-        databaseURL.deletingLastPathComponent().appendingPathComponent("Backups", isDirectory: true)
+    var backupsDirectory: URL { Self.backupsDirectory(forDatabaseAt: databaseURL) }
+
+    static func backupsDirectory(forDatabaseAt url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent("Backups", isDirectory: true)
     }
 
     // MARK: - Integrity / vacuum
@@ -122,6 +124,14 @@ extension ClipDatabase {
     /// copy of the media folder into `Backups/clippy-<timestamp>/`.
     @discardableResult
     func createBackup(now: Date = Date()) throws -> BackupSnapshot {
+        try Self.writeBackup(from: dbQueue, mediaDirectory: media.directory,
+                             backupsDirectory: backupsDirectory, now: now)
+    }
+
+    /// The snapshot writer, independent of any `ClipDatabase` instance so the
+    /// upgrade path can run it before the connection pool exists.
+    private static func writeBackup(from source: DatabaseReader, mediaDirectory: URL,
+                                    backupsDirectory: URL, now: Date) throws -> BackupSnapshot {
         let fm = FileManager.default
         let stamp = Self.snapshotStamp(now)
         var folder = backupsDirectory.appendingPathComponent("clippy-\(stamp)", isDirectory: true)
@@ -133,7 +143,7 @@ extension ClipDatabase {
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
             let destination = try DatabaseQueue(path: folder.appendingPathComponent(Self.snapshotDatabaseName).path)
-            try dbQueue.backup(to: destination)
+            try source.backup(to: destination)
             // The backup inherits WAL mode from the live database. A snapshot must
             // be one self-contained file: no -wal/-shm sidecars to lose in a copy,
             // and openable read-only.
@@ -142,7 +152,7 @@ extension ClipDatabase {
             }
             try destination.close()
             // APFS clones these, so the copy is near-instant and shares blocks.
-            try fm.copyItem(at: media.directory, to: folder.appendingPathComponent("media", isDirectory: true))
+            try fm.copyItem(at: mediaDirectory, to: folder.appendingPathComponent("media", isDirectory: true))
         } catch {
             try? fm.removeItem(at: folder)
             throw error
@@ -215,26 +225,28 @@ extension ClipDatabase {
         return (size?.int64Value ?? 0) > 0
     }
 
-    /// Runs the migrations. An existing database with migrations still pending is
-    /// snapshotted first (some migrations rebuild whole tables at launch), and the
-    /// run is timed. A failed snapshot is logged and the upgrade goes on: refusing
-    /// to open would be worse than migrating without the safety net.
-    func migrateBackingUpFirst(existedBefore: Bool) throws {
-        let migrator = Self.makeMigrator()
-        if existedBefore, try dbQueue.read({ try !migrator.hasCompletedMigrations($0) }) {
-            do {
-                let snapshot = try createBackup()
-                ClippyLog.info("Backed up database before upgrade: \(snapshot.url.lastPathComponent)",
-                               category: ClippyLog.storage)
-            } catch {
-                ClippyLog.error("Pre-upgrade backup failed, migrating anyway: \(error)",
-                                category: ClippyLog.storage)
-            }
+    /// Snapshots an existing database that still has migrations pending (some
+    /// rebuild whole tables at launch). Runs BEFORE the connection pool exists, on
+    /// a throwaway connection that is closed again: a pool reader opened ahead of
+    /// the migrations keeps column positions cached from the old table layout and
+    /// misdecodes rows after a rebuild. It never decodes clip rows. A failed
+    /// snapshot is logged and the upgrade goes on: refusing to open would be worse
+    /// than migrating without the safety net.
+    static func backUpIfUpgradePending(databaseURL: URL, mediaDirectory: URL) {
+        guard fileHasContent(databaseURL) else { return }
+        do {
+            let probe = try DatabaseQueue(path: databaseURL.path, configuration: makeConfiguration())
+            defer { try? probe.close() }
+            guard try probe.read({ try !makeMigrator().hasCompletedMigrations($0) }) else { return }
+            let snapshot = try writeBackup(
+                from: probe, mediaDirectory: mediaDirectory,
+                backupsDirectory: backupsDirectory(forDatabaseAt: databaseURL), now: Date())
+            ClippyLog.info("Backed up database before upgrade: \(snapshot.url.lastPathComponent)",
+                           category: ClippyLog.storage)
+        } catch {
+            ClippyLog.error("Pre-upgrade backup failed, migrating anyway: \(error)",
+                            category: ClippyLog.storage)
         }
-        let started = ContinuousClock.now
-        try migrator.migrate(dbQueue)
-        let elapsed = started.duration(to: .now)
-        ClippyLog.info("Database migrations finished in \(elapsed)", category: ClippyLog.storage)
     }
 
     // MARK: - Orphaned media
