@@ -35,6 +35,8 @@
 !.agents/**
 !scripts/
 !scripts/**
+!ci/
+!ci/**
 !assets/
 !assets/**
 !img/

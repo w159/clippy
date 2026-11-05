@@ -164,6 +164,89 @@ jobs:
                   archive: false
                   if-no-files-found: warn
 
+    # The panel as it looked in 2.2.0 (b8aa9a0) next to this commit, on one image.
+    # 2.2.0 has no UI harness, so ci/before-2.2.0/BeforeScreenshotTests.swift is
+    # dropped into a checkout of it. Nothing depends on this job, and it never
+    # fails the run (continue-on-error): it is a reviewer's aid, not a gate.
+    before-after:
+        name: Before and after screenshots
+        needs: app
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v6.0.3
+
+            - uses: actions/checkout@v6.0.3
+              with:
+                  ref: b8aa9a0d9b375f490deb937c0ee420fba2ddfb89
+                  path: before
+
+            - name: Render the 2.2.0 panel
+              env:
+                  CLIPPY_UI_HARNESS: "1"
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/before-shots
+              run: |
+                  cp ci/before-2.2.0/BeforeScreenshotTests.swift before/Tests/ClippyTests/
+                  cd before
+                  swift test --filter BeforeScreenshotTests
+                  ls -l "$CLIPPY_SCREENSHOT_DIR"
+
+            - name: Download current screenshots
+              uses: actions/download-artifact@v8
+              with:
+                  name: clippy-screenshots
+                  path: ${{ runner.temp }}/screenshots
+
+            # Left: 2.2.0. Right: this commit's main panel, preferring
+            # panel-history-detail over 01-panel-light.
+            - name: Compose before and after
+              run: |
+                  cat > "$RUNNER_TEMP/compose.swift" <<'SWIFT'
+                  import AppKit
+                  let args = CommandLine.arguments
+                  let beforeURL = URL(fileURLWithPath: args[1]), shots = URL(fileURLWithPath: args[2])
+                  let out = URL(fileURLWithPath: args[3])
+                  let afterURL = ["panel-history-detail.png", "01-panel-light.png"]
+                      .map { shots.appendingPathComponent($0) }
+                      .first { FileManager.default.fileExists(atPath: $0.path) }
+                  guard let afterURL, let before = NSImage(contentsOf: beforeURL), let after = NSImage(contentsOf: afterURL),
+                        before.size.width > 0, after.size.width > 0 else { print("missing input image"); exit(1) }
+                  let cellW: CGFloat = 900, labelH: CGFloat = 44, pad: CGFloat = 16
+                  let cells: [(String, NSImage, CGFloat)] = [
+                      ("2.2.0", before, cellW * before.size.height / before.size.width),
+                      ("Now", after, cellW * after.size.height / after.size.width)]
+                  let width = 2 * (cellW + pad) + pad
+                  let height = (cells.map(\.2).max() ?? 0) + labelH + 2 * pad
+                  guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width), pixelsHigh: Int(height),
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+                  NSGraphicsContext.saveGraphicsState()
+                  NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                  NSColor(white: 0.5, alpha: 1).setFill()
+                  NSRect(x: 0, y: 0, width: width, height: height).fill()
+                  let top = height - pad
+                  for (column, cell) in cells.enumerated() {
+                      let x = pad + CGFloat(column) * (cellW + pad)
+                      (cell.0 as NSString).draw(at: NSPoint(x: x, y: top - labelH + 8), withAttributes: [
+                          .font: NSFont.boldSystemFont(ofSize: 28), .foregroundColor: NSColor.white])
+                      cell.1.draw(in: NSRect(x: x, y: top - labelH - cell.2, width: cellW, height: cell.2))
+                  }
+                  NSGraphicsContext.restoreGraphicsState()
+                  try rep.representation(using: .png, properties: [:])!.write(to: out)
+                  print("before-after: \(beforeURL.lastPathComponent) | \(afterURL.lastPathComponent), \(Int(width))x\(Int(height))")
+                  SWIFT
+                  swift "$RUNNER_TEMP/compose.swift" "$RUNNER_TEMP/before-shots/before-panel-history.png" \
+                      "$RUNNER_TEMP/screenshots" "$RUNNER_TEMP/clippy-before-after.png"
+
+            - name: Upload before and after
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  path: ${{ runner.temp }}/clippy-before-after.png
+                  archive: false
+                  if-no-files-found: warn
+
     mcp:
         name: MCP server
         runs-on: macos-26
