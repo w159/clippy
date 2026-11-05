@@ -22,10 +22,14 @@ struct ClipRowView: View {
     private var comfortable: Bool { density == .comfortable }
     private var showsActions: Bool { isHovering || model.isSelected }
     private var kind: ClipKind { clip.kind }
+    /// Kind style, label and symbol from the preview classifier (code, rich text and email included).
+    private let visual: ClipVisualKind
     private var hue: Color {
         if case .colorValue(let swatch) = kind { return swatch }
-        return tokens.kind(ClipCardView.style(for: kind, clip: clip))
+        return tokens.kind(visual.style)
     }
+    /// Symbol drawn on a selected (filled) tile: white on the light-theme hues, near-black on the dark-theme pastels.
+    private var onHue: Color { tokens.scheme == .dark ? Color.black.opacity(0.8) : Color.white }
 
     /// Creates a row for `density` (.compact or .comfortable).
     init(
@@ -39,6 +43,8 @@ struct ClipRowView: View {
         self.query = query
         self.actions = actions
         self.isPinnedCategoryIcon = pinnedCategory
+        self.visual = model.isSensitive ? ClipVisualKind(style: .text, label: "Sensitive", symbol: "lock.fill")
+            : ClipPreviewProvider.visual(for: clip)
         self._isRenaming = isRenaming
         self.onRename = onRename
     }
@@ -96,26 +102,37 @@ struct ClipRowView: View {
         return ZStack(alignment: .bottomTrailing) {
             if !model.isSensitive, let icon = appIcon {
                 Image(nsImage: icon).resizable().interpolation(.high).frame(width: 32, height: 32)
-                Image(systemName: kind.iconName)
+                Image(systemName: visual.symbol)
                     .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(onHue)
                     .frame(width: 14, height: 14)
                     .background(hue, in: Circle())
                     .offset(x: 3, y: 3)
             } else {
-                shape.fill(model.isSensitive ? tokens.surfaceInset : hue.opacity(0.16))
+                shape.fill(tileFill)
                     .frame(width: 32, height: 32)
                     .overlay {
-                        Image(systemName: model.isSensitive ? "lock.fill" : kind.iconName)
+                        Image(systemName: visual.symbol)
                             .font(.system(size: 14, weight: .semibold))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(model.isSensitive ? tokens.textSecondary : hue)
+                            .foregroundStyle(tileSymbol)
                     }
             }
         }
         .frame(width: 32, height: 32)
         .accessibilityHidden(true)
-        .help(model.isSensitive ? "Sensitive" : kind.label)
+        .help(visual.label)
+    }
+
+    /// Tinted by kind; filled with the kind color when the row is selected. Sensitive stays neutral.
+    private var tileFill: Color {
+        if model.isSensitive { return tokens.surfaceInset }
+        return model.isSelected ? hue : hue.opacity(0.2)
+    }
+
+    private var tileSymbol: Color {
+        if model.isSensitive { return tokens.textSecondary }
+        return model.isSelected ? onHue : hue
     }
 
     @ViewBuilder
@@ -139,13 +156,13 @@ struct ClipRowView: View {
                 if thumbnail == nil { thumbnail = await ClipCardView.thumbnail(for: name) }
             }
         } else {
-            Image(systemName: model.isSensitive ? "lock.fill" : kind.iconName)
+            Image(systemName: visual.symbol)
                 .font(.system(size: 13, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(model.isSensitive ? tokens.textSecondary : hue)
                 .frame(width: 24)
                 .accessibilityHidden(true)
-                .help(model.isSensitive ? "Sensitive" : kind.label)
+                .help(visual.label)
         }
     }
 
@@ -191,7 +208,7 @@ struct ClipRowView: View {
             }
             Text(RelativeTime.string(for: clip.createdAt)).monospacedDigit().lineLimit(1).fixedSize()
             metaDot
-            Text(model.kindLabel).lineLimit(1)
+            Text(visual.label).lineLimit(1)
             if model.matchedInOCR { ClippyBadge("OCR match") }
         }
         .font(PanelTypography.micro(settings))

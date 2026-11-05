@@ -190,10 +190,12 @@ final class PanelHarnessTests: XCTestCase {
         XCTFail("\"\(fragment)\" is on screen. \(message)", file: file, line: line)
     }
 
-    /// Window-coordinate center of the first recognized line containing `fragment`.
+    /// Window-coordinate center of the leftmost recognized line containing `fragment`. The detail pane on the
+    /// right can repeat the selected clip's text; the list row is always the leftmost match.
     private func centerOfText(_ fragment: String) -> NSPoint? {
         guard let view = window?.contentView,
-              let line = recognizedLines().first(where: { $0.text.localizedCaseInsensitiveContains(fragment) })
+              let line = recognizedLines().filter({ $0.text.localizedCaseInsensitiveContains(fragment) })
+                  .min(by: { $0.box.midX < $1.box.midX })
         else { return nil }
         let bounds = view.bounds
         let y = view.isFlipped ? (1 - line.box.midY) * bounds.height : line.box.midY * bounds.height

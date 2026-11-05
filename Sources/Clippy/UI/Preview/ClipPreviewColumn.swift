@@ -11,8 +11,8 @@ struct ClipPreviewMetadata: Equatable {
 
     /// Builds rows: kind, source app, time, size, dimensions, OCR match. Sensitive clips expose kind and time only.
     static func make(for clip: Clip, item: ClipPreviewItem, query: String = "", now: Date = Date(),
-                     sensitive: Bool) -> ClipPreviewMetadata {
-        var rows: [(String, String)] = [("Kind", item.kindLabel)]
+                     sensitive: Bool, kindLabel: String? = nil) -> ClipPreviewMetadata {
+        var rows: [(String, String)] = [("Kind", kindLabel ?? item.kindLabel)]
         if !sensitive, let app = clip.sourceAppName { rows.append(("Source", app)) }
         rows.append(("Copied", clip.createdAt.formatted(.relative(presentation: .named, unitsStyle: .wide))))
         guard !sensitive else { return ClipPreviewMetadata(rows: rows) }
@@ -30,6 +30,7 @@ struct ClipPreviewMetadata: Equatable {
 /// `PreviewColumnPreferences.isVisible(panelWidth:enabled:)`; the width is user-resizable and persisted.
 struct ClipPreviewColumn: View {
     @Environment(\.clippyTokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let clip: Clip?
     var query: String = ""
     /// Called for the "Quick Look" action.
@@ -50,27 +51,115 @@ struct ClipPreviewColumn: View {
     @ViewBuilder
     private var content: some View {
         if let clip {
-            let sensitive = CardSensitivity.isSensitive(clip)
-            let item = ClipPreviewProvider.item(for: clip, isSensitive: { _ in sensitive })
-            let meta = ClipPreviewMetadata.make(for: clip, item: item, query: query, sensitive: sensitive)
-            VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
-                ScrollView { ClipPreviewView(item: item, lineLimit: 60) }
-                Divider()
-                ForEach(Array(meta.rows.enumerated()), id: \.offset) { _, row in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(row.label).font(.caption).foregroundStyle(tokens.textSecondary).frame(width: 74, alignment: .leading)
-                        Text(row.value).font(.caption).foregroundStyle(tokens.textPrimary).textSelection(.enabled)
-                    }
-                }
-                HStack {
-                    if let onQuickLook, !sensitive { Button("Quick Look", action: onQuickLook) }
-                    if let onPaste { Button("Paste", action: onPaste) }
-                }
-            }
-            .padding(tokens.metrics.space.three)
+            detail(for: clip)
+                .transition(.opacity)
+                .id(clip.id)
         } else {
             Text("Select a clip to preview").font(.callout).foregroundStyle(tokens.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func detail(for clip: Clip) -> some View {
+        let sensitive = CardSensitivity.isSensitive(clip)
+        let item = ClipPreviewProvider.item(for: clip, isSensitive: { _ in sensitive })
+        let visual: ClipVisualKind? = sensitive ? nil : ClipPreviewProvider.visual(for: clip)
+        let meta = ClipPreviewMetadata.make(for: clip, item: item, query: query, sensitive: sensitive, kindLabel: visual?.label)
+        return VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
+            header(for: clip, item: item, visual: visual)
+            contentCard(item: item)
+            metadataGrid(meta)
+            actionBar(sensitive: sensitive)
+        }
+        .padding(tokens.metrics.space.four)
+        .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: clip.id)
+    }
+
+    /// 40pt kind tile, title (2 lines) and "App \u{00B7} time" subtitle.
+    private func header(for clip: Clip, item: ClipPreviewItem, visual: ClipVisualKind?) -> some View {
+        let hue: Color = {
+            guard let visual else { return tokens.textSecondary }
+            if case .colorValue(let swatch) = clip.kind { return swatch }
+            return tokens.kind(visual.style)
+        }()
+        let time = RelativeTime.string(for: clip.createdAt)
+        let subtitle = visual == nil ? time : [clip.sourceAppName, time].compactMap { $0 }.joined(separator: " \u{00B7} ")
+        return HStack(alignment: .top, spacing: tokens.metrics.space.three) {
+            RoundedRectangle(cornerRadius: tokens.metrics.radius.md, style: .continuous)
+                .fill(visual == nil ? tokens.surfaceInset : hue.opacity(0.2))
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Image(systemName: visual?.symbol ?? "lock.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(hue)
+                }
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.title(for: clip, item: item, sensitive: visual == nil))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tokens.textPrimary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle).font(.system(size: 12)).foregroundStyle(tokens.textSecondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The user title, else the content's first line; never the content of a sensitive clip.
+    static func title(for clip: Clip, item: ClipPreviewItem, sensitive: Bool) -> String {
+        if sensitive { return "Sensitive clip" }
+        if let title = clip.userTitle, !title.isEmpty { return title }
+        switch item {
+        case .image(_, let width, let height):
+            let size = [width, height].compactMap { $0 }.map(String.init).joined(separator: "\u{00D7}")
+            return size.isEmpty ? "Image" : "Image \(size)"
+        case .file(_, let name): return name
+        default: return clip.previewText.replacingOccurrences(of: "\n", with: " ")
+        }
+    }
+
+    /// Content in a rounded card on the design-system surface that fills the free height.
+    private func contentCard(item: ClipPreviewItem) -> some View {
+        let shape = RoundedRectangle(cornerRadius: tokens.metrics.radius.card, style: .continuous)
+        return ScrollView { ClipPreviewView(item: item, lineLimit: 60, contentFontSize: 13) }
+            .padding(tokens.metrics.space.three)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(shape.fill(tokens.surfaceElevated))
+            .overlay(shape.strokeBorder(tokens.stroke))
+    }
+
+    private func metadataGrid(_ meta: ClipPreviewMetadata) -> some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: tokens.metrics.space.three, verticalSpacing: tokens.metrics.space.one) {
+            ForEach(Array(meta.rows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    Text(row.label).font(.system(size: 12)).foregroundStyle(tokens.textSecondary)
+                    Text(row.value).font(.system(size: 12)).foregroundStyle(tokens.textPrimary)
+                        .textSelection(.enabled).lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    /// Paste (accent-filled) and Quick Look (bordered) side by side.
+    private func actionBar(sensitive: Bool) -> some View {
+        HStack(spacing: tokens.metrics.space.two) {
+            if let onPaste {
+                Button(action: onPaste) {
+                    Label("Paste", systemImage: "arrow.down.doc").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.accent)
+                .accessibilityLabel("Paste selected clip")
+            }
+            if let onQuickLook, !sensitive {
+                Button(action: onQuickLook) {
+                    Label("Quick Look", systemImage: "eye").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Quick Look selected clip")
+            }
         }
     }
 
