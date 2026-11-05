@@ -85,9 +85,21 @@ jobs:
                   status=0
                   swift test --filter 'PanelHarnessTests|SettingsKeyboardHarnessTests' 2>&1 | tee "$RUNNER_TEMP/harness.log" || status=$?
                   grep -E 'Executed [0-9]+ tests' "$RUNNER_TEMP/harness.log" | tail -1 || true
+                  echo "capture=window: $(grep -c '^capture=window' "$RUNNER_TEMP/harness.log" || true)"
+                  echo "capture=cache: $(grep -c '^capture=cache' "$RUNNER_TEMP/harness.log" || true)"
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -100 || true
                   grep -E ': error: ' "$RUNNER_TEMP/harness.log" | sort -u | head -10 | while IFS= read -r line; do echo "::error::$line"; done || true
                   exit $status
+
+            # Sizes in points measured on the real laid-out panel, Settings and onboarding windows
+            # (PanelHarnessTests+Measure.swift). The test also writes measurements.txt into the
+            # screenshot folder, which the clippy-screenshots artifact carries.
+            - name: Measurements
+              if: always()
+              run: |
+                  grep -E '^MEASURE ' "$RUNNER_TEMP/harness.log" | awk '!seen[$0]++' | tee "$RUNNER_TEMP/measure-log.txt" || true
+                  if [ ! -s "$RUNNER_TEMP/screenshots/measurements.txt" ]; then echo "::warning::measurements.txt was not written"; fi
+                  { echo '### Measurements (points)'; echo '```'; cat "$RUNNER_TEMP/measure-log.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY" || true
 
             - name: Build Clippy.app
               run: scripts/make-app.sh 0.0.0-ci
@@ -166,14 +178,14 @@ jobs:
                   archive: false
                   if-no-files-found: warn
 
-    # Every screen of Clippy 2.2.0 (b8aa9a0), 2.3.0 (dfc8ea3, tag v2.3.0) and this
-    # commit side by side, light and dark, so the redesign can be judged at a glance.
-    # This commit's shots are the app job's clippy-screenshots artifact. 2.3.0 has
-    # the same UI harness, so its own tests run unchanged and already shoot dark.
-    # 2.2.0 has no harness: ci/before-2.2.0/BeforeScreenshotTests.swift is dropped
-    # into its checkout. ci/compare/compose.py maps each version's file names to
-    # one screen key and tiles them. Nothing depends on this job and it never
-    # fails the run (continue-on-error): it is a reviewer's aid, not a gate.
+    # Every screen of Clippy 2.2.0 (b8aa9a0), 2.4.0 (f1c1035, tag v2.4.0) and this
+    # commit side by side, light and dark, at actual size, so the redesign can be
+    # judged at a glance. This commit's shots are the app job's clippy-screenshots
+    # artifact. 2.4.0 has the same UI harness, so its own tests run unchanged and
+    # already shoot dark. 2.2.0 has no harness: ci/before-2.2.0/BeforeScreenshotTests.swift
+    # is dropped into its checkout. ci/compare/compose.py maps each version's file
+    # names to one screen key and tiles them. Nothing depends on this job and it
+    # never fails the run (continue-on-error): it is a reviewer's aid, not a gate.
     compare:
         name: Version comparison
         needs: app
@@ -185,25 +197,44 @@ jobs:
 
             - uses: actions/checkout@v6.0.3
               with:
-                  ref: dfc8ea3a8fbfef82345492d6a3413f18e36bbd34
-                  path: v230
+                  ref: f1c1035e83a984dfa10beb03e99a0752e1f1b73a # tag v2.4.0
+                  path: v240
 
             - uses: actions/checkout@v6.0.3
               with:
                   ref: b8aa9a0d9b375f490deb937c0ee420fba2ddfb89
                   path: v220
 
-            # The screenshot tests that exist at dfc8ea3 (PanelHarnessTests and its
+            # The screenshot tests that exist at v2.4.0 (PanelHarnessTests and its
             # +Screens extension); testKeyboardOnlyJourneys is left out, it takes
             # no screenshots. A test that fails still leaves the shots it took.
-            - name: Render the 2.3.0 screens
+            - name: Render the 2.4.0 screens
               env:
                   CLIPPY_UI_HARNESS: "1"
-                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/v230-shots
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/v240-shots
               run: |
-                  cd v230
-                  swift test --filter 'PanelHarnessTests/test(SearchFlowsInTheRealPanel|DarkPanelScreenshots|SettingsAndOnboardingScreenshots|SettingsPaneScreenshots|PanelPaneScreenshots|EditorAndSheetScreenshots|EmptyAndErrorStateScreenshots)' || echo "::warning::2.3.0 screenshot tests reported failures"
+                  cd v240
+                  swift test --filter 'PanelHarnessTests/test(SearchFlowsInTheRealPanel|DarkPanelScreenshots|SettingsAndOnboardingScreenshots|SettingsPaneScreenshots|PanelPaneScreenshots|EditorAndSheetScreenshots|EmptyAndErrorStateScreenshots)' || echo "::warning::2.4.0 screenshot tests reported failures"
                   ls "$CLIPPY_SCREENSHOT_DIR" | wc -l
+
+            # 2.4.0's panel at its own default size (920x560). Its harness opens the panel
+            # at a fixed 1000x620, so openPanel is opened up to take a size and one extra
+            # test (ci/before-2.4.0) shoots the default-size panel.
+            - name: Render the 2.4.0 default-size panel
+              env:
+                  CLIPPY_UI_HARNESS: "1"
+                  CLIPPY_SCREENSHOT_DIR: ${{ runner.temp }}/v240-shots
+              run: |
+                  cp ci/before-2.4.0/DefaultSizeScreenshotTests.swift v240/Tests/ClippyTests/
+                  cd v240
+                  sed -i.bak \
+                      -e 's|private func openPanel(appearance: NSAppearance.Name) throws {|func openPanel(appearance: NSAppearance.Name, size: NSSize = NSSize(width: 1000, height: 620)) throws {|' \
+                      -e 's|show(view.clippyDesignSystem(), size: NSSize(width: 1000, height: 620), appearance: appearance, panelChrome: true)|show(view.clippyDesignSystem(), size: size, appearance: appearance, panelChrome: true)|' \
+                      Tests/ClippyTests/PanelHarnessTests.swift
+                  rm -f Tests/ClippyTests/PanelHarnessTests.swift.bak
+                  grep -c 'size: size, appearance: appearance, panelChrome: true' Tests/ClippyTests/PanelHarnessTests.swift
+                  swift test --filter 'PanelHarnessTests/testDefaultSizePanelScreenshots' || echo "::warning::2.4.0 default-size panel test reported failures"
+                  ls "$CLIPPY_SCREENSHOT_DIR" | grep -c '50-panel-default' || true
 
             - name: Render the 2.2.0 screens
               env:
@@ -239,7 +270,7 @@ jobs:
                   python3 -m pip install --quiet pillow
                   python3 ci/compare/compose.py \
                       --v220 "$RUNNER_TEMP/v220-shots" \
-                      --v230 "$RUNNER_TEMP/v230-shots" \
+                      --v240 "$RUNNER_TEMP/v240-shots" \
                       --new "$RUNNER_TEMP/screenshots" \
                       --out "$RUNNER_TEMP/compare"
 
