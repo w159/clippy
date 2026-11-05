@@ -122,37 +122,33 @@ jobs:
                   let files = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
                       .filter { $0.pathExtension == "png" }
                       .sorted { $0.lastPathComponent < $1.lastPathComponent }
-                  // Both screenshots are drawn at the same scale (pixels times one shared factor), top-aligned,
-                  // so a larger panel looks larger. The factor only ever shrinks, to keep the composite readable.
-                  func pixelSize(_ image: NSImage) -> CGSize {
-                      if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
-                          return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
-                      }
-                      return image.size
+                  let cellW: CGFloat = 900, labelH: CGFloat = 30, pad: CGFloat = 16, cols = 2
+                  var cells: [(name: String, image: NSImage, height: CGFloat)] = []
+                  for file in files {
+                      guard let image = NSImage(contentsOf: file), image.size.width > 0 else { continue }
+                      cells.append((file.lastPathComponent, image, cellW * image.size.height / image.size.width))
                   }
-                  let labelH: CGFloat = 44, pad: CGFloat = 16, maxCellW: CGFloat = 1100
-                  let cells: [(String, NSImage, CGSize)] = [
-                      ("2.2.0 (default 640x480)", before, pixelSize(before)),
-                      ("Now (default 920x560)", after, pixelSize(after))]
-                  let scale = min(1, maxCellW / (cells.map { $0.2.width }.max() ?? 1))
-                  let drawn = cells.map { CGSize(width: $0.2.width * scale, height: $0.2.height * scale) }
-                  let width = drawn.reduce(pad) { $0 + $1.width + pad }
-                  let height = (drawn.map(\.height).max() ?? 0) + labelH + 2 * pad
+                  let rows = stride(from: 0, to: cells.count, by: cols).map { Array(cells[$0..<min($0 + cols, cells.count)]) }
+                  let rowHeights = rows.map { ($0.map(\.height).max() ?? 0) + labelH + pad }
+                  let width = CGFloat(cols) * (cellW + pad) + pad
+                  let height = rowHeights.reduce(pad, +)
                   guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width), pixelsHigh: Int(height),
                                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
                   NSGraphicsContext.saveGraphicsState()
                   NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                  // Mid grey so the edges of light and dark windows both show.
                   NSColor(white: 0.5, alpha: 1).setFill()
                   NSRect(x: 0, y: 0, width: width, height: height).fill()
-                  let top = height - pad
-                  var x = pad
-                  for (index, cell) in cells.enumerated() {
-                      let size = drawn[index]
-                      (cell.0 as NSString).draw(at: NSPoint(x: x, y: top - labelH + 8), withAttributes: [
-                          .font: NSFont.boldSystemFont(ofSize: 28), .foregroundColor: NSColor.white])
-                      cell.1.draw(in: NSRect(x: x, y: top - labelH - size.height, width: size.width, height: size.height))
-                      x += size.width + pad
+                  var top = height - pad
+                  for (index, row) in rows.enumerated() {
+                      for (column, cell) in row.enumerated() {
+                          let x = pad + CGFloat(column) * (cellW + pad)
+                          (cell.name as NSString).draw(at: NSPoint(x: x, y: top - labelH + 6), withAttributes: [
+                              .font: NSFont.boldSystemFont(ofSize: 18), .foregroundColor: NSColor.white])
+                          cell.image.draw(in: NSRect(x: x, y: top - labelH - cell.height, width: cellW, height: cell.height))
+                      }
+                      top -= rowHeights[index]
                   }
                   NSGraphicsContext.restoreGraphicsState()
                   try rep.representation(using: .png, properties: [:])!.write(to: out)
@@ -216,12 +212,21 @@ jobs:
                       .first { FileManager.default.fileExists(atPath: $0.path) }
                   guard let afterURL, let before = NSImage(contentsOf: beforeURL), let after = NSImage(contentsOf: afterURL),
                         before.size.width > 0, after.size.width > 0 else { print("missing input image"); exit(1) }
-                  let cellW: CGFloat = 900, labelH: CGFloat = 44, pad: CGFloat = 16
-                  let cells: [(String, NSImage, CGFloat)] = [
-                      ("2.2.0", before, cellW * before.size.height / before.size.width),
-                      ("Now", after, cellW * after.size.height / after.size.width)]
-                  let width = 2 * (cellW + pad) + pad
-                  let height = (cells.map(\.2).max() ?? 0) + labelH + 2 * pad
+                  func pixelSize(_ image: NSImage) -> CGSize {
+                      if let rep = image.representations.first, rep.pixelsWide > 0, rep.pixelsHigh > 0 {
+                          return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
+                      }
+                      return image.size
+                  }
+                  // Both images are drawn at one shared scale (never upscaled), top-aligned, so a larger panel looks larger.
+                  let labelH: CGFloat = 44, pad: CGFloat = 16, maxCellW: CGFloat = 1100
+                  let cells: [(String, NSImage, CGSize)] = [
+                      ("2.2.0 (default 640x480)", before, pixelSize(before)),
+                      ("Now (default 920x560)", after, pixelSize(after))]
+                  let scale = min(1, maxCellW / (cells.map { $0.2.width }.max() ?? 1))
+                  let drawn = cells.map { CGSize(width: $0.2.width * scale, height: $0.2.height * scale) }
+                  let width = drawn.reduce(pad) { $0 + $1.width + pad }
+                  let height = (drawn.map(\.height).max() ?? 0) + labelH + 2 * pad
                   guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(width), pixelsHigh: Int(height),
                                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                                                    colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
@@ -230,11 +235,13 @@ jobs:
                   NSColor(white: 0.5, alpha: 1).setFill()
                   NSRect(x: 0, y: 0, width: width, height: height).fill()
                   let top = height - pad
-                  for (column, cell) in cells.enumerated() {
-                      let x = pad + CGFloat(column) * (cellW + pad)
+                  var x = pad
+                  for (index, cell) in cells.enumerated() {
+                      let size = drawn[index]
                       (cell.0 as NSString).draw(at: NSPoint(x: x, y: top - labelH + 8), withAttributes: [
                           .font: NSFont.boldSystemFont(ofSize: 28), .foregroundColor: NSColor.white])
-                      cell.1.draw(in: NSRect(x: x, y: top - labelH - cell.2, width: cellW, height: cell.2))
+                      cell.1.draw(in: NSRect(x: x, y: top - labelH - size.height, width: size.width, height: size.height))
+                      x += size.width + pad
                   }
                   NSGraphicsContext.restoreGraphicsState()
                   try rep.representation(using: .png, properties: [:])!.write(to: out)
