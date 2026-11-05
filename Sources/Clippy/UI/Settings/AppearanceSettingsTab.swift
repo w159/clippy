@@ -184,6 +184,7 @@ struct AppearanceSettingsTab: View {
                 Toggle("Remember last panel size", isOn: $settings.rememberPanelSize)
                     .settingsRow("appearance.size")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

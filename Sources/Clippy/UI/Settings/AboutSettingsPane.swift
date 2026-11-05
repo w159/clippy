@@ -53,6 +53,7 @@ struct AboutSettingsPane: View {
                 }
                 SettingsNote("Diagnostics contain versions and setting switches only, never clip content or keys.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

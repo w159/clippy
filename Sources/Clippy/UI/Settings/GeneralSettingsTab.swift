@@ -38,6 +38,7 @@ struct GeneralSettingsTab: View {
                     .settingsRow("general.reset")
                 SettingsNote("Restores every setting to its default. API keys in the keychain and your clip history are not affected.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .task {

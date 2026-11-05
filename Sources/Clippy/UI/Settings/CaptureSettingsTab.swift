@@ -42,6 +42,7 @@ struct CaptureSettingsTab: View {
                 SettingsNote("Lower is more responsive; higher uses less idle CPU.")
                 SettingsNote("Concealed items (password managers) and transient clipboard writes are always skipped.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .onChange(of: settings.captureSoundVolume) { _, newValue in

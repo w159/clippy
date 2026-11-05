@@ -38,6 +38,7 @@ struct PaneScroll<Content: View>: View {
                 }
             }
             content
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .accessibilityLabel(Text(title))

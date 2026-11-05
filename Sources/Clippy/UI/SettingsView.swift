@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The settings window: a sidebar of panes with search (SET-09), or a pushing list when
-/// the window is compact. Each pane footer offers reset, export and import.
+/// the window is compact. Each pane ends with a section offering reset, export and import.
 struct SettingsView: View {
     private let settings = AppSettings.shared
     @State private var model: SettingsShellModel
@@ -24,7 +24,6 @@ struct SettingsView: View {
         }
         .frame(minWidth: 680, minHeight: 500)
         .clippyDesignSystem()
-        .tint(ClippyTokens.resolve(from: settings.theme).accentInk)
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
@@ -180,7 +179,7 @@ struct SettingsView: View {
                 SearchHitRow(hit: hit, isHighlighted: hit.id == hits[safe: highlightedHit]?.id) { model.jump(to: hit) }
                     .listRowBackground(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(hit.id == hits[safe: highlightedHit]?.id ? Color.accentColor.opacity(0.18) : Color.clear)
+                            .fill(hit.id == hits[safe: highlightedHit]?.id ? Color.clippyAccent.opacity(0.18) : Color.clear)
                             .padding(.horizontal, 6)
                     )
             }
@@ -192,7 +191,7 @@ struct SettingsView: View {
 
     private var detail: some View {
         // Scripts is a full editor (its own list, toolbar and output drawer): give it the whole
-        // detail area instead of the footer bar that would clip it.
+        // detail area instead of the action section.
         if model.selection == .scripts {
             return AnyView(SettingsPaneRegistry.view(for: .scripts).navigationTitle("Scripts"))
         }
@@ -207,7 +206,7 @@ struct SettingsView: View {
                     if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
                 }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .environment(\.settingsShell, model)
         // The pane title lives in the window toolbar, the same for every pane.
         .navigationTitle(model.selection.title)
     }
@@ -224,21 +223,6 @@ struct SettingsView: View {
         if let editor = window.firstResponder as? NSTextView,
            (editor.delegate as? NSView)?.identifier == SettingsSearchField.identifier { return }
         searchFocusToken += 1
-    }
-
-    private var footer: some View {
-        HStack(spacing: 8) {
-            Button("Reset this pane") { model.showResetConfirmation = true }
-                .disabled(!model.selection.isResettable)
-            Button("Export\u{2026}") { model.exportPreferences() }
-            Button("Import\u{2026}") { model.beginImport() }
-            Spacer(minLength: 8)
-            if let status = model.status { StatusOutcomeLabel(outcome: status, successColor: .green) }
-        }
-        .buttonStyle(.glass)
-        .controlSize(.small)
-        .lineLimit(1)
-        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 }
 
@@ -301,34 +285,18 @@ private extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
-/// Sidebar row: colored symbol tile, pane name, and the New pill on recently added panes.
+/// Sidebar row: colored symbol tile and pane name.
 private struct PaneRow: View {
-    @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     let pane: SettingsPaneID
 
     var body: some View {
         Label {
-            HStack(spacing: 6) {
-                Text(pane.title).font(.body)
-                if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
-            }
+            Text(pane.title).font(.body)
         } icon: {
             SettingsSidebarTile(pane: pane)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(pane.title)
-    }
-}
-
-/// Small "NEW" marker on recently added panes.
-private struct NewPill: View {
-    var body: some View {
-        Text("NEW")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 6).padding(.vertical, 1)
-            .background(Color.accentColor, in: Capsule())
-            .accessibilityLabel("New")
     }
 }
 

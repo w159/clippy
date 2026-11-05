@@ -19,11 +19,8 @@ final class SettingsShellModel {
     /// Below this width the window shows a list that pushes panes.
     static let compactBreakpoint: CGFloat = 560
 
-    /// The visible pane. Every change, including the initial one, marks the pane as seen
-    /// so its NEW pill clears whichever route opened it (sidebar, search, launch request).
-    var selection: SettingsPaneID {
-        didSet { markSeen(selection) }
-    }
+    /// The visible pane.
+    var selection: SettingsPaneID
     var query = ""
     private(set) var flashRow: String?
     private(set) var jumpToken = UUID()
@@ -35,26 +32,15 @@ final class SettingsShellModel {
     var confirmedKeys: Set<String> = []
 
     private let settings: AppSettings
-    private let seenDefaults: UserDefaults
     private let porter = SettingsPreferencesPorter(knownKeys: SettingsPaneID.allExportableKeys)
     @ObservationIgnored private var flashTask: Task<Void, Never>?
 
-    init(settings: AppSettings = .shared, seenDefaults: UserDefaults = .standard,
+    init(settings: AppSettings = .shared,
          requestedSection: String = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_SECTION"] ?? "") {
         self.settings = settings
-        self.seenDefaults = seenDefaults
         let initial = SettingsPaneID(rawValue: requestedSection) ?? .general
         selection = initial
-        markSeen(initial) // didSet does not fire for the assignment in init
         query = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_QUERY"] ?? ""
-    }
-
-    /// The only writer of `SettingsSeenPanes.defaultsKey`. Writes synchronously so a relaunch
-    /// right after the pane appears still sees it; views read the key through `@AppStorage`.
-    private func markSeen(_ pane: SettingsPaneID) {
-        let current = seenDefaults.string(forKey: SettingsSeenPanes.defaultsKey) ?? ""
-        let updated = SettingsSeenPanes.marking(pane, in: current)
-        if updated != current { seenDefaults.set(updated, forKey: SettingsSeenPanes.defaultsKey) }
     }
 
     /// Ranked search results for the current query.

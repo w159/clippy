@@ -52,6 +52,7 @@ struct AISettingsTab: View {
                     .disabled(!settings.aiEnabled).settingsManaged(AppSettings.Keys.aiAgentAllowCodeExecution).settingsRow("ai.code")
                 SettingsNote("Runs as you with a 30-second timeout. You see the code and confirm each run. Off by default.")
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showActions) {

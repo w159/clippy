@@ -48,6 +48,7 @@ struct PreviewSettingsPane: View {
                     }
                 }
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         .onDisappear {

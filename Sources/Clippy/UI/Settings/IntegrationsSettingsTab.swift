@@ -132,6 +132,7 @@ struct IntegrationsSettingsTab: View {
             iCloudSection
 
             mcpSection
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
         // SET-10: every state write happens in a task after the view update, never in body/onAppear.

@@ -36,6 +36,7 @@ struct SemanticSettingsPane: View {
                 Text("Suggestions are never applied until you accept them. Only a short preview and category names reach the on-device model.")
                     .font(.caption).foregroundStyle(tokens.textSecondary)
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

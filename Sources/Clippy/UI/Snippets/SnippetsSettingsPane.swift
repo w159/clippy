@@ -54,6 +54,7 @@ struct SnippetsSettingsPane: View {
                 Text("Bundle IDs, one per line. Password managers and terminals are excluded by default. Expansion also pauses in secure text fields and while Clippy is locked.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

@@ -52,6 +52,7 @@ struct PasteStackSettingsPane: View {
                 }
                 .onChange(of: mergeSeparator) { _, value in AppendPreferences.mergeSeparator = value }
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }

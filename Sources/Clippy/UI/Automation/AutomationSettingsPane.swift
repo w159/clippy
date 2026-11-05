@@ -31,6 +31,7 @@ struct AutomationSettingsPane: View {
                     + "Reads are read-only and never show sensitive clips; writes go through this app.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            SettingsPaneActionsSection()
         }
         .formStyle(.grouped)
     }
