@@ -9,7 +9,6 @@ extension ScriptsView {
         if editing != nil {
             VStack(spacing: 0) {
                 toolbar
-                Divider()
                 messageRows
                 editorAndDrawer
             }
@@ -19,7 +18,7 @@ extension ScriptsView {
     }
 
     private var detailEmptyState: some View {
-        EmptyState(
+        PaneEmptyState(
             systemImage: "applepencil.on.rectangle",
             title: store.scripts.isEmpty ? "No scripts yet" : "No script selected",
             message: store.scripts.isEmpty
@@ -50,12 +49,13 @@ extension ScriptsView {
                 }
             }
         }
-        .padding(8)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     private var nameField: some View {
         TextField("Name", text: Binding(get: { editing?.name ?? "" }, set: { editing?.name = $0 }))
-            .textFieldStyle(.roundedBorder)
+            .textFieldStyle(.plain)
+            .font(.title3.weight(.semibold))
     }
 
     private var interpreterPicker: some View {
@@ -68,7 +68,8 @@ extension ScriptsView {
     }
 
     private func toolbarActions(compact: Bool) -> some View {
-        HStack(spacing: 6) {
+        GlassEffectContainer(spacing: 8) {
+        HStack(spacing: 8) {
             Button { showOptions.toggle() } label: {
                 if compact { Image(systemName: "slider.horizontal.3") }
                 else { Label("Options", systemImage: "slider.horizontal.3") }
@@ -79,30 +80,34 @@ extension ScriptsView {
                         .id(script.id)
                 }
             }
+            .buttonStyle(.glass)
             .help("Arguments, working directory, environment, timeout, interpreter path, stdin")
             .accessibilityLabel("Options")
             Button { showRunHistory.toggle() } label: {
                 if compact { Image(systemName: "clock.arrow.circlepath") }
                 else { Label("History", systemImage: "clock.arrow.circlepath") }
             }
+            .buttonStyle(.glass)
             .disabled(currentHistory.isEmpty)
             .popover(isPresented: $showRunHistory, arrowEdge: .bottom) { historyPopover }
             .help("Run history")
             .accessibilityLabel("History")
             Spacer(minLength: 4)
             Button("Save") { save() }
+                .buttonStyle(.glass)
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled((editing?.name.trimmingCharacters(in: .whitespaces).isEmpty ?? true) || (!isDirty && !isDraft))
             if currentRun?.isRunning == true {
                 Button { currentRun?.cancel() } label: {
                     if compact { Image(systemName: "stop.fill") } else { Label("Stop", systemImage: "stop.fill") }
                 }
+                .buttonStyle(.glass)
                 .help("Stop").accessibilityLabel("Stop")
             } else {
                 Button { activeDialog = .run } label: {
                     if compact { Image(systemName: "play.fill") } else { Label("Run", systemImage: "play.fill") }
                 }
-                .buttonStyle(.accent)
+                .buttonStyle(.glassProminent)
                 .disabled((editing?.body.isEmpty ?? true) || !(editing?.isEnabled ?? false) || preflight != nil)
                 .help(preflight ?? "Run the script")
                 .accessibilityLabel("Run")
@@ -118,7 +123,8 @@ extension ScriptsView {
                 .fixedSize()
                 .accessibilityLabel("More")
         }
-        .controlSize(.small)
+        }
+        .controlSize(.regular)
         // Ideal width = real width, so ViewThatFits only picks a tier whose buttons all fit
         // untruncated (Save was clipping to "Sa..." in the middle tier).
         .fixedSize(horizontal: true, vertical: false)
@@ -160,30 +166,30 @@ extension ScriptsView {
         if let preflight {
             Label(preflight, systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
-                .foregroundStyle(tokens.danger)
-                .padding(.horizontal, 10).padding(.vertical, 6)
+                .foregroundStyle(.red)
+                .padding(.horizontal, 16).padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         if editing?.isEnabled == false {
             Label("Disabled scripts cannot run. Review the body, then enable it in Options.",
                   systemImage: "exclamationmark.shield")
                 .font(.callout)
-                .foregroundStyle(tokens.textSecondary)
-                .padding(.horizontal, 10).padding(.vertical, 6)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16).padding(.vertical, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         if let saveOutcome {
             HStack(spacing: 6) {
                 if saveOutcome == .saved {
-                    Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(tokens.success)
+                    Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
                     Label("Could not save script", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(tokens.danger)
-                    Button("Try Again") { save() }.controlSize(.small)
+                        .foregroundStyle(.red)
+                    Button("Try Again") { save() }.buttonStyle(.glass).controlSize(.small)
                 }
             }
             .font(.caption)
-            .padding(.horizontal, 10).padding(.vertical, 4)
+            .padding(.horizontal, 16).padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -197,6 +203,8 @@ extension ScriptsView {
                 accessibilityLabel: "Script body",
                 onSave: { save() })
                 .frame(minHeight: OutputDrawerMetrics.minEditorHeight, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
         } drawer: {
             drawer
         }

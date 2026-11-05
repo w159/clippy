@@ -68,7 +68,7 @@ struct HotKeyRecorderView: View {
 
     private var fieldLabel: some View {
         Text(isRecording ? "Press shortcut\u{2026}" : (center.chords[action]?.displayString ?? "Not set"))
-            .font(.system(size: 12, weight: .medium, design: .rounded).monospaced())
+            .font(.callout.weight(.medium).monospaced())
             .foregroundStyle(isRecording ? tokens.accentText : tokens.textPrimary)
             .lineLimit(1)
             .frame(minWidth: 96)

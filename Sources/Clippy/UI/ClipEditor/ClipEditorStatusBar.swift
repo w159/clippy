@@ -19,9 +19,8 @@ struct EditorStatusBarView: View {
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(tokens.textSecondary)
-        .padding(.horizontal, tokens.metrics.space.four)
+        .padding(.horizontal, 20)
         .padding(.vertical, 4)
-        .background(tokens.surfaceInset)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status")
         .accessibilityValue("\(showsCaret ? snapshot.spokenLabel + ", " : "")\(CopyFormat.counted(wordCount, "word")), \(languageName)")

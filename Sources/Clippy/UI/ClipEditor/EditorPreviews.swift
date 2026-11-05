@@ -81,7 +81,7 @@ struct ColorSwatchStrip: View {
                             .frame(width: 22, height: 22)
                             .overlay(RoundedRectangle(cornerRadius: ClippyRadius.xs).stroke(tokens.textSecondary.opacity(0.4), lineWidth: 1))
                         Text(value.hex)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.caption.monospaced())
                             .foregroundStyle(tokens.textSecondary)
                     }
                     .accessibilityElement(children: .combine)

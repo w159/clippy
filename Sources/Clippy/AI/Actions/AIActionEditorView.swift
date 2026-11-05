@@ -50,17 +50,14 @@ struct AIActionEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            Divider().overlay(tokens.stroke)
             HStack(alignment: .top, spacing: 0) {
-                settingsPane.frame(width: 300)
-                Divider().overlay(tokens.stroke)
+                settingsPane.frame(width: 320)
                 rightPane
             }
-            Divider().overlay(tokens.stroke)
             Text("Cmd-S saves. Cancel discards your edits.")
-                .font(.caption).foregroundStyle(tokens.textSecondary).padding(tokens.metrics.space.two)
+                .font(.caption).foregroundStyle(.secondary).padding(10)
         }
-        .background(tokens.surface)
+        .background(Color(nsColor: .windowBackgroundColor))
         .frame(width: 900, height: 600)
         .onAppear(perform: loadTestClips)
         .onDisappear { testTask?.cancel() }
@@ -68,13 +65,19 @@ struct AIActionEditorView: View {
 
     private var titleBar: some View {
         HStack {
-            Text(initial == nil ? "New Action" : "Edit Action").font(.title3.weight(.semibold)).foregroundStyle(tokens.textPrimary)
+            Text(initial == nil ? "New Action" : "Edit Action").font(.title2.weight(.semibold))
             Spacer()
-            Button("Cancel") { testTask?.cancel(); onCancel() }.keyboardShortcut(.cancelAction)
-            Button("Save") { testTask?.cancel(); onSave(draft()) }
-                .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.accent)
-                .disabled(!isValid)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("Cancel") { testTask?.cancel(); onCancel() }
+                        .buttonStyle(.glass)
+                        .keyboardShortcut(.cancelAction)
+                    Button("Save") { testTask?.cancel(); onSave(draft()) }
+                        .keyboardShortcut("s", modifiers: .command)
+                        .buttonStyle(.glassProminent)
+                        .disabled(!isValid)
+                }
+            }
         }
         .padding(.horizontal, tokens.metrics.space.five)
         .padding(.vertical, tokens.metrics.space.three)
@@ -106,11 +109,11 @@ struct AIActionEditorView: View {
                 ClippySegmentedPicker("Result", selection: $outputDisposition, options: AIActionOutputDisposition.allCases.map {
                     SegmentOption(value: $0, title: AIActionEditorSupport.dispositionBadge($0))
                 })
-                Text(AIActionEditorSupport.dispositionHelp(outputDisposition)).font(.caption).foregroundStyle(tokens.textSecondary)
+                Text(AIActionEditorSupport.dispositionHelp(outputDisposition)).font(.caption).foregroundStyle(.secondary)
             }
             Section("Model") {
                 LabeledContent("Temperature \(temperature, format: .number.precision(.fractionLength(1)))") {
-                    Slider(value: $temperature, in: 0...1, step: 0.1).tint(tokens.accent)
+                    Slider(value: $temperature, in: 0...1, step: 0.1)
                 }
                 Stepper("Max tokens: \(maxTokens)", value: $maxTokens, in: 16...4096, step: 64)
             }
@@ -125,7 +128,6 @@ struct AIActionEditorView: View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
             AIActionPromptPane(template: $promptTemplate, issues: promptTouched ? issues : [])
                 .onChange(of: promptTemplate) { _, _ in promptTouched = true }
-            Divider().overlay(tokens.stroke)
             AIActionTestPanel(
                 clips: testClips, clipID: $testClipID, instruction: $testInstruction,
                 showsInstruction: promptTemplate.contains("{instruction}"),

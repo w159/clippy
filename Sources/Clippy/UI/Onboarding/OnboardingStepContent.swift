@@ -4,10 +4,11 @@ import UserNotifications
 /// The body of the current onboarding step. Each step reads live state from the view model.
 struct OnboardingStepContent: View {
     var viewModel: OnboardingViewModel
-    @Environment(\.clippyTokens) private var tokens
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var heroTick = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 16) {
             switch viewModel.model.current {
             case .welcome: welcome
             case .accessibility: accessibility
@@ -19,57 +20,76 @@ struct OnboardingStepContent: View {
             case .privacy: privacy
             }
         }
+        .frame(maxWidth: .infinity)
+        .onAppear { if !reduceMotion { heroTick += 1 } }
     }
 
-    private func heading(_ title: String, _ detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.title2.weight(.semibold)).foregroundStyle(tokens.textPrimary)
+    /// Large symbol, title and body, centered. The symbol bounces once when the step appears.
+    private func hero(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: symbol)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 56, height: 56)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.accentColor)
+                .symbolEffect(.bounce, options: .nonRepeating, value: heroTick)
+                .padding(.bottom, 6)
+                .accessibilityHidden(true)
+            Text(title).font(.largeTitle.weight(.bold)).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
-            Text(detail).foregroundStyle(tokens.textSecondary).fixedSize(horizontal: false, vertical: true)
+            Text(detail).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 8)
     }
 
-    /// A permission row: title and detail on the left, live status on the right, action below when needed.
+    /// A rounded card holding a group of rows.
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) { content() }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// A permission row: title on the left, live status on the right.
     private func permissionRow(_ title: String, ok: Bool, okText: String, pendingText: String) -> some View {
-        HStack {
-            Text(title).foregroundStyle(tokens.textPrimary)
-            Spacer(minLength: tokens.metrics.space.three)
-            status(ok ? okText : pendingText, ok: ok)
+        card {
+            HStack {
+                Text(title).font(.headline)
+                Spacer(minLength: 12)
+                status(ok ? okText : pendingText, ok: ok)
+            }
         }
-        .padding(tokens.metrics.space.three)
-        .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous).stroke(tokens.stroke, lineWidth: 1))
     }
 
     /// The "what you get" checklist for a permission step.
     private func benefits(_ step: OnboardingStep) -> some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.one) {
-            Text("What you get").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
+        card {
+            Text("What you get").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(step.benefits, id: \.self) { item in
-                Label(item, systemImage: "checkmark").font(.callout).foregroundStyle(tokens.textPrimary)
+                Label(item, systemImage: "checkmark.circle.fill").font(.callout)
+                    .symbolRenderingMode(.hierarchical)
             }
         }
     }
 
     private func status(_ text: String, ok: Bool) -> some View {
         Label(text, systemImage: ok ? "checkmark.circle.fill" : "exclamationmark.circle")
-            .foregroundStyle(ok ? tokens.success : tokens.warning)
+            .foregroundStyle(ok ? Color.green : Color.orange)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
     }
 
     private var welcome: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Image(nsImage: StatusBarIcon.image())
-                .renderingMode(.template)
-                .resizable()
-                .frame(width: 30, height: 30)
-                .foregroundStyle(tokens.accent)
-                .frame(width: 60, height: 60)
-                .background(tokens.selection, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .accessibilityHidden(true)
-            heading("Your clipboard, remembered",
-                    "Clippy keeps what you copy so you can paste it again. This short tour sets up permissions, optional features and your shortcut. " +
-                        "Every step can be skipped and changed later in Settings.")
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 20) {
+            hero("paperclip", "Your clipboard, remembered",
+                 "Clippy keeps what you copy so you can paste it again. This short tour sets up permissions, optional features and your shortcut. " +
+                     "Every step can be skipped and changed later in Settings.")
+            card {
                 welcomeFeature("magnifyingglass", "Find anything you copied", "Search text, links, files and the words inside images.")
                 welcomeFeature("folder", "Keep what matters", "File clips into categories so they stay out of the way of history.")
                 welcomeFeature("keyboard", "Paste without leaving the keyboard", "Open the panel with your shortcut, pick a clip, press Return.")
@@ -81,11 +101,11 @@ struct OnboardingStepContent: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: symbol)
                 .font(.body.weight(.medium))
-                .foregroundStyle(tokens.accentText)
-                .frame(width: 20)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.body.weight(.semibold)).foregroundStyle(tokens.textPrimary)
-                Text(detail).font(.callout).foregroundStyle(tokens.textSecondary)
+                Text(title).font(.headline)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -93,67 +113,76 @@ struct OnboardingStepContent: View {
     }
 
     private var accessibility: some View {
-        Group {
-            heading("Allow Accessibility",
-                    "Clippy uses Accessibility to send the paste keystroke and to find your text caret so the panel opens " +
-                        "beside it. It reads only the caret position, never the content of other apps here. " +
-                        "Everything stays on this Mac.")
+        VStack(spacing: 16) {
+            hero("hand.raised.fill", "Allow Accessibility",
+                 "Clippy uses Accessibility to send the paste keystroke and to find your text caret so the panel opens " +
+                     "beside it. It reads only the caret position, never the content of other apps here. " +
+                     "Everything stays on this Mac.")
             permissionRow("Accessibility", ok: viewModel.accessibilityTrusted, okText: "Access granted", pendingText: "Not granted yet")
             benefits(.accessibility)
             if !viewModel.accessibilityTrusted {
                 Button("Grant Access") { viewModel.grantAccessibility() }
-                Text("This updates automatically when you return from System Settings.")
-                    .font(.caption).foregroundStyle(tokens.textSecondary)
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                note("This updates automatically when you return from System Settings.")
             }
         }
     }
 
     private var suggestions: some View {
-        Group {
-            heading("Smart Suggestions (optional)",
-                    "Suggests clips that fit the app you are typing in, using its name and window title. On-device only. " +
-                        "Off unless you turn it on.")
-            Toggle("Turn on Smart Suggestions", isOn: Binding(get: { viewModel.suggestionsOn }, set: { viewModel.setSuggestions($0) }))
+        VStack(spacing: 16) {
+            hero("sparkles", "Smart Suggestions (optional)",
+                 "Suggests clips that fit the app you are typing in, using its name and window title. On-device only. " +
+                     "Off unless you turn it on.")
+            card {
+                Toggle("Turn on Smart Suggestions", isOn: Binding(get: { viewModel.suggestionsOn }, set: { viewModel.setSuggestions($0) }))
+            }
             if !viewModel.accessibilityTrusted {
-                Text("Suggestions also need Accessibility access (previous step).")
-                    .font(.caption).foregroundStyle(tokens.textSecondary)
+                note("Suggestions also need Accessibility access (previous step).")
             }
         }
     }
 
     private var ocr: some View {
-        Group {
-            heading("Search text inside images (optional)",
-                    "Clippy can recognize text in copied images on this Mac so you can find them by search. " +
-                        "Recognized text never leaves the device and can be deleted in Settings.")
-            Toggle("Index text in images", isOn: Binding(get: { viewModel.ocrOn }, set: { viewModel.setOCR($0) }))
+        VStack(spacing: 16) {
+            hero("text.viewfinder", "Search text inside images (optional)",
+                 "Clippy can recognize text in copied images on this Mac so you can find them by search. " +
+                     "Recognized text never leaves the device and can be deleted in Settings.")
+            card {
+                Toggle("Index text in images", isOn: Binding(get: { viewModel.ocrOn }, set: { viewModel.setOCR($0) }))
+            }
         }
     }
 
     private var hotkey: some View {
-        Group {
-            heading("Choose your shortcut", "Press this from any app to open Clippy. Conflicts with system shortcuts are flagged.")
-            HotKeyRecorderView(action: .showPanel)
-            HotKeyRecorderView(action: .pastePlain)
-            HotKeyRecorderView(action: .pastePrevious)
+        VStack(spacing: 16) {
+            hero("command", "Choose your shortcut", "Press this from any app to open Clippy. Conflicts with system shortcuts are flagged.")
+            card {
+                HotKeyRecorderView(action: .showPanel)
+                HotKeyRecorderView(action: .pastePlain)
+                HotKeyRecorderView(action: .pastePrevious)
+            }
         }
     }
 
     private var launchAtLogin: some View {
-        Group {
-            heading("Open Clippy at login", "Clippy lives in the menu bar and only captures while it is running.")
-            Toggle("Launch Clippy at login", isOn: Binding(
-                get: { viewModel.launchStatus == .enabled || viewModel.launchStatus == .requiresApproval },
-                set: { viewModel.setLaunchAtLogin($0) }))
-            switch viewModel.launchStatus {
-            case .requiresApproval:
-                status("Waiting for approval in System Settings", ok: false)
-                Button("Open Login Items") { LaunchAtLogin.openSystemSettings() }
-            case .notFound:
-                Text("Not available in this build (run the packaged app).").font(.caption).foregroundStyle(tokens.textSecondary)
-            default: EmptyView()
+        VStack(spacing: 16) {
+            hero("power", "Open Clippy at login", "Clippy lives in the menu bar and only captures while it is running.")
+            card {
+                Toggle("Launch Clippy at login", isOn: Binding(
+                    get: { viewModel.launchStatus == .enabled || viewModel.launchStatus == .requiresApproval },
+                    set: { viewModel.setLaunchAtLogin($0) }))
+                switch viewModel.launchStatus {
+                case .requiresApproval:
+                    status("Waiting for approval in System Settings", ok: false)
+                    Button("Open Login Items") { LaunchAtLogin.openSystemSettings() }
+                        .buttonStyle(.glass)
+                case .notFound:
+                    Text("Not available in this build (run the packaged app).").font(.caption).foregroundStyle(.secondary)
+                default: EmptyView()
+                }
+                if let error = viewModel.launchError { Text(error).font(.caption).foregroundStyle(.red) }
             }
-            if let error = viewModel.launchError { Text(error).font(.caption).foregroundStyle(tokens.danger) }
         }
     }
 
@@ -165,9 +194,9 @@ struct OnboardingStepContent: View {
     }
 
     private var notifications: some View {
-        Group {
-            heading("Notifications (optional)",
-                    "Get a notice when Clippy clears a sensitive clip from the clipboard automatically.")
+        VStack(spacing: 16) {
+            hero("bell.badge.fill", "Notifications (optional)",
+                 "Get a notice when Clippy clears a sensitive clip from the clipboard automatically.")
             permissionRow("Notifications",
                           ok: notificationsAllowed,
                           okText: "Allowed", pendingText: viewModel.notificationStatus == .denied ? "Off for Clippy" : "Not asked yet")
@@ -175,13 +204,13 @@ struct OnboardingStepContent: View {
             switch viewModel.notificationStatus {
             case .authorized, .provisional, .ephemeral: EmptyView()
             case .denied:
-                Text("Enable them in System Settings > Notifications.").font(.caption).foregroundStyle(tokens.textSecondary)
+                note("Enable them in System Settings > Notifications.")
             default:
                 Button {
                     viewModel.requestNotifications()
                 } label: {
                     if viewModel.requestingNotifications {
-                        HStack(spacing: tokens.metrics.space.two) {
+                        HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
                             Text("Requesting…")
                         }
@@ -189,15 +218,17 @@ struct OnboardingStepContent: View {
                         Text("Allow notifications")
                     }
                 }
+                .buttonStyle(.glass)
+                .controlSize(.large)
                 .disabled(viewModel.requestingNotifications)
             }
         }
     }
 
     private var privacy: some View {
-        Group {
-            heading("Your data stays yours", "A summary of how Clippy handles what you copy.")
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 16) {
+            hero("lock.shield.fill", "Your data stays yours", "A summary of how Clippy handles what you copy.")
+            card {
                 Label("History is stored locally on this Mac.", systemImage: "internaldrive")
                 Label("Passwords, card numbers and keys are masked, and reveal only while held.", systemImage: "eye.slash")
                 Label("Nothing is sent anywhere unless you enable AI or sync.", systemImage: "network.slash")
@@ -206,7 +237,7 @@ struct OnboardingStepContent: View {
                 Label(viewModel.suggestionsOn ? "Smart Suggestions: on" : "Smart Suggestions: off", systemImage: "sparkles")
                 Label(viewModel.ocrOn ? "Image text search: on" : "Image text search: off", systemImage: "text.viewfinder")
             }
-            .foregroundStyle(tokens.textPrimary)
+            .font(.callout)
         }
     }
 }

@@ -15,7 +15,6 @@ struct CategoryEditorView: View {
     let onSave: (_ name: String, _ colorHex: String, _ iconKind: CategoryIconKind, _ iconValue: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.clippyTokens) private var designTokens
     @State private var name: String
     @State private var colorHex: String
     @State private var iconKind: CategoryIconKind
@@ -52,75 +51,81 @@ struct CategoryEditorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Category name", text: $name)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    guard !name.trimmingCharacters(in: .whitespaces).isEmpty,
-                          duplicateNameMessage == nil else { return }
-                    onSave(name.trimmingCharacters(in: .whitespaces), colorHex, iconKind, iconValue)
-                    dismiss()
-                }
-
-            // Audit finding: warn on duplicate category names.
-            if let message = duplicateNameMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(designTokens.danger)
-                    .accessibilityLabel("Warning: \(message)")
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Color")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                // Wrapped into balanced rows so every swatch stays inside the 252 pt popover.
-                LazyVGrid(columns: swatchColumns, alignment: .leading, spacing: Self.swatchSpacing) {
-                    ForEach(Array(CategoryPalette.hexes.enumerated()), id: \.element) { index, hex in
-                        colorSwatch(hex, index: index + 1)
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    TextField("Category name", text: $name)
+                        .onSubmit {
+                            guard !name.trimmingCharacters(in: .whitespaces).isEmpty,
+                                  duplicateNameMessage == nil else { return }
+                            onSave(name.trimmingCharacters(in: .whitespaces), colorHex, iconKind, iconValue)
+                            dismiss()
+                        }
+                } header: {
+                    Text(category == nil ? "New Category" : "Edit Category")
+                } footer: {
+                    // Audit finding: warn on duplicate category names.
+                    if let message = duplicateNameMessage {
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .accessibilityLabel("Warning: \(message)")
                     }
                 }
-                // Audit finding: palette was limited to 10 fixed swatches.
-                // A Custom swatch opens the system color picker; the chosen
-                // color is written back to colorHex as "#RRGGBB".
-                HStack(spacing: 8) {
-                    customColorSwatch
-                    Text("Custom").font(.caption).foregroundStyle(.secondary)
+
+                Section("Color") {
+                    // Wrapped into balanced rows so every swatch stays inside the popover.
+                    LazyVGrid(columns: swatchColumns, alignment: .leading, spacing: Self.swatchSpacing) {
+                        ForEach(Array(CategoryPalette.hexes.enumerated()), id: \.element) { index, hex in
+                            colorSwatch(hex, index: index + 1)
+                        }
+                    }
+                    // Audit finding: palette was limited to 10 fixed swatches.
+                    // A Custom swatch opens the system color picker; the chosen
+                    // color is written back to colorHex as "#RRGGBB".
+                    LabeledContent("Custom") { customColorSwatch }
                 }
-            }
 
-            IconPickerView(
-                iconKind: $iconKind,
-                iconValue: $iconValue,
-                knownBundleIDs: knownBundleIDs,
-                accentHex: colorHex
-            )
-
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(category == nil ? "Create" : "Save") {
-                    onSave(
-                        name.trimmingCharacters(in: .whitespaces),
-                        colorHex,
-                        iconKind,
-                        iconValue
+                Section("Icon") {
+                    IconPickerView(
+                        iconKind: $iconKind,
+                        iconValue: $iconValue,
+                        knownBundleIDs: knownBundleIDs,
+                        accentHex: colorHex
                     )
-                    dismiss()
                 }
-                .buttonStyle(.accent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || duplicateNameMessage != nil)
             }
+            .formStyle(.grouped)
+
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Spacer()
+                    Button("Cancel", role: .cancel) { dismiss() }
+                        .buttonStyle(.glass)
+                        .keyboardShortcut(.cancelAction)
+                    Button(category == nil ? "Create" : "Save") {
+                        onSave(
+                            name.trimmingCharacters(in: .whitespaces),
+                            colorHex,
+                            iconKind,
+                            iconValue
+                        )
+                        dismiss()
+                    }
+                    .buttonStyle(.glassProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || duplicateNameMessage != nil)
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 14).padding(.top, 4)
         }
-        .padding(14)
-        .frame(width: 280)
+        .frame(width: 340)
     }
 
-    private static let swatchSize: CGFloat = 20
+    private static let swatchSize: CGFloat = 22
     private static let swatchSpacing: CGFloat = 8
     /// Popover content width: 280 minus 14 pt padding on each side.
-    private static let contentWidth: CGFloat = 252
+    private static let contentWidth: CGFloat = 270
 
     private var swatchColumns: [GridItem] {
         let count = SwatchRowLayout.columns(
@@ -137,8 +142,12 @@ struct CategoryEditorView: View {
         } label: {
             Circle()
                 .fill(Color(hexString: hex))
-                .frame(width: 20, height: 20)
-                .overlay(Circle().strokeBorder(.primary.opacity(isSelected ? 0.7 : 0), lineWidth: 2))
+                .frame(width: 22, height: 22)
+                .overlay {
+                    if isSelected {
+                        Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(.white)
+                    }
+                }
         }
         .buttonStyle(.plain)
         // Audit finding: swatches did not expose selected state for a11y.

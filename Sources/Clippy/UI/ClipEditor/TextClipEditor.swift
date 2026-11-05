@@ -133,9 +133,7 @@ struct TextClipEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            Divider()
             optionsBar
-            Divider()
             if conflictText != nil {
                 EditorConflictBanner(
                     onReload: { reloadFromConflict() },
@@ -146,20 +144,21 @@ struct TextClipEditor: View {
             if clipDeleted { EditorDeletedBanner(onCopy: { copyEditedText() }) }
             if !colors.isEmpty && !richMode {
                 ColorSwatchStrip(colors: colors)
-                Divider()
             }
             editingSurface
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             if !pendingEffects.isEmpty {
                 EditorPendingBar(effects: pendingEffects) { effect in
                     pendingEffects.removeAll { $0.id == effect.id }
                 }
             }
             statusBar
-            Divider()
             footer
         }
         .frame(minWidth: 520, minHeight: 380)
-        .background(tokens.cardSurface)
+        .background(Color(nsColor: .windowBackgroundColor))
         .task(id: StatusKey(text: text, selection: selectionRange)) {
             try? await Task.sleep(for: .milliseconds(60))
             guard !Task.isCancelled else { return }

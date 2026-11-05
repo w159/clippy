@@ -16,15 +16,9 @@ struct AIActionsManagerView: View {
     @State private var hoveredActionID: UUID?
     @State private var transferMessage: String?
 
-    @Environment(\.colorSchemeContrast) private var contrast
-
-    /// Semantic tokens resolved from the current theme so rows keep AA contrast (AI-13).
-    private var tokens: ClippyTokens { ClippyTokens.resolve(from: settings.theme, contrast: contrast) }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             listHeader
-            Divider()
             if store.actions.isEmpty {
                 emptyState
             } else {
@@ -89,34 +83,39 @@ struct AIActionsManagerView: View {
     // MARK: Header
 
     private var listHeader: some View {
-        HStack(spacing: tokens.metrics.space.two) {
-            Text("AI Actions").font(.headline).foregroundStyle(tokens.textPrimary)
+        HStack(spacing: 10) {
+            Label("AI Actions", systemImage: "wand.and.sparkles")
+                .font(.title3.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
             Spacer()
-            Menu {
-                Button("Import actions\u{2026}", action: importActions)
-                Button("Export actions\u{2026}", action: exportActions)
-            } label: {
-                ChromeMenuLabel("Import / Export", systemImage: "square.and.arrow.up.on.square")
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    Menu {
+                        Button("Import actions\u{2026}", action: importActions)
+                        Button("Export actions\u{2026}", action: exportActions)
+                    } label: {
+                        ChromeMenuLabel("Import / Export", systemImage: "square.and.arrow.up.on.square")
+                    }
+                    .chromeMenuStyle()
+                    .fixedSize()
+                    .accessibilityLabel("Import or export actions")
+                    Button {
+                        isCreating = true
+                    } label: {
+                        Label("New Action", systemImage: "plus")
+                    }
+                    .buttonStyle(.glassProminent)
+                }
             }
-            .chromeMenuStyle()
-            .fixedSize()
-            .accessibilityLabel("Import or export actions")
-            Button {
-                isCreating = true
-            } label: {
-                Label("New Action", systemImage: "plus")
-            }
-            .controlSize(.small)
-            .buttonStyle(.accent)
         }
-        .padding(.horizontal, tokens.metrics.space.three)
-        .padding(.vertical, tokens.metrics.space.two)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     // MARK: Empty state
 
     private var emptyState: some View {
-        EmptyState(systemImage: "wand.and.sparkles", title: "No actions yet",
+        PaneEmptyState(systemImage: "wand.and.sparkles", title: "No actions yet",
                    message: "Create an action to run a prompt on any clip.", actionTitle: "New Action") { isCreating = true }
     }
 
@@ -124,12 +123,9 @@ struct AIActionsManagerView: View {
 
     private var actionList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: 8) {
                 ForEach(store.actions) { action in
-                    VStack(spacing: 0) {
-                        actionRow(action)
-                        if action.id != store.actions.last?.id { Divider().overlay(tokens.stroke) }
-                    }
+                    actionRow(action)
                         .reorderDraggable(id: action.id.uuidString)
                         .reorderDropDestination(
                             id: action.id.uuidString,
@@ -142,7 +138,8 @@ struct AIActionsManagerView: View {
                         }
                 }
             }
-            .padding(8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
         .confirmationDialog(
             "Delete \"\(deletingAction?.name ?? "")\"?",
@@ -163,49 +160,51 @@ struct AIActionsManagerView: View {
     }
 
     private func actionRow(_ action: AIAction) -> some View {
-        HStack(spacing: tokens.metrics.space.three) {
+        HStack(spacing: 12) {
             ActionIconView(kind: action.iconKind, value: action.symbolName)
-                .frame(width: 22)
-                .foregroundStyle(tokens.accentText)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 34, height: 34)
+                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: tokens.metrics.space.two) {
-                    Text(action.name).font(.body.weight(.medium)).foregroundStyle(tokens.textPrimary)
+                HStack(spacing: 8) {
+                    Text(action.name).font(.body.weight(.medium))
                     if action.isBuiltIn { ReasonChip(title: "Built-in", systemImage: "lock", explanation: "Built-in actions can be edited but not deleted.") }
                 }
                 Text(AIActionEditorSupport.dispositionBadge(action.outputDisposition))
-                    .font(.caption).foregroundStyle(tokens.textSecondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Edit") { editingAction = action }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityLabel("Edit \(action.name)")
-            if !action.isBuiltIn {
-                Button("Delete", role: .destructive) { deletingAction = action }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(tokens.danger)
-                    .accessibilityLabel("Delete \(action.name)")
-            } else if action.isModifiedFromDefault {
-                Button("Restore") {
-                    if var original = AIAction.builtIns.first(where: { $0.id == action.id }) {
-                        // Keep the action's current position; the built-in template
-                        // carries its original seed sortOrder which would otherwise
-                        // reshuffle a list the user has reordered.
-                        original.sortOrder = action.sortOrder
-                        store.update(original)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    Button("Edit") { editingAction = action }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Edit \(action.name)")
+                    if !action.isBuiltIn {
+                        Button("Delete", role: .destructive) { deletingAction = action }
+                            .buttonStyle(.glass)
+                            .tint(.red)
+                            .accessibilityLabel("Delete \(action.name)")
+                    } else if action.isModifiedFromDefault {
+                        Button("Restore") {
+                            if var original = AIAction.builtIns.first(where: { $0.id == action.id }) {
+                                // Keep the action's current position; the built-in template
+                                // carries its original seed sortOrder which would otherwise
+                                // reshuffle a list the user has reordered.
+                                original.sortOrder = action.sortOrder
+                                store.update(original)
+                            }
+                        }
+                        .buttonStyle(.glass)
+                        .accessibilityLabel("Restore \(action.name) to its default")
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityLabel("Restore \(action.name) to its default")
             }
+            .controlSize(.small)
         }
-        .padding(.horizontal, tokens.metrics.space.three)
-        .padding(.vertical, tokens.metrics.space.two)
-        .background(hoveredActionID == action.id ? tokens.surfaceInset.opacity(0.7) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+        .padding(12)
+        .background(hoveredActionID == action.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.quaternary.opacity(0.5)),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onHover { hoveredActionID = $0 ? action.id : (hoveredActionID == action.id ? nil : hoveredActionID) }
         .accessibilityElement(children: .contain)
         .help(dispositionHelp(for: action.outputDisposition))

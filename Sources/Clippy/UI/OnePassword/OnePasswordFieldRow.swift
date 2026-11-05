@@ -85,7 +85,7 @@ struct OnePasswordFieldRow: View {
             if revealing {
                 ProgressView().controlSize(.mini)
             } else {
-                Image(systemName: revealed ? "eye.slash" : "eye").font(.system(size: 12))
+                Image(systemName: revealed ? "eye.slash" : "eye").font(.callout)
             }
         }
         .buttonStyle(.plain)

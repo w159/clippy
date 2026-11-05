@@ -11,41 +11,46 @@ enum OnePasswordPanelState {
 
 /// Designed state content for installation, sign-in, load, empty and error states.
 struct OnePasswordStatePanel: View {
-    @Environment(\.clippyTokens) private var tokens
     let state: OnePasswordPanelState
     var signingIn = false
     let retry: () -> Void
     let signIn: () -> Void
 
     var body: some View {
-        VStack(spacing: tokens.metrics.space.three) {
-            Image(systemName: icon)
-                .font(.system(size: 34, weight: .light))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(iconColor)
-            Text(title).font(.title2.weight(.semibold)).foregroundStyle(tokens.textPrimary)
-            Text(message)
-                .font(.body)
-                .foregroundStyle(tokens.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            action
+        Group {
+            if case .loading = state {
+                VStack(spacing: 12) {
+                    ProgressView().controlSize(.large)
+                    Text(title).font(.headline)
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ContentUnavailableView {
+                    Label(title, systemImage: icon)
+                } description: {
+                    Text(message)
+                } actions: {
+                    action
+                }
+            }
         }
-        .padding(tokens.metrics.space.six)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private var action: some View {
         switch state {
         case .notInstalled, .empty, .error:
-            Button(stateTitle, action: retry).buttonStyle(.accent)
+            Button(stateTitle, action: retry).buttonStyle(.glassProminent).controlSize(.large)
         case .needsSignIn:
             Button(action: signIn) {
                 if signingIn { ProgressView().controlSize(.small) }
                 else { Text("Sign in with op signin") }
             }
-            .buttonStyle(.accent)
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
             .disabled(signingIn)
         case .loading:
             ProgressView("Reading vault\u{2026}").controlSize(.small)
@@ -89,13 +94,6 @@ struct OnePasswordStatePanel: View {
         case .loading: return "key.fill"
         case .empty: return "tray"
         case .error: return "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var iconColor: Color {
-        switch state {
-        case .error, .needsSignIn, .notInstalled: return tokens.warning
-        case .empty, .loading: return tokens.accentText
         }
     }
 }

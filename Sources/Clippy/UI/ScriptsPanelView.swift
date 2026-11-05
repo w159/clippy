@@ -44,7 +44,7 @@ struct ScriptsPanelView: View {
     /// Shared empty state: reads the environment tokens (which follow the view's color scheme),
     /// not `settings.theme`, so the title stays legible in light and dark.
     private var emptyState: some View {
-        EmptyState(systemImage: "terminal", title: "No scripts yet",
+        PaneEmptyState(systemImage: "terminal", title: "No scripts yet",
                    message: "Add scripts in Settings to run them from here.",
                    actionTitle: "Open Settings", action: onOpenSettings)
     }
@@ -54,72 +54,60 @@ struct ScriptsPanelView: View {
     private var scriptList: some View {
         VStack(spacing: 0) {
             manageHeader
+            if filteredScripts.isEmpty {
+                ContentUnavailableView.search(text: query)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(filteredScripts) { script in
+                            ScriptRowView(script: script, store: store, center: center,
+                                          confirmedScripts: $confirmedScripts,
+                                          tokens: tokens, settings: settings)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+            }
+        }
+    }
+
+    private var manageHeader: some View {
+        HStack(spacing: 10) {
+            Label("Scripts", systemImage: "terminal")
+                .font(.title3.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+            Button { showLegend.toggle() } label: {
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("What the badges mean")
+            .accessibilityLabel("Badge legend")
+            .popover(isPresented: $showLegend, arrowEdge: .bottom) { ScriptBadgeLegendView() }
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundStyle(tokens.textSecondary)
+                    .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 TextField("Search names and script bodies", text: $query)
                     .textFieldStyle(.plain)
-                    .font(PanelTypography.metadata(settings))
                 if !query.isEmpty {
                     Button { query = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(tokens.textSecondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                     .help("Clear search")
                     .accessibilityLabel("Clear search")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            Divider()
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    if filteredScripts.isEmpty {
-                        Text("No scripts match \"\(query)\"")
-                            .font(PanelTypography.metadata(settings))
-                            .foregroundStyle(tokens.textSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                    }
-                    ForEach(filteredScripts) { script in
-                        ScriptRowView(script: script, store: store, center: center,
-                                      confirmedScripts: $confirmedScripts,
-                                      tokens: tokens, settings: settings)
-                    }
-                }
-                .padding(10)
-            }
-        }
-    }
-
-    private var manageHeader: some View {
-        HStack {
-            Text("SCRIPTS")
-                .font(PanelTypography.micro(settings).weight(.semibold))
-                .kerning(0.6)
-                .foregroundStyle(tokens.textSecondary)
-            Button { showLegend.toggle() } label: {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 11))
-                    .foregroundStyle(tokens.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("What the badges mean")
-            .accessibilityLabel("Badge legend")
-            .popover(isPresented: $showLegend, arrowEdge: .bottom) { ScriptBadgeLegendView() }
-            Spacer()
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .glassEffect(.regular, in: Capsule())
             Button("Manage\u{2026}") { onOpenSettings() }
-                .controlSize(.small)
-                .buttonStyle(.borderless)
-                .foregroundStyle(tokens.textSecondary)
+                .buttonStyle(.glass)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(tokens.headerBar.opacity(settings.panelOpacity))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -176,8 +164,6 @@ private struct ScriptRowView: View {
     @Binding var confirmedScripts: Set<UUID>
     let tokens: ThemeTokens
     let settings: AppSettings
-    @Environment(\.clippyTokens) private var designTokens
-
     @State private var pendingRun = false
 
     private var run: ScriptRun? { center.run(for: script.id) }
@@ -192,12 +178,8 @@ private struct ScriptRowView: View {
                                     onDismiss: { center.dismiss(script.id) })
             }
         }
-        .padding(10)
-        .background(tokens.cardSurface, in: RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous)
-                .strokeBorder(designTokens.stroke, lineWidth: 1)
-        )
+        .padding(12)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .confirmationDialog(
             "Run \"\(script.name.isEmpty ? "Untitled" : script.name)\"?",
             isPresented: $pendingRun,
@@ -213,32 +195,32 @@ private struct ScriptRowView: View {
     }
 
     private var rowHeader: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
+            Image(systemName: "terminal")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 34, height: 34)
+                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(script.name.isEmpty ? "Untitled" : script.name)
-                    .font(PanelTypography.body(settings).weight(.medium))
-                    .foregroundStyle(tokens.textPrimary)
+                    .font(.body.weight(.medium))
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     Text(script.interpreter.displayName)
-                        .font(PanelTypography.micro(settings).weight(.medium))
-                        .foregroundStyle(tokens.accent)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(tokens.accent.opacity(0.12),
-                                    in: RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.accentColor)
                     ForEach(ScriptBadge.allCases.filter { $0.applies(to: script) }, id: \.title) { badge in
                         Image(systemName: badge.icon)
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(tokens.textSecondary)
+                            .foregroundStyle(.secondary)
                             .help("\(badge.title). \(badge.detail)")
                             .accessibilityLabel(badge.title)
                     }
-                    Spacer(minLength: 0)
                     Text(RelativeTime.string(for: script.updatedAt))
-                        .font(PanelTypography.micro(settings))
-                        .foregroundStyle(tokens.textSecondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 8)
@@ -249,12 +231,10 @@ private struct ScriptRowView: View {
     private var runButton: some View {
         Button { isRunning ? run?.cancel() : attemptRun() } label: {
             Image(systemName: isRunning ? "stop.fill" : "play.fill")
-                .font(.system(size: 11, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .frame(width: 28, height: 28)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 24, height: 24)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(.glass)
         .disabled(!script.isEnabled && !isRunning)
         .help(script.isEnabled
               ? (isRunning ? "Stop script" : "Run script")

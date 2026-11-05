@@ -27,20 +27,26 @@ extension TextClipEditor {
                     .help(saveError)
             }
             Spacer(minLength: 0)
-            Button("Cancel", role: .cancel) {
-                if isDirty {
-                    showingDiscardPrompt = true
-                } else {
-                    onClose()
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("Cancel", role: .cancel) {
+                        if isDirty {
+                            showingDiscardPrompt = true
+                        } else {
+                            onClose()
+                        }
+                    }
+                    .buttonStyle(.glass)
+                    .keyboardShortcut(.cancelAction)
+                    .fixedSize()
+                    Button("Save") { if save() { onClose() } }
+                        .buttonStyle(.glassProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .fixedSize()
+                        .disabled(!isDirty || clipDeleted)
                 }
+                .controlSize(.large)
             }
-            .keyboardShortcut(.cancelAction)
-            .fixedSize()
-            Button("Save") { if save() { onClose() } }
-                .buttonStyle(.accent)
-                .keyboardShortcut(.defaultAction)
-                .fixedSize()
-                .disabled(!isDirty || clipDeleted)
             // Cmd-S save path. The NSTextView swallows Return, so the
             // .defaultAction shortcut above is unreachable while the body
             // editor has focus; the window still resolves this key
@@ -51,19 +57,20 @@ extension TextClipEditor {
                 .hidden()
                 .frame(width: 0, height: 0)
         }
-        .padding(12)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     /// Title field with the unsaved dot and the AI menu.
     var titleBar: some View {
         HStack(spacing: 8) {
             TextField("Title (optional)", text: $title)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .font(.title3.weight(.semibold))
                 .accessibilityLabel("Clip title")
             if isDirty {
                 HStack(spacing: 4) {
-                    Circle().fill(dsTokens.accent).frame(width: 8, height: 8)
-                    Text("unsaved").font(.caption).foregroundStyle(dsTokens.textSecondary)
+                    Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                    Text("unsaved").font(.caption).foregroundStyle(.secondary)
                 }
                 .fixedSize()
                 .accessibilityElement(children: .ignore)
@@ -72,7 +79,7 @@ extension TextClipEditor {
             }
             if settings.aiEnabled { aiMenu }
         }
-        .padding(10)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 6)
     }
 
     /// Caret, counts, encoding, language and source.

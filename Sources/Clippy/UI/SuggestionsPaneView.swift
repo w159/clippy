@@ -17,7 +17,6 @@ struct SuggestionsPaneScaffold<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             SuggestionsHeroHeader(contextSummary: store.suggestionsContextSummary) { store.recaptureSuggestions() }
-            Divider()
             ZStack(alignment: .bottom) {
                 if mode == .list { content } else { stateView }
                 if let message = feedback.toast {
@@ -33,7 +32,7 @@ struct SuggestionsPaneScaffold<Content: View>: View {
     private var stateView: some View {
         switch mode {
         case .needsPermission:
-            EmptyState(
+            PaneEmptyState(
                 systemImage: "hand.raised", title: "Enable context",
                 message: "Clippy needs Accessibility access to read what you are working on. Everything stays on this Mac.",
                 actionTitle: "Grant Access") {
@@ -46,14 +45,14 @@ struct SuggestionsPaneScaffold<Content: View>: View {
         case .loading:
             LoadingState("Finding relevant clips", rows: 3)
         case .disabled:
-            EmptyState(
+            PaneEmptyState(
                 systemImage: "sparkles", title: "Smart Suggestions are off",
                 message: "Turn them on in Settings, Intelligence.", actionTitle: "Open Settings", action: onOpenSettings)
         case .skipped(let message):
-            EmptyState(systemImage: "tortoise", title: "Context unavailable in this app", message: message,
+            PaneEmptyState(systemImage: "tortoise", title: "Context unavailable in this app", message: message,
                        actionTitle: "Try Again") { store.recaptureSuggestions() }
         case .empty, .list:
-            EmptyState(
+            PaneEmptyState(
                 systemImage: "tray", title: "Nothing relevant yet",
                 message: "Copy a few things and try again.",
                 actionTitle: "Refresh") { store.recaptureSuggestions() }

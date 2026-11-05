@@ -71,7 +71,7 @@ struct ScriptRunResultView: View {
             if run.isRunning {
                 Button("Stop") { run.cancel() }
                     .controlSize(.small)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
             }
         }
         .accessibilityElement(children: .combine)
@@ -137,11 +137,11 @@ struct ScriptRunResultView: View {
             HStack(spacing: 8) {
                 if !stdout.isEmpty {
                     Button("Copy output") { copy(stdout) }
-                        .controlSize(.small).buttonStyle(.bordered)
+                        .controlSize(.small).buttonStyle(.glass)
                 }
                 if !stderr.isEmpty {
                     Button("Copy stderr") { copy(stderr) }
-                        .controlSize(.small).buttonStyle(.bordered)
+                        .controlSize(.small).buttonStyle(.glass)
                 }
                 if run.result != nil, !stdout.isEmpty || !stderr.isEmpty { saveMenu }
                 Spacer()

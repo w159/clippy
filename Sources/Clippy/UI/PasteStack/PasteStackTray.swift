@@ -16,10 +16,10 @@ struct PasteStackTray: View {
     }
 
     var body: some View {
-        VStack(spacing: tokens.metrics.space.two) {
+        VStack(spacing: 12) {
             header
             if stack.items.isEmpty {
-                EmptyState(
+                PaneEmptyState(
                     systemImage: "tray", title: "Paste stack is empty",
                     message: stack.isCollecting
                         ? "Copy items to add them to the stack."
@@ -28,7 +28,7 @@ struct PasteStackTray: View {
                 list
             }
         }
-        .padding(tokens.metrics.space.three)
+        .padding(16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Paste stack, \(CopyFormat.counted(stack.count, "item"))")
         .confirmationDialog("Clear the paste stack?", isPresented: $confirmClear, titleVisibility: .visible) {
@@ -47,11 +47,15 @@ struct PasteStackTray: View {
             }
             .labelsHidden().pickerStyle(.menu).fixedSize()
             Spacer()
-            Text("\(stack.count)").font(.callout.monospacedDigit()).foregroundStyle(tokens.textSecondary)
-            IconButton("arrow.down.doc", label: "Paste next", help: "Paste the next item into the frontmost app") { onPasteNext() }
-                .disabled(stack.items.isEmpty)
-            IconButton("trash", label: "Clear stack", help: "Remove every item from the stack") { confirmClear = true }
-                .disabled(stack.items.isEmpty)
+            Text("\(stack.count)").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    IconButton("arrow.down.doc", label: "Paste next", help: "Paste the next item into the frontmost app") { onPasteNext() }
+                        .disabled(stack.items.isEmpty)
+                    IconButton("trash", label: "Clear stack", help: "Remove every item from the stack") { confirmClear = true }
+                        .disabled(stack.items.isEmpty)
+                }
+            }
         }
     }
 
@@ -68,6 +72,7 @@ struct PasteStackTray: View {
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .onDeleteCommand { if let selection { _ = stack.remove(id: selection); self.selection = nil } }
         .onKeyPress(.return) { onPasteNext(); return .handled }
         .onChange(of: stack.items.map(\.id)) { _, ids in
@@ -77,17 +82,23 @@ struct PasteStackTray: View {
 
     private func row(_ item: PasteStackItem, index: Int) -> some View {
         let isNext = stack.upcomingIndex == index
-        return HStack(spacing: tokens.metrics.space.two) {
-            Text("\(index + 1)").font(.caption.monospacedDigit()).foregroundStyle(tokens.textSecondary).frame(minWidth: 18)
-            Image(systemName: Self.symbol(for: item.clip)).foregroundStyle(tokens.textSecondary)
-            Text(Self.title(for: item.clip)).lineLimit(1).truncationMode(.tail)
+        return HStack(spacing: 10) {
+            Image(systemName: Self.symbol(for: item.clip))
+                .foregroundStyle(isNext ? Color.accentColor : Color.secondary)
+                .frame(width: 30, height: 30)
+                .background((isNext ? Color.accentColor : Color.secondary).opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(Self.title(for: item.clip)).lineLimit(2).truncationMode(.tail)
+                Text(isNext ? "Next to paste" : "Item \(index + 1)").font(.caption)
+                    .foregroundStyle(isNext ? Color.accentColor : Color.secondary)
+            }
             Spacer(minLength: 0)
-            if isNext { Text("Next").font(.caption.weight(.semibold)).foregroundStyle(tokens.accentText) }
             IconButton("xmark", label: "Remove from stack") {
                 _ = stack.remove(id: item.id)
                 if selection == item.id { selection = nil }
             }
         }
+        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Item \(index + 1)\(isNext ? ", next" : ""): \(Self.title(for: item.clip))")
     }

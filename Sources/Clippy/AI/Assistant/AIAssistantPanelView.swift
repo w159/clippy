@@ -63,7 +63,6 @@ struct AssistantPanelBody: View {
                 }
                 // AI off: only the off state; no context pill or composer.
                 if settings.aiEnabled {
-                    Divider().overlay(tokens.stroke)
                     inputBar
                 }
             }
@@ -108,22 +107,18 @@ struct AssistantPanelBody: View {
 
     /// Title-only header shown while AI features are off (no provider chip, tools or clear buttons).
     private var aiOffHeader: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: tokens.metrics.space.two) {
-                Image(systemName: "sparkles").font(.system(size: 14, weight: .semibold)).symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(tokens.textSecondary).accessibilityHidden(true)
-                Text("AI Assistant").font(.headline).foregroundStyle(tokens.textPrimary).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, tokens.metrics.space.three)
-            .padding(.vertical, tokens.metrics.space.two)
-            Divider().overlay(tokens.stroke)
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").font(.title3).symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.accentColor).accessibilityHidden(true)
+            Text("AI Assistant").font(.title3.weight(.semibold)).lineLimit(1)
+            Spacer(minLength: 0)
         }
-        .background(tokens.surface)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     private func notConfigured(title: String, message: String) -> some View {
-        EmptyState(systemImage: "sparkles", title: title, message: message,
+        PaneEmptyState(systemImage: "sparkles", title: title, message: message,
                    actionTitle: "Open Settings", action: onOpenSettings)
             .background(tokens.surface)
     }

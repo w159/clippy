@@ -42,13 +42,12 @@ extension AssistantPanelBody {
         let canSend = AssistantPresentation.canSend(viewModel.inputText)
         return VStack(spacing: tokens.metrics.space.one) {
             attachRow
-            GlassSurface(in: RoundedRectangle(cornerRadius: tokens.metrics.radius.lg, style: .continuous)) {
+            Group {
                 HStack(alignment: .bottom, spacing: tokens.metrics.space.two) {
                     TextField("Ask about your clips...", text: $viewModel.inputText, axis: .vertical)
                         .lineLimit(1...5)
                         .textFieldStyle(.plain)
                         .font(.body)
-                        .foregroundStyle(tokens.textPrimary)
                         .focused($inputFocused)
                         .accessibilityLabel("Message input")
                         .onSubmit { if canSend && viewModel.state == .ready { viewModel.send() } }
@@ -57,9 +56,9 @@ extension AssistantPanelBody {
                         if streaming { viewModel.stop() } else { viewModel.send() }
                     } label: {
                         Image(systemName: streaming ? "stop.circle.fill" : "arrow.up.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.title)
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(streaming || canSend ? tokens.accentText : tokens.textSecondary)
+                            .foregroundStyle(streaming || canSend ? Color.accentColor : Color.secondary)
                             .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                             .frame(minWidth: 28, minHeight: 28)
                     }
@@ -69,12 +68,13 @@ extension AssistantPanelBody {
                     .accessibilityLabel(streaming ? "Stop" : "Send")
                     .disabled(!streaming && !canSend)
                 }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
-            .padding(.horizontal, tokens.metrics.space.three)
+            .padding(.horizontal, 16)
             Text(streaming ? "Esc stops the reply" : "Return sends")
                 .font(.caption2).foregroundStyle(tokens.textSecondary)
         }
-        .padding(.vertical, tokens.metrics.space.two)
-        .background(tokens.surface)
+        .padding(.vertical, 10)
     }
 }

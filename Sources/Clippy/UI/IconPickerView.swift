@@ -76,11 +76,13 @@ struct IconPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ClippySegmentedPicker("Icon", selection: $iconTab, options: [
-                SegmentOption(value: CategoryIconKind.symbol, title: "Symbols"),
-                SegmentOption(value: CategoryIconKind.emoji, title: "Emoji"),
-                SegmentOption(value: CategoryIconKind.appLogo, title: "Apps"),
-            ])
+            Picker("Icon", selection: $iconTab) {
+                Text("Symbols").tag(CategoryIconKind.symbol)
+                Text("Emoji").tag(CategoryIconKind.emoji)
+                Text("Apps").tag(CategoryIconKind.appLogo)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
             if iconTab == .symbol {
                 TextField("Search symbols", text: $symbolQuery)
@@ -103,14 +105,12 @@ struct IconPickerView: View {
     @ViewBuilder
     private var iconGrid: some View {
         if iconTab == .symbol && filteredSymbols.isEmpty {
-            Text("No symbols match")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            ContentUnavailableView("No symbols match", systemImage: "magnifyingglass",
+                                   description: Text("Try a different search."))
                 .frame(maxWidth: .infinity, minHeight: 110)
         } else if iconTab == .emoji && filteredEmojis.isEmpty {
-            Text("No emoji match")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            ContentUnavailableView("No emoji match", systemImage: "magnifyingglass",
+                                   description: Text("Try a different search."))
                 .frame(maxWidth: .infinity, minHeight: 110)
         } else {
             symbolEmojiAppGrid
@@ -129,7 +129,7 @@ struct IconPickerView: View {
                             iconKind = .symbol
                             iconValue = symbol
                         } content: {
-                            Image(systemName: symbol).font(.system(size: 14))
+                            Image(systemName: symbol).font(.callout)
                         }
                         .accessibilityLabel(symbol)
                     }
@@ -140,7 +140,7 @@ struct IconPickerView: View {
                             iconKind = .emoji
                             iconValue = emoji
                         } content: {
-                            Text(emoji).font(.system(size: 15))
+                            Text(emoji).font(.callout)
                         }
                         .accessibilityLabel(pair.name)
                     }
@@ -159,7 +159,7 @@ struct IconPickerView: View {
                                 if let icon = AppIconProvider.shared.icon(forBundleID: bundleID) {
                                     Image(nsImage: icon).resizable().frame(width: 18, height: 18)
                                 } else {
-                                    Image(systemName: "app.dashed").font(.system(size: 14))
+                                    Image(systemName: "app.dashed").font(.callout)
                                 }
                             }
                             .accessibilityLabel(bundleID)
@@ -181,7 +181,7 @@ struct IconPickerView: View {
                 .frame(width: 30, height: 28)
                 .background(
                     selectedBackground(isSelected: isSelected),
-                    in: RoundedRectangle(cornerRadius: ClippyRadius.inset)
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                 )
         }
         .buttonStyle(.plain)

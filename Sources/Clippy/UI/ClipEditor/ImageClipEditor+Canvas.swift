@@ -50,12 +50,9 @@ extension ImageClipEditor {
 
     /// Error treatment shown when the clip's image file cannot be loaded.
     var imageLoadError: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").font(.system(size: 30, weight: .light)).foregroundStyle(dsTokens.textSecondary)
-            Text("Could not load the image. The file may have been moved or deleted. You can still rename the clip.")
-                .font(PanelTypography.body(settings)).foregroundStyle(dsTokens.textSecondary).multilineTextAlignment(.center)
-        }
-        .padding(24)
+        ContentUnavailableView("Could not load the image", systemImage: "exclamationmark.triangle",
+                               description: Text("The file may have been moved or deleted. You can still rename the clip."))
+            .padding(24)
     }
 
     /// Chooses move / resize / create from where the drag began, then edits the image-space selection.

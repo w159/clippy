@@ -98,18 +98,17 @@ struct ImageClipEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             titleBar
-            Divider()
             toolbar
-            Divider()
             if let ocrNotice { ocrBanner(ocrNotice) }
             canvas
-            Divider()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             statusBar
-            Divider()
             footer
         }
         .frame(minWidth: 520, minHeight: 460)
-        .background(tokens.cardSurface)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             // Wire the title-bar close button to the same dirty/save logic as
             // the Cancel button (see EditorWindowController.windowShouldClose).
@@ -150,34 +149,41 @@ struct ImageClipEditor: View {
                     .layoutPriority(-1)
                     .help(saveError)
             }
-            Button("Save a copy\u{2026}") { saveCopy() }
-                .fixedSize()
-                .disabled(model.working == nil)
-            Spacer(minLength: 0)
-            Button("Cancel", role: .cancel) {
-                if cropping {
-                    // Esc / Cancel leaves the crop tool first, keeping the edits made so far.
-                    setCropping(false)
-                } else if isDirty {
-                    showingDiscardPrompt = true
-                } else {
-                    onClose()
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Button("Save a copy\u{2026}") { saveCopy() }
+                        .buttonStyle(.glass)
+                        .fixedSize()
+                        .disabled(model.working == nil)
+                    Spacer(minLength: 0)
+                    Button("Cancel", role: .cancel) {
+                        if cropping {
+                            // Esc / Cancel leaves the crop tool first, keeping the edits made so far.
+                            setCropping(false)
+                        } else if isDirty {
+                            showingDiscardPrompt = true
+                        } else {
+                            onClose()
+                        }
+                    }
+                    .buttonStyle(.glass)
+                    .keyboardShortcut(.cancelAction)
+                    .fixedSize()
+                    Button("Save") { save { if $0 { onClose() } } }
+                        .buttonStyle(.glassProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .fixedSize()
+                        .disabled(!isDirty || isSaving)
                 }
+                .controlSize(.large)
             }
-            .keyboardShortcut(.cancelAction)
-            .fixedSize()
-            Button("Save") { save { if $0 { onClose() } } }
-                .buttonStyle(.accent)
-                .keyboardShortcut(.defaultAction)
-                .fixedSize()
-                .disabled(!isDirty || isSaving)
             Button("") { save { if $0 { onClose() } } }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!isDirty || isSaving)
                 .hidden()
                 .frame(width: 0, height: 0)
         }
-        .padding(12)
+        .padding(.horizontal, 16).padding(.vertical, 12)
     }
 
     // MARK: - Operations
