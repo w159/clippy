@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// iCloud sync that actually works for a Developer-ID / Sparkle-distributed app.
 ///
@@ -20,16 +21,17 @@ import Foundation
 ///     in before the winner is written: union by content hash, newest metadata wins;
 ///   - the whole merge is additive and runs in one database transaction per source.
 ///
-/// The class is @MainActor so @Published state is only ever touched on the main
+/// The class is @MainActor so observed state is only ever touched on the main
 /// actor; the heavy work runs in a detached task and reports back a Sendable outcome.
 @MainActor
-final class ICloudSyncService: ObservableObject {
+@Observable
+final class ICloudSyncService {
     static let shared = ICloudSyncService()
 
-    @Published private(set) var status = "Idle"
-    @Published private(set) var syncing = false
+    private(set) var status = "Idle"
+    private(set) var syncing = false
     /// Non-nil when syncing has been stopped to protect the remote copy.
-    @Published private(set) var haltReason: String? = UserDefaults.standard.string(forKey: ICloudSyncService.haltDefaultsKey)
+    private(set) var haltReason: String? = UserDefaults.standard.string(forKey: ICloudSyncService.haltDefaultsKey)
 
     /// UserDefaults key persisting `haltReason` across launches.
     nonisolated static let haltDefaultsKey = "dat.icloud.syncHaltReason"

@@ -4,7 +4,7 @@ import SwiftUI
 // The Appearance settings tab (theme, colors, cards, typography, panel size), with its color-row and swatch helpers.
 
 struct AppearanceSettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @Environment(\.clippyTokens) private var tokens
 
     /// Only font families that are installed on this machine.

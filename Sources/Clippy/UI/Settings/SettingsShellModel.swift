@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import Observation
 
 // State and actions behind the settings window: selection, search, pane reset,
 // preferences export/import (SET-09). SwiftUI-free logic lives in the pure types.
@@ -13,29 +14,30 @@ struct PendingSettingsImport: Identifiable {
 }
 
 @MainActor
-final class SettingsShellModel: ObservableObject {
+@Observable
+final class SettingsShellModel {
     /// Below this width the window shows a list that pushes panes.
     static let compactBreakpoint: CGFloat = 560
 
     /// The visible pane. Every change, including the initial one, marks the pane as seen
     /// so its NEW pill clears whichever route opened it (sidebar, search, launch request).
-    @Published var selection: SettingsPaneID {
+    var selection: SettingsPaneID {
         didSet { markSeen(selection) }
     }
-    @Published var query = ""
-    @Published private(set) var flashRow: String?
-    @Published private(set) var jumpToken = UUID()
-    @Published var compactShowsPane = false
-    @Published var showResetConfirmation = false
-    @Published var pendingImport: PendingSettingsImport?
-    @Published private(set) var status: StatusOutcome?
+    var query = ""
+    private(set) var flashRow: String?
+    private(set) var jumpToken = UUID()
+    var compactShowsPane = false
+    var showResetConfirmation = false
+    var pendingImport: PendingSettingsImport?
+    private(set) var status: StatusOutcome?
     /// Security-relevant keys the user explicitly ticked in the import sheet.
-    @Published var confirmedKeys: Set<String> = []
+    var confirmedKeys: Set<String> = []
 
     private let settings: AppSettings
     private let seenDefaults: UserDefaults
     private let porter = SettingsPreferencesPorter(knownKeys: SettingsPaneID.allExportableKeys)
-    private var flashTask: Task<Void, Never>?
+    @ObservationIgnored private var flashTask: Task<Void, Never>?
 
     init(settings: AppSettings = .shared, seenDefaults: UserDefaults = .standard,
          requestedSection: String = ProcessInfo.processInfo.environment["CLIPPY_SETTINGS_SECTION"] ?? "") {

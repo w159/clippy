@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 // Bulk reset operations for AppSettings.
 
@@ -24,7 +25,7 @@ extension AppSettings {
     /// Reset every setting to its registered default. Audit finding: the only
     /// global reset was clearColorOverrides. This wipes all stored keys so the
     /// @AppDefault wrappers fall back to their declared defaults, then re-applies
-    /// the same clamping/migration the init does for the @Published properties.
+    /// the same clamping/migration the init does for the observed stored properties.
     /// The theme's base colors, AI config, capture knobs, hotkeys, and behavior
     /// toggles all return to their out-of-box values. Does not touch the
     /// keychain (API keys) or the clip database.
@@ -36,9 +37,9 @@ extension AppSettings {
             defaults.removeObject(forKey: key)
         }
 
-        // @Published properties live in instance memory, not UserDefaults, so
+        // Observed stored properties live in instance memory, not UserDefaults, so
         // removing keys is not enough: reset them to their defaults explicitly.
-        // Each assignment fires objectWillChange so bound views re-render.
+        // Each assignment notifies observers so bound views re-render.
         pollingIntervalMs = 200.0
         mcpEnabled = false
         fontSizeBase = 13
@@ -54,17 +55,17 @@ extension AppSettings {
         // Re-seed the logger threshold from the reset value.
         ClippyLog.threshold = logLevel
 
-        // Fire one consolidated change so views bound to @AppDefault properties
+        // Announce one consolidated change so views bound to @AppDefault properties
         // (which did not go through their wrapper setter) re-read UserDefaults.
         // @AppDefault reads live from UserDefaults, so after the key removals
         // above they will return their declared defaultValue on the next access.
-        objectWillChange.send()
+        announceStorageReloaded()
     }
 
     // MARK: - Per-pane reset and import reload (SET-09)
 
     /// Remove `keys` from UserDefaults so their wrappers fall back to declared
-    /// defaults, then refresh the in-memory @Published mirrors. Managed (forced)
+    /// defaults, then refresh the in-memory observed mirrors. Managed (forced)
     /// keys are skipped so a pane reset never fights policy.
     func resetKeys(_ keys: [String]) {
         for key in keys where !Self.isForced(key) && defaults.object(forKey: key) != nil {
@@ -90,7 +91,7 @@ extension AppSettings {
         }
     }
 
-    /// Re-read the @Published mirrors (which do not read UserDefaults live) after
+    /// Re-read the observed mirrors (which do not read UserDefaults live) after
     /// keys were removed or bulk-imported, applying the same clamping as init.
     func reloadFromDefaults() {
         pollingIntervalMs = defaults.object(forKey: Keys.pollingIntervalMs) as? Double ?? 200.0
@@ -107,6 +108,6 @@ extension AppSettings {
         suggestionsLimit = (3...20).contains(limit) ? limit : 8
         if !Self.isForced(Keys.mcpEnabled) { mcpEnabled = defaults.bool(forKey: Keys.mcpEnabled) }
         ClippyLog.threshold = logLevel
-        objectWillChange.send()
+        announceStorageReloaded()
     }
 }

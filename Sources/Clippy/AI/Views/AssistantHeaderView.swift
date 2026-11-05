@@ -3,7 +3,7 @@ import SwiftUI
 /// Assistant header: title, provider status, capability chip, conversation usage,
 /// tool drawer and clear button. Layout collapses gracefully at compact widths.
 struct AssistantHeaderView: View {
-    @ObservedObject var viewModel: AIAssistantViewModel
+    var viewModel: AIAssistantViewModel
     let capabilities: AssistantCapabilities
     let onOpenSettings: () -> Void
     @Environment(\.clippyTokens) private var tokens

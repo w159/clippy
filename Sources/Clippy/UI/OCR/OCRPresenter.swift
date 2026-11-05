@@ -1,12 +1,13 @@
-import Combine
 import Foundation
+import Observation
 
 /// Presentation state for Extract Text (OCR-01, OCR-11). Pure logic, no views:
 /// which clips are being recognised (drives the scrim) and which result sheet
 /// is showing. Shared so `ClipListView+StatusBanner.runOCR` can drive it
 /// without stored state on `ClipListView`.
 @MainActor
-final class OCRPresenter: ObservableObject {
+@Observable
+final class OCRPresenter {
     static let shared = OCRPresenter()
 
     /// One recognised text awaiting the user's decision.
@@ -23,11 +24,11 @@ final class OCRPresenter: ObservableObject {
     }
 
     /// Clips with an extraction in flight; the scrim/spinner shows while non-empty.
-    @Published private(set) var runningClipIDs: Set<Int64> = []
+    private(set) var runningClipIDs: Set<Int64> = []
     /// Non-nil while the result sheet is showing.
-    @Published private(set) var result: Result?
+    private(set) var result: Result?
     /// Runs in flight for clips without an id (never persisted).
-    @Published private(set) var anonymousRuns = 0
+    private(set) var anonymousRuns = 0
 
     /// True while any extraction runs.
     var isRunning: Bool { !runningClipIDs.isEmpty || anonymousRuns > 0 }

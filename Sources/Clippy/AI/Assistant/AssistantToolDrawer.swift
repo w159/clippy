@@ -3,7 +3,7 @@ import SwiftUI
 /// Lists the tools the assistant can call with a per-tool policy picker (AI-07,
 /// AI-12). Shows why the list is empty when the provider cannot call tools.
 struct AssistantToolDrawer: View {
-    @ObservedObject var viewModel: AIAssistantViewModel
+    var viewModel: AIAssistantViewModel
     @Environment(\.clippyTokens) private var tokens
 
     var body: some View {

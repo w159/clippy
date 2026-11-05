@@ -1,4 +1,3 @@
-import Combine
 import XCTest
 @testable import Clippy
 
@@ -58,19 +57,15 @@ final class ManagedPreferencesTests: XCTestCase {
         AppSettings.managed = .none
         settings.mcpEnabled = false
 
-        var emitted: [Bool] = []
-        let cancellable = settings.$mcpEnabled.dropFirst().sink { emitted.append($0) }
-        defer { cancellable.cancel() }
-
         AppSettings.managed = .forcing([AppSettings.Keys.mcpEnabled])
-        settings.mcpEnabled = true
+        let rejected = observedChangeCount(tracking: { _ = settings.mcpEnabled }, during: { settings.mcpEnabled = true })
         XCTAssertFalse(settings.mcpEnabled)
-        XCTAssertEqual(emitted, [], "a rejected write must never reach subscribers (it would start the MCP server)")
+        XCTAssertEqual(rejected, 0, "a rejected write must never reach observers (it would start the MCP server)")
 
         AppSettings.managed = .none
-        settings.mcpEnabled = true
+        let accepted = observedChangeCount(tracking: { _ = settings.mcpEnabled }, during: { settings.mcpEnabled = true })
         XCTAssertTrue(settings.mcpEnabled)
-        XCTAssertEqual(emitted, [true], "an accepted write emits exactly once")
+        XCTAssertEqual(accepted, 1, "an accepted write notifies observers")
     }
 
     func testForcedOnePasswordDelayIsReadOnlyAndUnforcedWritesClamp() {
@@ -80,21 +75,23 @@ final class ManagedPreferencesTests: XCTestCase {
         AppSettings.managed = .none
         settings.onePasswordAutoClearDelaySecs = 45
 
-        var emitted: [Int] = []
-        let cancellable = settings.$onePasswordAutoClearDelaySecs.dropFirst().sink { emitted.append($0) }
-        defer { cancellable.cancel() }
-
         AppSettings.managed = .forcing([AppSettings.Keys.onePasswordAutoClearDelaySecs])
-        settings.onePasswordAutoClearDelaySecs = 600
+        let rejected = observedChangeCount(
+            tracking: { _ = settings.onePasswordAutoClearDelaySecs },
+            during: { settings.onePasswordAutoClearDelaySecs = 600 })
         XCTAssertEqual(settings.onePasswordAutoClearDelaySecs, 45)
-        XCTAssertTrue(emitted.isEmpty)
+        XCTAssertEqual(rejected, 0)
 
         AppSettings.managed = .none
-        settings.onePasswordAutoClearDelaySecs = 99_999
+        let clampedHigh = observedChangeCount(
+            tracking: { _ = settings.onePasswordAutoClearDelaySecs },
+            during: { settings.onePasswordAutoClearDelaySecs = 99_999 })
         XCTAssertEqual(settings.onePasswordAutoClearDelaySecs, 600)
-        settings.onePasswordAutoClearDelaySecs = 1
+        let clampedLow = observedChangeCount(
+            tracking: { _ = settings.onePasswordAutoClearDelaySecs },
+            during: { settings.onePasswordAutoClearDelaySecs = 1 })
         XCTAssertEqual(settings.onePasswordAutoClearDelaySecs, 10)
-        XCTAssertEqual(emitted, [600, 10])
+        XCTAssertEqual([clampedHigh, clampedLow], [1, 1], "each accepted write notifies observers")
     }
 
     func testForcedKeysListsOnlyForcedSecurityKeys() {

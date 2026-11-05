@@ -4,7 +4,7 @@ import SwiftUI
 /// Smart Suggestions settings: behavior, Accessibility, on-device model, dismissals, diagnostics, cache.
 struct IntelligenceSettingsPane: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @State private var notice: PaneNotice?
     @State private var accessibilityTrusted = CaretLocator.isTrusted
     @State private var useFoundationModels = SuggestionTuning.useFoundationModels

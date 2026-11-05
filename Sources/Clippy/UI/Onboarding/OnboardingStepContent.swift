@@ -3,7 +3,7 @@ import UserNotifications
 
 /// The body of the current onboarding step. Each step reads live state from the view model.
 struct OnboardingStepContent: View {
-    @ObservedObject var viewModel: OnboardingViewModel
+    var viewModel: OnboardingViewModel
     @Environment(\.clippyTokens) private var tokens
 
     var body: some View {

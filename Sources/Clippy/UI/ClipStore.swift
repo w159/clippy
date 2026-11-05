@@ -1,6 +1,6 @@
-import Combine
 import Foundation
 import GRDB
+import Observation
 
 #if canImport(AppKit)
     import AppKit
@@ -15,38 +15,39 @@ enum SuggestionsState: Equatable {
 /// membership; FTS5 search when a query is typed. "Pinned" is derived:
 /// a clip is pinned when it belongs to at least one category.
 @MainActor
-final class ClipStore: ObservableObject {
-    @Published var query: String = "" {
+@Observable
+final class ClipStore {
+    var query: String = "" {
         didSet { scheduleRefilter() }
     }
     /// Widened from private(set): ClipStore+Older (paged history) appends to it.
-    @Published var clips: [Clip] = []
+    var clips: [Clip] = []
     /// Clips loaded past the resident window by `loadOlder(before:limit:)`, newest
     /// first, appended to `clips` in browse mode. Dropped by `resetOlder()`.
-    @Published var olderClips: [Clip] = []
+    var olderClips: [Clip] = []
     /// False once `loadOlder` reached the oldest clip.
-    @Published var hasMoreOlder = true
-    @Published private(set) var categories: [Category] = []
-    @Published private(set) var membership: [Int64: Set<Int64>] = [:] {
+    var hasMoreOlder = true
+    private(set) var categories: [Category] = []
+    private(set) var membership: [Int64: Set<Int64>] = [:] {
         didSet { categoryPaneVersion &+= 1 }
     }
     /// Per-category ordered clip ID lists, keyed by categoryID.
     /// Reflects clip_category.sortOrder so category panes can present clips
     /// in user-defined order rather than global createdAt order.
-    @Published var categoryClipOrder: [Int64: [Int64]] = [:] {
+    var categoryClipOrder: [Int64: [Int64]] = [:] {
         didSet { categoryPaneVersion &+= 1 }
     }
     /// Last search failure. Non-nil triggers an error banner with Retry in the
     /// panel. Cleared on the next successful search or when the query empties.
-    @Published var searchError: String?
+    var searchError: String?
     /// Trimmed query whose results are in `clips`. Lags `query` while a search
     /// is debounced or running; `hasPendingSearch` compares the two so Return
     /// pressed mid-typing can wait for the results it means instead of pasting
     /// the previous query's top clip.
-    @Published private(set) var completedQuery = ""
+    private(set) var completedQuery = ""
     /// Last DB observation failure. Non-nil triggers an error banner with a
     /// Retry that re-starts the ValueObservation pipelines.
-    @Published var observationError: String?
+    var observationError: String?
     /// Clip IDs with OCR (Extract Text) currently in flight. Lives on the store,
     /// not view state, because PanelController.show() builds a fresh ClipListView
     /// per presentation — view @State would drop both the spinner and the
@@ -55,30 +56,30 @@ final class ClipStore: ObservableObject {
     /// OCR-05: this whole-store set still invalidates every observer on each OCR
     /// start/finish. New code should observe `ocrProgress(for:)` instead, which
     /// invalidates only the affected card; callers migrate off this set over time.
-    @Published var ocrInFlightClipIDs: Set<Int64> = []
+    var ocrInFlightClipIDs: Set<Int64> = []
     /// Per-clip OCR state, created on demand (see ClipStore+OCR.swift).
-    var ocrProgressByClip: [Int64: OCRProgress] = [:]
+    @ObservationIgnored var ocrProgressByClip: [Int64: OCRProgress] = [:]
     /// Identity of the OCR run currently owning each clip; a completion whose
     /// token no longer matches was cancelled and must not write anything.
-    var ocrRunTokens: [Int64: UUID] = [:]
+    @ObservationIgnored var ocrRunTokens: [Int64: UUID] = [:]
     /// Last category create/rename/delete failure (DAT-14) or failed background
     /// write (pin, delete, rename, filing; see `performWrite`). UI shows it as a
     /// banner and clears it.
-    @Published var categoryError: String?
+    var categoryError: String?
     /// Last "load older" page failure. Loaded rows are kept; the list foot shows
     /// this with a Retry that calls `loadOlder` again. Cleared on the next success.
-    @Published var olderLoadError: String?
+    var olderLoadError: String?
     /// Non-nil when the clip table is at or above 90% of the configured ceiling (DAT-06).
-    @Published private(set) var storageWarning: StorageUsage?
+    private(set) var storageWarning: StorageUsage?
 
     /// Ranked Smart Suggestions for the current screen context (or a
     /// "Find Similar" clip). In memory only; dropped when the panel hides.
-    @Published var suggestions: [Suggestion] = []
-    @Published var suggestionsState: SuggestionsState = .disabled
+    var suggestions: [Suggestion] = []
+    var suggestionsState: SuggestionsState = .disabled
     /// Human summary shown in the pane header. Never raw screen text.
-    @Published var suggestionsContextSummary: String?
+    var suggestionsContextSummary: String?
 
-    var recents: [Clip] = [] {
+    @ObservationIgnored var recents: [Clip] = [] {
         didSet {
             // The observation window is re-published for any write to clips (OCR
             // every ~2 s, each capture). An identical window changes nothing the
@@ -97,56 +98,56 @@ final class ClipStore: ObservableObject {
         }
     }
     /// id -> clip lookup over `recents`, kept in sync by `recents.didSet`.
-    var recentsByID: [Int64: Clip] = [:]
+    @ObservationIgnored var recentsByID: [Int64: Clip] = [:]
     /// Decodes the observed window incrementally (see ClipWindowLoader).
     let windowLoader = ClipWindowLoader()
-    private var searchDebounce: Task<Void, Never>?
+    @ObservationIgnored private var searchDebounce: Task<Void, Never>?
     /// The in-flight FTS read, cancelled whenever the query or window changes.
-    private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private var searchTask: Task<Void, Never>?
     /// Monotonic generation for the async FTS search. Incremented on every
     /// refilter that kicks off a background read; the completion discards
     /// results from any earlier generation so a fast-typed query or a DB pulse
     /// mid-search cannot overwrite the current results with stale ones.
-    var refilterToken = 0
+    @ObservationIgnored var refilterToken = 0
     /// Where each semantic-merged hit came from (search pass 2); empty unless the semantic opt-in produced results.
-    /// Deliberately not @Published: views read it together with `clips`, which is republished on any change.
-    var semanticMatches: [Int64: SearchMatchSource] = [:] {
+    /// Deliberately ignored by observation: views read it together with `clips`, which is changed on any write.
+    @ObservationIgnored var semanticMatches: [Int64: SearchMatchSource] = [:] {
         didSet { semanticMatchesAssignCount += 1 }
     }
     /// Test seam: how many times `semanticMatches` was assigned, so a pulse that clears and restores badges is visible.
-    private(set) var semanticMatchesAssignCount = 0
+    @ObservationIgnored private(set) var semanticMatchesAssignCount = 0
     /// Runs the keyword search off the main actor. A seam so tests can make it fail.
     typealias SearchRunner = @Sendable (ClipDatabase, String, Int) throws -> [Clip]
-    var searchRunner: SearchRunner = { database, query, limit in
+    @ObservationIgnored var searchRunner: SearchRunner = { database, query, limit in
         try database.searchClips(matching: query, limit: limit)
     }
     /// Gate and engine of the semantic pass; replaced in tests.
-    var semanticEnvironment = SemanticSearchEnvironment.standard
+    @ObservationIgnored var semanticEnvironment = SemanticSearchEnvironment.standard
     /// The in-flight semantic merge; cancelled by every new search so overlapping
     /// runs do not each load and embed the candidate pool.
-    var semanticTask: Task<Void, Never>?
+    @ObservationIgnored var semanticTask: Task<Void, Never>?
     /// Generation of the newest merge. A merge whose id is no longer current drops
     /// its result even if it finished before the cancel reached it.
-    var semanticRunID = 0
+    @ObservationIgnored var semanticRunID = 0
     /// Highest merge generation that finished (published or fell back).
-    var semanticCompletedRunID = 0
+    @ObservationIgnored var semanticCompletedRunID = 0
     /// Trimmed query whose fused (keyword plus semantic) order is on screen. While
     /// it matches the query being refreshed, a DB pulse keeps that order up
     /// instead of flashing the keyword-only one.
-    var fusedQuery: String?
+    @ObservationIgnored var fusedQuery: String?
     /// Bumped whenever the inputs of `clipsForCategory` change.
-    var categoryPaneVersion = 0
+    @ObservationIgnored var categoryPaneVersion = 0
     /// Filtered category-pane results for one query and data version.
-    var categoryPaneCache: (query: String, version: Int, results: [Int64: [Clip]])?
+    @ObservationIgnored var categoryPaneCache: (query: String, version: Int, results: [Int64: [Clip]])?
     /// The query last parsed for category-pane filtering, with when it was parsed
     /// (relative dates such as `#yesterday` move with the clock).
-    var localQueryParse: (query: String, parsed: ParsedQuery, at: Date)?
+    @ObservationIgnored var localQueryParse: (query: String, parsed: ParsedQuery, at: Date)?
     /// How many times a category-pane query was parsed; observable in tests.
-    var localQueryParseCount = 0
+    @ObservationIgnored var localQueryParseCount = 0
     /// Generation for async suggestion ranking; stale completions are dropped.
-    var suggestionsToken = 0
-    private var clipsCancellable: AnyDatabaseCancellable?
-    private var categoriesCancellable: AnyDatabaseCancellable?
+    @ObservationIgnored var suggestionsToken = 0
+    @ObservationIgnored private var clipsCancellable: AnyDatabaseCancellable?
+    @ObservationIgnored private var categoriesCancellable: AnyDatabaseCancellable?
     let database: ClipDatabase
     let monitor: ClipboardMonitor?
     /// Pasteboard the OCR result is written to. Injectable for tests so
@@ -356,7 +357,7 @@ final class ClipStore: ObservableObject {
     /// removed from every other category so it lives in exactly one.
     func fileClip(id clipID: Int64, intoCategory categoryID: Int64) {
         // Snapshot the memberships on the main thread (`membership` is
-        // @Published), then run removals + add as one enqueued unit so another
+        // observed), then run removals + add as one enqueued unit so another
         // mutation cannot interleave between them.
         let others =
             AppSettings.shared.allowMultipleCategories
@@ -401,7 +402,7 @@ final class ClipStore: ObservableObject {
         searchDebounce = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 180_000_000)
             guard !Task.isCancelled, let self else { return }
-            // refilter touches @Published state; route it through the main
+            // refilter touches observed state; route it through the main
             // thread so SwiftUI observes the change on the right queue.
             await MainActor.run { self.refilter() }
         }

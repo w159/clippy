@@ -1,16 +1,18 @@
 import AppKit
 import SwiftUI
+import Observation
 
 // MARK: - Image
 /// Working image plus undo registration for transforms (EDT-08). A class so
 /// `UndoManager` can target it.
 @MainActor
-final class ImageEditModel: ObservableObject {
-    @Published private(set) var working: NSImage?
+@Observable
+final class ImageEditModel {
+    private(set) var working: NSImage?
     /// A rotate/flip/crop was applied since the editor opened.
-    @Published private(set) var isEdited = false
+    private(set) var isEdited = false
     /// Pixel size and alpha of `working`, recomputed only when the image changes.
-    @Published private(set) var info: ImageInfo
+    private(set) var info: ImageInfo
 
     init(image: NSImage?) {
         working = image
@@ -49,10 +51,10 @@ struct ImageClipEditor: View {
     let persistence: ClipEditorPersistence
     let onClose: () -> Void
 
-    @ObservedObject var settings = AppSettings.shared
+    var settings = AppSettings.shared
     @Environment(\.clippyTokens) var dsTokens
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    @StateObject var model: ImageEditModel
+    @State var model: ImageEditModel
     @Environment(\.undoManager) var undoManager
     @State var title: String
     @State var baseTitle: String
@@ -89,7 +91,7 @@ struct ImageClipEditor: View {
         self.onClose = onClose
         _title = State(initialValue: clip.userTitle ?? "")
         _baseTitle = State(initialValue: clip.userTitle ?? "")
-        _model = StateObject(wrappedValue: ImageEditModel(
+        _model = State(initialValue: ImageEditModel(
             image: store.imageURL(for: clip).flatMap { NSImage(contentsOf: $0) }))
     }
 

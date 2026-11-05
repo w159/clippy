@@ -1,5 +1,5 @@
-import Combine
 import Foundation
+import Observation
 
 /// What an external trigger (a `clippy://` link) asks the open panel to do.
 /// The panel rebuilds its view on show and the link handler cannot reach the
@@ -32,12 +32,13 @@ struct PanelLaunchQueue {
 }
 
 @MainActor
-final class PanelLaunchRequest: ObservableObject {
+@Observable
+final class PanelLaunchRequest {
     static let shared = PanelLaunchRequest()
 
-    /// Increments on every post so the panel's `onReceive` fires.
-    @Published private(set) var token = 0
-    private var queue = PanelLaunchQueue()
+    /// Increments on every post so the panel's `onChange` fires.
+    private(set) var token = 0
+    @ObservationIgnored private var queue = PanelLaunchQueue()
 
     func post(_ action: PanelLaunchAction) {
         queue.post(action)

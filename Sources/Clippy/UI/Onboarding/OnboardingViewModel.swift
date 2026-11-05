@@ -1,34 +1,35 @@
-import Combine
 import Foundation
 import UserNotifications
+import Observation
 
 /// Live system state behind the walkthrough. Every value comes from the real API
 /// (CaretLocator, AppSettings, OCRIndexPreferences, LaunchAtLogin, UNUserNotificationCenter).
 @MainActor
-final class OnboardingViewModel: ObservableObject {
+@Observable
+final class OnboardingViewModel {
     /// Step machine.
-    @Published var model = OnboardingModel()
+    var model = OnboardingModel()
     /// Accessibility trust, polled while the window is open.
-    @Published private(set) var accessibilityTrusted = CaretLocator.isTrusted
+    private(set) var accessibilityTrusted = CaretLocator.isTrusted
     /// Notification authorization.
-    @Published private(set) var notificationStatus: UNAuthorizationStatus = .notDetermined
-    @Published private(set) var requestingNotifications = false
+    private(set) var notificationStatus: UNAuthorizationStatus = .notDetermined
+    private(set) var requestingNotifications = false
     /// Login item state.
-    @Published private(set) var launchStatus = LaunchAtLogin.status
+    private(set) var launchStatus = LaunchAtLogin.status
     /// Last error from toggling the login item.
-    @Published var launchError: String?
+    var launchError: String?
     /// Smart Suggestions opt-in mirror.
-    @Published var suggestionsOn = AppSettings.shared.suggestionsEnabled
+    var suggestionsOn = AppSettings.shared.suggestionsEnabled
     /// OCR indexing opt-in mirror.
-    @Published var ocrOn = OCRIndexPreferences.isEnabled
+    var ocrOn = OCRIndexPreferences.isEnabled
 
-    private var timer: Timer?
-    private var notificationRefreshTask: Task<Void, Never>?
-    private var notificationRequestTask: Task<Void, Never>?
-    private var didClose = false
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var notificationRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var notificationRequestTask: Task<Void, Never>?
+    @ObservationIgnored private var didClose = false
     private let defaults: UserDefaults
     /// Called after the walkthrough finishes or is dismissed.
-    var onClose: (() -> Void)?
+    @ObservationIgnored var onClose: (() -> Void)?
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 

@@ -4,7 +4,7 @@ import SwiftUI
 /// `selection.activeRule`. Reuses `SmartCollectionEditorSheet` for create/edit.
 struct SmartCollectionsSidebarSection: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject var selection: SmartCollectionSelection
+    var selection: SmartCollectionSelection
     @State private var editing: EditTarget?
     @State private var deleting: SmartCollection?
 

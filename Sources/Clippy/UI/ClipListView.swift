@@ -6,8 +6,8 @@ import AppKit
 /// pane slides between History and a selected category. Keyboard driven end
 /// to end.
 struct ClipListView: View {
-    @ObservedObject var store: ClipStore
-    @ObservedObject var settings = AppSettings.shared
+    @Bindable var store: ClipStore
+    var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     /// Contrast-checked semantic tokens (text roles, status colors, metrics).
     /// `tokens` below is the legacy palette the panel chrome was built on.
@@ -93,7 +93,7 @@ struct ClipListView: View {
     /// Local event monitor for right-click and modifier changes.
     @State var eventMonitor = PanelEventMonitor()
     /// AI runner used by the context-menu AI submenu.
-    @StateObject var aiRunner = AIActionRunner()
+    @State var aiRunner = AIActionRunner()
     /// The clip the AI action is being run against (needed so onApply can write back).
     @State var aiTargetClip: Clip?
     /// The action awaiting an instruction from the user (for {instruction} templates).
@@ -129,7 +129,7 @@ struct ClipListView: View {
     /// Feature integration state: sheets, preview column width, auto-file tray, smart filter (see `ClipListView+Features`).
     @State var features = ClipListFeatureState()
     /// Smart collections shown in the sidebar; its rule filters History.
-    @StateObject var smartCollections = SmartCollectionSelection()
+    @State var smartCollections = SmartCollectionSelection()
     /// Preview column opt-in, observed so the Settings pane and palette toggles apply live.
     @AppStorage(PreviewColumnPreferences.enabledKey) var previewColumnEnabled = PreviewColumnPreferences.defaultEnabled
 
@@ -269,7 +269,7 @@ struct ClipListView: View {
     private var launchLayer: some View {
         trackedLayout
         .onAppear { applyLaunchRequest() }
-        .onReceive(PanelLaunchRequest.shared.$token.dropFirst()) { _ in applyLaunchRequest() }
+        .onChange(of: PanelLaunchRequest.shared.token) { _, _ in applyLaunchRequest() }
     }
 
     private var sheetsLayer: some View {

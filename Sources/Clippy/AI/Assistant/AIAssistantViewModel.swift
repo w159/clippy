@@ -1,11 +1,13 @@
 import Foundation
 import SwiftUI
+import Observation
 
 /// Drives one agentic conversation. Display messages are addressed by id, never
 /// by index, so clearing or retrying while a reply streams cannot trap (AI-01);
 /// what the model sees is the structured `AITranscript` (AI-05).
 @MainActor
-final class AIAssistantViewModel: ObservableObject {
+@Observable
+final class AIAssistantViewModel {
     enum State: Equatable { case ready, streaming, notConfigured(String) }
 
     struct PendingConfirmation: Identifiable {
@@ -24,22 +26,22 @@ final class AIAssistantViewModel: ObservableObject {
         var policy: AIToolPolicy
     }
 
-    @Published private(set) var messages: [AssistantMessage] = []
-    @Published private(set) var state: State = .ready
-    @Published var inputText: String = ""
+    private(set) var messages: [AssistantMessage] = []
+    private(set) var state: State = .ready
+    var inputText: String = ""
     /// The clip the user explicitly attached (AI-03). Never set automatically.
-    @Published var contextClip: Clip?
-    @Published var pendingConfirmation: PendingConfirmation?
+    var contextClip: Clip?
+    var pendingConfirmation: PendingConfirmation?
     /// Tools the model is offered, with policies, for the drawer.
-    @Published private(set) var toolInfos: [ToolInfo] = []
-    @Published private(set) var toolsSupported = true
+    private(set) var toolInfos: [ToolInfo] = []
+    private(set) var toolsSupported = true
 
     let env: AIAssistantEnvironment
-    private(set) var transcript = AITranscript()
-    private var runningTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var transcript = AITranscript()
+    @ObservationIgnored private var runningTask: Task<Void, Never>?
     /// Identifies the live turn. A stale task (cleared or superseded) sees a
     /// different token and stops touching shared state.
-    private var turnToken = UUID()
+    @ObservationIgnored private var turnToken = UUID()
 
     init(env: AIAssistantEnvironment = .live()) {
         self.env = env

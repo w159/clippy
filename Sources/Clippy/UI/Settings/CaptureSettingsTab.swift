@@ -5,7 +5,7 @@ import SwiftUI
 // Launch capture, blocklist, sensitive auto-clear and paste profiles live in CaptureSettingsTab+Policy.swift.
 
 struct CaptureSettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
+    @Bindable private var settings = AppSettings.shared
     @Environment(\.clippyTokens) private var tokens
     @State private var soundVolumeSlider: Double = Double(AppSettings.shared.captureSoundVolume)
 

@@ -17,7 +17,7 @@ struct PanelHeaderView<Search: View>: View {
     /// The search field shown between title and controls; empty for panes without search.
     private let search: Search
 
-    @ObservedObject private var grid = GridPreferences.shared
+    @Bindable private var grid = GridPreferences.shared
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var overflowHovered = false

@@ -5,7 +5,7 @@ import SwiftUI
 /// The AI Assistant pane shown when `.assistant` is selected in the sidebar.
 /// Injects the design-system environment, then hosts `AssistantPanelBody`.
 struct AIAssistantPanelView: View {
-    @ObservedObject var store: ClipStore
+    var store: ClipStore
     /// The clip selected when the panel was opened (or re-selected while open).
     /// Offered as an explicit attach chip; never attached automatically (AI-03).
     var contextClip: Clip? = nil
@@ -19,12 +19,12 @@ struct AIAssistantPanelView: View {
 
 /// Header, transcript, banners, confirmation overlay and composer.
 struct AssistantPanelBody: View {
-    @ObservedObject var store: ClipStore
+    var store: ClipStore
     var contextClip: Clip?
     let onOpenSettings: () -> Void
 
-    @StateObject var viewModel = AIAssistantViewModel()
-    @ObservedObject var settings = AppSettings.shared
+    @State var viewModel = AIAssistantViewModel()
+    var settings = AppSettings.shared
     @Environment(\.clippyTokens) var tokens
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @FocusState var inputFocused: Bool

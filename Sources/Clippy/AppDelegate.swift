@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Darwin
 import Sparkle
 import SwiftUI
@@ -8,7 +7,6 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var settingsWindow: NSWindow?
-    var statusIconObservers: [AnyCancellable] = []
     let onboardingController = OnboardingWindowController()
     let scriptsMenu = NSMenu()
     let keystrokeService = KeystrokeService()

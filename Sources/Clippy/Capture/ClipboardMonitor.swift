@@ -1,6 +1,6 @@
 import AppKit
-import Combine
 import UniformTypeIdentifiers
+import Observation
 
 extension Notification.Name {
     /// Posted on the main thread immediately after a clip is saved, at the same
@@ -12,10 +12,11 @@ extension Notification.Name {
 /// Watches NSPasteboard.general by polling changeCount (the only supported
 /// detection mechanism on macOS) and stores new items.
 ///
-/// `ObservableObject` so the UI can surface `failureCount` / `hasRepeatedFailures`
+/// `@Observable` so the UI can surface `failureCount` / `hasRepeatedFailures`
 /// (CAP-05) and `readingBlockedByPrivacy` (PLT-09).
 @MainActor
-final class ClipboardMonitor: ObservableObject {
+@Observable
+final class ClipboardMonitor {
     let database: ClipDatabase
     let pasteboard: NSPasteboard
     /// Attributes copies to the app that made them (CAP-04).
@@ -24,34 +25,33 @@ final class ClipboardMonitor: ObservableObject {
     private let flagStore: SensitiveFlagStore
     /// Remembers the last text clip for "copy twice to append" (FEAT-13).
     private let appendTracker = ClipAppendTracker()
-    private var timer: Timer?
-    private var lastChangeCount = 0
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var lastChangeCount = 0
 
     /// Change counts of pasteboard writes Clippy itself produced. Exactly these
     /// are skipped, so a foreign copy made around the same moment is never lost
     /// (CAP-02).
-    private var ownWriteCounts = Set<Int>()
+    @ObservationIgnored private var ownWriteCounts = Set<Int>()
 
     /// Legacy one-shot armed by `ignoreNextChange()`: skips the change that is
     /// exactly one past `baseline`, and only within its short window.
-    private var armedIgnore: (baseline: Int, expires: Date)?
+    @ObservationIgnored private var armedIgnore: (baseline: Int, expires: Date)?
     private static let armedIgnoreWindow: TimeInterval = 1.5
 
     /// When the previous poll ran, and the start of the window the current
     /// change was first seen in; the source app is resolved against that window.
-    private var lastPollDate = Date()
-    private var sourceWindowStart = Date()
+    @ObservationIgnored private var lastPollDate = Date()
+    @ObservationIgnored private var sourceWindowStart = Date()
 
     /// A change whose file capture failed outright, allowed to run again.
-    private var forcedRetryChangeCount: Int?
-    private var fileRetryCounts: [Int: Int] = [:]
+    @ObservationIgnored private var forcedRetryChangeCount: Int?
+    @ObservationIgnored private var fileRetryCounts: [Int: Int] = [:]
     private static let maxFileRetries = 2
 
     /// The changeCount of a pasteboard write we have seen but that had not been
     /// filled in yet, and when we first saw it. See tick().
-    private var unresolvedChangeCount: Int?
-    private var unresolvedSince = Date.distantPast
+    @ObservationIgnored private var unresolvedChangeCount: Int?
+    @ObservationIgnored private var unresolvedSince = Date.distantPast
 
     /// How long a change may stay unresolved before it is retired anyway. Long
     /// enough for the slowest multi-flavor writers, short enough that a flavor
@@ -61,13 +61,13 @@ final class ClipboardMonitor: ObservableObject {
     // MARK: Published health (main thread only)
 
     /// Total capture failures since launch (CAP-05).
-    @Published private(set) var failureCount = 0
+    private(set) var failureCount = 0
     /// Failures since the last successful capture.
-    @Published private(set) var consecutiveFailures = 0
+    private(set) var consecutiveFailures = 0
     /// The most recent failure, described without clip content.
-    @Published private(set) var lastFailure: String?
+    private(set) var lastFailure: String?
     /// True while macOS denies this app pasteboard reads (PLT-09).
-    @Published private(set) var readingBlockedByPrivacy = false
+    private(set) var readingBlockedByPrivacy = false
 
     /// Consecutive failures at which `hasRepeatedFailures` turns true.
     static let repeatedFailureThreshold = 3
@@ -75,7 +75,7 @@ final class ClipboardMonitor: ObservableObject {
 
     /// Delivers the user notification for an auto-cleared sensitive clip.
     /// Replaceable so tests never touch UserNotifications.
-    var autoClearNotifier: (_ title: String, _ body: String) -> Void = { CaptureNotifier.post(title: $0, body: $1) }
+    @ObservationIgnored var autoClearNotifier: (_ title: String, _ body: String) -> Void = { CaptureNotifier.post(title: $0, body: $1) }
 
     /// Serial queue for the heavy capture work (DB write, FTS reindex, eviction,
     /// media file copy, thumbnail encoding). The poll timer fires on the main
@@ -87,7 +87,7 @@ final class ClipboardMonitor: ObservableObject {
     /// concurrent evictions from racing on the shared DatabaseQueue.
     private let captureQueue = DispatchQueue(label: "com.bytesavvy.clippy.capture-save", qos: .userInitiated)
 
-    var isPaused = false
+    @ObservationIgnored var isPaused = false
 
     /// A pasteboard file URL that survived classification, with the facts the
     /// save loop needs so it does not re-stat the file off-main.
@@ -208,11 +208,9 @@ final class ClipboardMonitor: ObservableObject {
         sourceWindowStart = Date()
         SensitiveFlagStore.register(flagStore)
         scheduleTimer()
-        AppSettings.shared.$pollingIntervalMs
-            .removeDuplicates()
-            .dropFirst()
-            .sink { [weak self] _ in self?.scheduleTimer() }
-            .store(in: &cancellables)
+        observeChanges(of: { AppSettings.shared.pollingIntervalMs }) { [weak self] _ in
+            self?.scheduleTimer()
+        }
     }
 
     /// Legacy entry point for writers that cannot report their change count:

@@ -1,6 +1,6 @@
-import Combine
 import Foundation
 import LocalAuthentication
+import Observation
 
 /// Verifies the user's identity. The production implementation uses LAContext
 /// (Touch ID with password fallback); tests inject a fake.
@@ -35,23 +35,24 @@ struct LocalAuthenticator: AppLockAuthenticator {
 /// panel is opened while already locked. Main-thread only (UI state), like
 /// the other observable settings objects.
 @MainActor
-final class AppLock: ObservableObject {
+@Observable
+final class AppLock {
 
     static let shared = AppLock()
 
     /// True while history must not be shown. Starts locked when the feature is on.
-    @Published private(set) var isLocked: Bool
+    private(set) var isLocked: Bool
     /// True while a system authentication prompt is up.
-    @Published private(set) var isAuthenticating = false
+    private(set) var isAuthenticating = false
     /// Set when the last attempt failed or was cancelled.
-    @Published private(set) var lastAttemptFailed = false
+    private(set) var lastAttemptFailed = false
 
     private let preferences: AppLockPreferences
     private let authenticator: AppLockAuthenticator
     private let audit: AuditLog
     private let now: () -> Date
-    private var lastActivity: Date
-    private var timer: Timer?
+    @ObservationIgnored private var lastActivity: Date
+    @ObservationIgnored private var timer: Timer?
 
     init(preferences: AppLockPreferences = AppLockPreferences(),
          authenticator: AppLockAuthenticator = LocalAuthenticator(),

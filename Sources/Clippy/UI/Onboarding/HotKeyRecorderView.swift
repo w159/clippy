@@ -1,12 +1,14 @@
 import AppKit
 import Carbon.HIToolbox
 import SwiftUI
+import Observation
 
 /// Only one recorder may capture keys at a time; a second click hands capture over.
 @MainActor
-private final class ActiveHotKeyRecorder: ObservableObject {
+@Observable
+private final class ActiveHotKeyRecorder {
     static let shared = ActiveHotKeyRecorder()
-    @Published var action: HotKeyAction?
+    var action: HotKeyAction?
 }
 
 /// Reusable recorder for one `HotKeyAction`. Click the field, press a chord;
@@ -15,9 +17,9 @@ private final class ActiveHotKeyRecorder: ObservableObject {
 struct HotKeyRecorderView: View {
     /// The action being bound.
     let action: HotKeyAction
-    @ObservedObject private var center = HotKeyCenter.shared
+    private var center = HotKeyCenter.shared
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var recorder = ActiveHotKeyRecorder.shared
+    private var recorder = ActiveHotKeyRecorder.shared
     @State private var isHovered = false
     @State private var warning: String?
     @FocusState private var fieldFocused: Bool

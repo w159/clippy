@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 /// Data access used by the selection model; injectable for tests.
 protocol SmartCollectionSource {
@@ -39,18 +39,19 @@ struct DatabaseSmartCollectionSource: SmartCollectionSource {
 /// Selection + counts for the sidebar's smart collections. The History list filters by `activeRule`
 /// (evaluate it with `ClipDatabase.clips(matching:)` or call `selectedClips()`), nil meaning no smart filter.
 @MainActor
-final class SmartCollectionSelection: ObservableObject {
+@Observable
+final class SmartCollectionSelection {
     /// Highest count displayed; larger sets show as `countCap+`.
     static let countCap = 999
 
     /// Loaded collections.
-    @Published private(set) var collections: [SmartCollection] = []
+    private(set) var collections: [SmartCollection] = []
     /// Clip counts by collection id.
-    @Published private(set) var counts: [Int64: Int] = [:]
+    private(set) var counts: [Int64: Int] = [:]
     /// Selected collection id, nil when no smart collection filters History.
-    @Published private(set) var selectedID: Int64?
+    private(set) var selectedID: Int64?
     /// Last error message (never contains clip content).
-    @Published private(set) var errorText: String?
+    private(set) var errorText: String?
 
     private let source: SmartCollectionSource
 

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// One dismissal a user can apply to a suggestion (INT-07).
 enum SuggestionFeedbackAction: Equatable {
@@ -46,11 +47,12 @@ struct SuggestionFeedback {
 
 /// Owns the undo toast and removes dismissed rows from the store's list.
 @MainActor
-final class SuggestionFeedbackModel: ObservableObject {
+@Observable
+final class SuggestionFeedbackModel {
     /// Message of the visible undo toast.
-    @Published var toast: String?
-    private var pending: (action: SuggestionFeedbackAction, clip: Clip, before: [Suggestion])?
-    private var dismissTask: Task<Void, Never>?
+    var toast: String?
+    @ObservationIgnored private var pending: (action: SuggestionFeedbackAction, clip: Clip, before: [Suggestion])?
+    @ObservationIgnored private var dismissTask: Task<Void, Never>?
     private let feedback: SuggestionFeedback
 
     init(feedback: SuggestionFeedback = SuggestionFeedback()) { self.feedback = feedback }

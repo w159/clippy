@@ -4,9 +4,9 @@ import SwiftUI
 /// `SidebarRailItem` with tooltip, count in the tooltip and selection state.
 struct CategoryRail: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject var store: ClipStore
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var scriptStore = ScriptStore.shared
+    var store: ClipStore
+    private var settings = AppSettings.shared
+    private var scriptStore = ScriptStore.shared
     @Binding var selection: PanelSelection
     @Binding var hover: SidebarDropRow?
     let historyCount: Int

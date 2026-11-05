@@ -7,7 +7,7 @@ import SwiftUI
 /// auto-collapsed below `SidebarMetrics.collapseBreakpoint`. Width and collapse
 /// state persist through `SidebarPreferences.shared`.
 struct SidebarSplitView<Sidebar: View, Content: View>: View {
-    @ObservedObject private var preferences = SidebarPreferences.shared
+    private var preferences = SidebarPreferences.shared
     @Environment(\.clippyTokens) private var tokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragStartWidth: CGFloat?

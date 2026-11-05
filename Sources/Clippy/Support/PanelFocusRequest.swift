@@ -1,20 +1,20 @@
-import Combine
 import Foundation
+import Observation
 
 /// PNL-04: "focus the panel's search field" request. AppDelegate posts
 /// `Notification.Name.clippyFocusPanelSearch` when the panel is already visible;
 /// this observable turns each post into an incremented `token` that the
-/// ClipListView owner can observe (`.onReceive(PanelFocusRequest.shared.$token)`
-/// or `.onChange(of:)`) to move focus to the search field without rebuilding
+/// ClipListView owner can observe (`.onChange(of: PanelFocusRequest.shared.token)`) to move focus to the search field without rebuilding
 /// the view.
 @MainActor
-final class PanelFocusRequest: ObservableObject {
+@Observable
+final class PanelFocusRequest {
     static let shared = PanelFocusRequest()
 
     /// Increments on every request. The initial value (0) is not a request.
-    @Published private(set) var token = 0
+    private(set) var token = 0
 
-    private var observer: NSObjectProtocol?
+    @ObservationIgnored private var observer: NSObjectProtocol?
 
     init(center: NotificationCenter = .default) {
         observer = center.addObserver(forName: .clippyFocusPanelSearch, object: nil, queue: .main) { [weak self] _ in
@@ -28,10 +28,10 @@ final class PanelFocusRequest: ObservableObject {
     }
 
     /// Increments on every request to focus the clip list. 0 is not a request.
-    @Published private(set) var listToken = 0
+    private(set) var listToken = 0
 
     /// Increments on every request to focus the sidebar. 0 is not a request.
-    @Published private(set) var sidebarToken = 0
+    private(set) var sidebarToken = 0
 
     /// Ask the search field to take focus.
     func request() {

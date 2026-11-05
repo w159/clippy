@@ -3,8 +3,8 @@ import SwiftUI
 /// Storage ceiling with current usage, plus a read-only iCloud sync summary.
 struct DataStorageSection: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var cloud = ICloudSyncService.shared
+    private var settings = AppSettings.shared
+    private var cloud = ICloudSyncService.shared
     @State private var ceiling = StorageCeiling.current
     @State private var usage: StorageUsage?
 

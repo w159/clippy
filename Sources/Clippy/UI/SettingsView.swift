@@ -4,8 +4,8 @@ import SwiftUI
 /// The settings window: a sidebar of panes with search (SET-09), or a pushing list when
 /// the window is compact. Each pane footer offers reset, export and import.
 struct SettingsView: View {
-    @ObservedObject private var settings = AppSettings.shared
-    @StateObject private var model: SettingsShellModel
+    private var settings = AppSettings.shared
+    @State private var model: SettingsShellModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hostWindow: NSWindow?
     @State private var highlightedHit = 0
@@ -13,7 +13,7 @@ struct SettingsView: View {
 
     /// `model` is injectable so tests can assert on selection and search state.
     init(model: SettingsShellModel? = nil) {
-        _model = StateObject(wrappedValue: model ?? SettingsShellModel())
+        _model = State(initialValue: model ?? SettingsShellModel())
     }
 
     var body: some View {

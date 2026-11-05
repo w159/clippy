@@ -51,7 +51,7 @@ extension View {
 
 /// Resolves settings at the root, with environment-driven accessibility preferences.
 private struct ClippyDesignSystemEnvironment: ViewModifier {
-    @ObservedObject private var settings = AppSettings.shared
+    private var settings = AppSettings.shared
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var colorScheme
 
@@ -61,7 +61,7 @@ private struct ClippyDesignSystemEnvironment: ViewModifier {
         // the shared value and the re-render below.
         settings.hostColorSchemeChanged(isDark: colorScheme == .dark)
         return content
-            .onChange(of: colorScheme) { _, _ in settings.objectWillChange.send() }
+            .onChange(of: colorScheme) { _, _ in settings.hostColorSchemeDidChange() }
             .environment(\.clippyTokens, ClippyTokens.resolve(from: settings.theme, contrast: contrast))
             .environment(\.clippyTextScale, ClippyTextScale.multiplier)
             .environment(\.clippyFontFamily, settings.fontFamily)

@@ -196,7 +196,7 @@ extension ClipListView {
 /// Observes `GridPreferences` so only the list body re-renders on a density or
 /// column change; the parent view does not need to observe it.
 struct GridPreferencesReader<Content: View>: View {
-    @ObservedObject private var prefs = GridPreferences.shared
+    private var prefs = GridPreferences.shared
     private let content: (GridPreferences) -> Content
 
     init(@ViewBuilder content: @escaping (GridPreferences) -> Content) {

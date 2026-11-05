@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Built with Swift 6.3; app state uses the Observation framework (`@Observable`) instead of Combine `ObservableObject`.
 - Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
 - The New pill on a Settings pane now clears as soon as that pane is shown, including from search, and stays cleared after relaunch.
 - The default theme is Clean Light again, as before 2.3.0. Automatic (Clean Light in light mode, GitHub Dark in dark mode) is still available in Settings.

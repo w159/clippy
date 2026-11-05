@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// What the 1Password pane is showing. Exactly one at a time, so the view can
 /// never sit on an unexplained spinner (OPW-01).
@@ -22,15 +23,16 @@ enum OnePasswordViewState: Equatable {
 /// still the current one (OPW-02). The `op` binary is reached through the
 /// service's injectable runner, so tests script every transition.
 @MainActor
-final class OnePasswordViewModel: ObservableObject {
-    @Published private(set) var state: OnePasswordViewState = .loading
-    @Published private(set) var items: [OPItem] = []
-    @Published private(set) var expandedItemID: String?
-    @Published private(set) var detail: OPItemDetail?
-    @Published private(set) var detailLoading = false
-    @Published private(set) var detailError: String?
+@Observable
+final class OnePasswordViewModel {
+    private(set) var state: OnePasswordViewState = .loading
+    private(set) var items: [OPItem] = []
+    private(set) var expandedItemID: String?
+    private(set) var detail: OPItemDetail?
+    private(set) var detailLoading = false
+    private(set) var detailError: String?
     /// True while an `op signin` request is running.
-    @Published private(set) var signingIn = false
+    private(set) var signingIn = false
 
     /// Builds the service for the current vault setting, so a vault change takes
     /// effect on the next load without recreating the model.
@@ -41,11 +43,11 @@ final class OnePasswordViewModel: ObservableObject {
     /// so a runner that never returns still resolves to `.error`.
     private let deadline: TimeInterval
 
-    private var loadTask: Task<Void, Never>?
-    private var detailTask: Task<Void, Never>?
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var detailTask: Task<Void, Never>?
     // Bumped whenever a load/detail is replaced; results carrying an older value are dropped.
-    private var loadGeneration = 0
-    private var detailGeneration = 0
+    @ObservationIgnored private var loadGeneration = 0
+    @ObservationIgnored private var detailGeneration = 0
 
     init(makeService: @escaping () -> OnePasswordService,
          probeInstalled: @escaping () -> Bool = { OnePasswordService.refreshInstalled() },

@@ -7,8 +7,8 @@ import UniformTypeIdentifiers
 /// A list of all AI actions (built-in + custom) with full create/edit/delete
 /// support. Built-ins are editable but non-deletable and restorable to defaults.
 struct AIActionsManagerView: View {
-    @ObservedObject private var store = AIActionStore.shared
-    @ObservedObject private var settings = AppSettings.shared
+    private var store = AIActionStore.shared
+    private var settings = AppSettings.shared
     @State private var editingAction: AIAction?
     @State private var isCreating = false
     @State private var deletingAction: AIAction?

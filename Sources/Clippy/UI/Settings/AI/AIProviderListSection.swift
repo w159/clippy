@@ -3,8 +3,8 @@ import SwiftUI
 /// The configured provider instances: active radio, status dot, duplicate and remove,
 /// plus the "+ Add provider" menu.
 struct AIProviderListSection: View {
-    @ObservedObject var model: AIProviderManagerModel
-    @ObservedObject var store: AIProviderStore
+    var model: AIProviderManagerModel
+    var store: AIProviderStore
     @Environment(\.clippyTokens) private var tokens
     @State private var pendingRemoval: ProviderInstance?
     private let gate = AIProviderSettingsLogic.ForcedGate()

@@ -12,8 +12,8 @@ extension ClipListView {
         searchField
             .onAppear { focusTarget = .search }
             // PNL-04: an already-visible panel focuses the field instead of rebuilding.
-            .onReceive(PanelFocusRequest.shared.$token.dropFirst()) { _ in focusTarget = .search }
-            .onReceive(PanelFocusRequest.shared.$listToken.dropFirst()) { _ in focusList() }
+            .onChange(of: PanelFocusRequest.shared.token) { _, _ in focusTarget = .search }
+            .onChange(of: PanelFocusRequest.shared.listToken) { _, _ in focusList() }
     }
 
     /// True when the warning notice or the chip row needs space under the header.

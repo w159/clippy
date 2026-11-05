@@ -1,25 +1,26 @@
 import Foundation
-import Combine
+import Observation
 
 @MainActor
-final class ModelBrowserViewModel: ObservableObject {
-    @Published var models: [ModelInfo] = []
-    @Published var filter = ModelFilter()
-    @Published var sortOrder = [ModelSort()]
-    @Published var selection: String?
-    @Published var customModel: String
-    @Published var loading = false
-    @Published var error: String?
-    @Published var measuring = false
-    @Published var measurementError: String?
-    @Published var visibleColumns = Set(ModelColumn.allCases)
+@Observable
+final class ModelBrowserViewModel {
+    var models: [ModelInfo] = []
+    var filter = ModelFilter()
+    var sortOrder = [ModelSort()]
+    var selection: String?
+    var customModel: String
+    var loading = false
+    var error: String?
+    var measuring = false
+    var measurementError: String?
+    var visibleColumns = Set(ModelColumn.allCases)
     let providerID: UUID
-    var onSelect: @MainActor (String) -> Void
-    var onClose: (@MainActor () -> Void)?
-    private var task: Task<Void, Never>?
-    private var measurementTask: Task<Void, Never>?
-    private var endpointTask: Task<Void, Never>?
-    private var generation = UUID()
+    @ObservationIgnored var onSelect: @MainActor (String) -> Void
+    @ObservationIgnored var onClose: (@MainActor () -> Void)?
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var measurementTask: Task<Void, Never>?
+    @ObservationIgnored private var endpointTask: Task<Void, Never>?
+    @ObservationIgnored private var generation = UUID()
 
     init(providerID: UUID, currentModel: String, onSelect: @escaping @MainActor (String) -> Void) {
         self.providerID = providerID

@@ -14,13 +14,13 @@ struct ScriptRunResultView: View {
         case fill
     }
 
-    @ObservedObject var run: ScriptRun
+    var run: ScriptRun
     var layout: Layout
     /// Inserts text as a new clip; returns whether it was saved.
     var saveClip: (String) -> Bool
     var onDismiss: (() -> Void)?
 
-    @ObservedObject private var settings = AppSettings.shared
+    private var settings = AppSettings.shared
     @State private var shownStream: ScriptOutputStream?
     @State private var saveTask: Task<Void, Never>?
     private var tokens: ThemeTokens { settings.theme }

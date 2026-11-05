@@ -11,12 +11,12 @@ import AppKit
 /// per script per session, or on every run when the script sets
 /// `confirmBeforeRun`. Settings confirms every run.
 struct ScriptsPanelView: View {
-    @ObservedObject var store: ClipStore
+    var store: ClipStore
     let onOpenSettings: () -> Void
 
-    @ObservedObject private var scriptStore = ScriptStore.shared
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var center = ScriptRunCenter.shared
+    private var scriptStore = ScriptStore.shared
+    private var settings = AppSettings.shared
+    private var center = ScriptRunCenter.shared
 
     /// Scripts the user has already confirmed once this session.
     @State private var confirmedScripts: Set<UUID> = []
@@ -172,7 +172,7 @@ enum ScriptBadge: CaseIterable {
 private struct ScriptRowView: View {
     let script: Script
     let store: ClipStore
-    @ObservedObject var center: ScriptRunCenter
+    var center: ScriptRunCenter
     @Binding var confirmedScripts: Set<UUID>
     let tokens: ThemeTokens
     let settings: AppSettings

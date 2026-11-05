@@ -1,10 +1,11 @@
 import Foundation
-import Combine
+import Observation
 
 /// Owns the user's configured providers, their credentials, and `resolve()`, the one
 /// place that turns "what the user set up" into "what a request needs".
 @MainActor
-final class AIProviderStore: ObservableObject {
+@Observable
+final class AIProviderStore {
     static let shared = AIProviderStore()
 
     enum Keys {
@@ -19,8 +20,8 @@ final class AIProviderStore: ObservableObject {
         static let legacyAPIVersion = "aiAzureAPIVersion"
     }
 
-    @Published private(set) var instances: [ProviderInstance]
-    @Published var activeID: UUID? {
+    private(set) var instances: [ProviderInstance]
+    var activeID: UUID? {
         didSet { if activeID != oldValue { persistActive() } }
     }
 
@@ -28,7 +29,7 @@ final class AIProviderStore: ObservableObject {
         activeID.flatMap { id in instances.first { $0.id == id } }
     }
 
-    private var migrationError: AIError?
+    @ObservationIgnored private var migrationError: AIError?
     private let defaults: UserDefaults
     private let secrets: AISecretStore
     private let isForced: @Sendable (String) -> Bool

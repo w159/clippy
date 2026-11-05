@@ -4,7 +4,7 @@ import SwiftUI
 /// reorder, Delete removes the selected row, Return pastes the next item.
 struct PasteStackTray: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject var stack: PasteStack
+    @Bindable var stack: PasteStack
     /// Pastes the next item into the frontmost app.
     let onPasteNext: () -> Void
     @State private var selection: UUID?

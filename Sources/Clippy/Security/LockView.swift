@@ -3,7 +3,7 @@ import SwiftUI
 /// Shown in place of the clip list while `AppLock` is locked. Contains no clip
 /// data. Authenticates automatically on appear and offers a retry button.
 struct LockView: View {
-    @ObservedObject var lock: AppLock
+    var lock: AppLock
     var onClose: () -> Void
 
     var body: some View {

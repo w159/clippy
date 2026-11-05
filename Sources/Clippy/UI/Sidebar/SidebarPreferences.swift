@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Observation
 
 extension Notification.Name {
     /// Posted (Cmd+Ctrl+S) to toggle the sidebar between expanded and icon rail.
@@ -11,7 +12,8 @@ extension Notification.Name {
 /// UserDefaults keys (prefixed `sidebar.`): `sidebar.width` (Double, expanded
 /// width in points) and `sidebar.collapsed` (Bool, user chose the icon rail).
 @MainActor
-final class SidebarPreferences: ObservableObject {
+@Observable
+final class SidebarPreferences {
     /// Shared instance backed by `UserDefaults.standard`.
     static let shared = SidebarPreferences()
 
@@ -21,11 +23,11 @@ final class SidebarPreferences: ObservableObject {
     nonisolated static let collapsedKey = "sidebar.collapsed"
 
     /// Expanded width; clamped for display by `SidebarSplitView`, persisted as set.
-    @Published var width: CGFloat {
+    var width: CGFloat {
         didSet { defaults.set(Double(width), forKey: Self.widthKey) }
     }
     /// True when the user collapsed the sidebar to the icon rail.
-    @Published var isCollapsed: Bool {
+    var isCollapsed: Bool {
         didSet { defaults.set(isCollapsed, forKey: Self.collapsedKey) }
     }
 

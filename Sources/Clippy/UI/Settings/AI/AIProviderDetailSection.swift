@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The form for the selected instance, generated from `descriptor.fields`.
 struct AIProviderDetailSection: View {
-    @ObservedObject var model: AIProviderManagerModel
+    var model: AIProviderManagerModel
     @Binding var draft: ProviderInstance
     let descriptor: ProviderDescriptor
     @Environment(\.clippyTokens) private var tokens

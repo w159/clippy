@@ -6,11 +6,11 @@ import SwiftUI
 /// individual field on demand, and creates a new secret. No values are stored
 /// or logged by Clippy.
 struct OnePasswordView: View {
-    @ObservedObject private var settings = AppSettings.shared
+    private var settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Owns the list/detail loads and the state machine (OPW-01, OPW-02).
-    @StateObject private var model = OnePasswordViewModel(
+    @State private var model = OnePasswordViewModel(
         makeService: { OnePasswordService(vault: AppSettings.shared.onePasswordVault) })
     @State private var creating = false
     @State private var newTitle = ""

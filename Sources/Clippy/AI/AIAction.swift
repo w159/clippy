@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 // MARK: - Model
 
@@ -199,10 +199,11 @@ extension AIAction {
 /// Persists user-defined and built-in AI actions as a JSON file, following the
 /// same pattern as ScriptStore. Injectable `fileURL` for tests.
 @MainActor
-final class AIActionStore: ObservableObject {
+@Observable
+final class AIActionStore {
     static let shared = AIActionStore()
 
-    @Published private(set) var actions: [AIAction] = []
+    private(set) var actions: [AIAction] = []
 
     private let store: JSONFileStore<AIAction>
 

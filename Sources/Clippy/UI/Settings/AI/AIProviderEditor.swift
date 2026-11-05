@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AIProviderEditor: View {
-    @ObservedObject var model: AIProviderManagerModel
+    var model: AIProviderManagerModel
     let descriptor: ProviderDescriptor
     @State private var draft: ProviderInstance
 

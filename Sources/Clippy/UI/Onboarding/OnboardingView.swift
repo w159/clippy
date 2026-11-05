@@ -3,7 +3,7 @@ import SwiftUI
 /// The first-run walkthrough: step list on the left, current step on the right,
 /// Back / Skip / Continue in the footer. Every step, including informational ones, is skippable.
 struct OnboardingView: View {
-    @ObservedObject var viewModel: OnboardingViewModel
+    var viewModel: OnboardingViewModel
     @Environment(\.clippyTokens) private var tokens
 
     var body: some View {

@@ -4,8 +4,8 @@ import SwiftUI
 /// the current `SuggestionsPaneMode` or the caller's ranked list, with an undo toast.
 struct SuggestionsPaneScaffold<Content: View>: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject var store: ClipStore
-    @ObservedObject var feedback: SuggestionFeedbackModel
+    var store: ClipStore
+    var feedback: SuggestionFeedbackModel
     let onOpenSettings: () -> Void
     let content: Content
 
@@ -73,8 +73,8 @@ struct SuggestionsPaneScaffold<Content: View>: View {
 
 /// Owns the feedback model so the extension-built pane keeps toast state across redraws.
 struct SuggestionsPaneHost<Content: View>: View {
-    @ObservedObject var store: ClipStore
-    @StateObject private var feedback = SuggestionFeedbackModel()
+    var store: ClipStore
+    @State private var feedback = SuggestionFeedbackModel()
     let onOpenSettings: () -> Void
     let content: (SuggestionFeedbackModel) -> Content
 

@@ -16,8 +16,8 @@ struct ClipListFeatureState {
 
 /// Sheets, geometry and background refresh hooks for the features. Stateless apart from the bindings it receives.
 struct ClipListFeatureModifier: ViewModifier {
-    @ObservedObject var store: ClipStore
-    @ObservedObject var smartCollections: SmartCollectionSelection
+    var store: ClipStore
+    var smartCollections: SmartCollectionSelection
     @Binding var features: ClipListFeatureState
     let selectedClip: Clip?
 

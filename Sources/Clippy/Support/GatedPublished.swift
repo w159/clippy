@@ -1,22 +1,24 @@
-import Combine
 import Foundation
+import Observation
 
-/// A `@Published`-like, UserDefaults-persisted setting whose writes can be vetoed
+/// An observable, UserDefaults-persisted setting whose writes can be vetoed
 /// (SEC-01: an MDM-forced key is read-only).
 ///
-/// Why not `@Published` + a revert in `didSet`: `@Published` publishes the new
-/// value in `willSet`, before any veto in `didSet` can run, so subscribers such
-/// as `McpServerController` would see (and act on) a value the policy rejected,
-/// and re-assigning inside `didSet` fights the wrapper. Here a rejected write
-/// changes nothing: no persistence, no `objectWillChange`, no emission.
+/// Why not a plain stored property with a revert in `didSet`: observers are
+/// told about a change before `didSet` can run, so an observer such as
+/// `McpServerController` would see (and act on) a value the policy rejected, and
+/// re-assigning inside `didSet` fights the observation machinery. Here a
+/// rejected write changes nothing: no persistence and no observer notification.
 ///
-/// `projectedValue` (`$setting`) is an `AnyPublisher` that emits the current value
-/// on subscription and then each accepted change, matching `Published`.
+/// Declare it `@ObservationIgnored @GatedPublished(...)` inside an `@Observable`
+/// class (the macro cannot wrap a property that already has a property wrapper).
+/// The enclosing-instance subscript reports reads and writes to the class's
+/// registrar, so `withObservationTracking` and SwiftUI see accepted changes only.
 @MainActor
 @propertyWrapper
 final class GatedPublished<Value> {
 
-    private let subject: CurrentValueSubject<Value, Never>
+    private var value: Value
     private let key: String
     private let isForced: (String) -> Bool
     private let sanitize: (Value) -> Value
@@ -33,7 +35,7 @@ final class GatedPublished<Value> {
          isForced: @escaping (String) -> Bool = { AppSettings.isForced($0) },
          persist: @escaping (String, Value) -> Void = { UserDefaults.standard.set($1, forKey: $0) }) {
         self.key = key
-        self.subject = CurrentValueSubject(sanitize(initial))
+        self.value = sanitize(initial)
         self.sanitize = sanitize
         self.isForced = isForced
         self.persist = persist
@@ -42,33 +44,36 @@ final class GatedPublished<Value> {
     /// Fallback accessor required by the wrapper grammar; inside a class the
     /// enclosing-instance subscript below is used instead.
     var wrappedValue: Value {
-        get { subject.value }
-        set { apply(newValue) }
-    }
-
-    var projectedValue: AnyPublisher<Value, Never> {
-        subject.eraseToAnyPublisher()
+        get { value }
+        set { apply(newValue) { $0() } }
     }
 
     /// Applies an accepted write. Returns false (and does nothing) when the key is forced.
+    /// `mutate` runs the change; the subscript wraps it in `withMutation`.
     @discardableResult
-    fileprivate func apply(_ newValue: Value, notify: () -> Void = {}) -> Bool {
+    fileprivate func apply(_ newValue: Value, mutate: (() -> Void) -> Void) -> Bool {
         guard !isForced(key) else { return false }
-        let value = sanitize(newValue)
-        notify()
-        persist(key, value)
-        subject.send(value)
+        let sanitized = sanitize(newValue)
+        mutate {
+            persist(key, sanitized)
+            value = sanitized
+        }
         return true
     }
 
-    static subscript<EnclosingSelf: ObservableObject>(
+    static subscript<EnclosingSelf: ObservationNotifying>(
         _enclosingInstance instance: EnclosingSelf,
         wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
         storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, GatedPublished<Value>>
-    ) -> Value where EnclosingSelf.ObjectWillChangePublisher == ObservableObjectPublisher {
-        get { instance[keyPath: storageKeyPath].subject.value }
+    ) -> Value {
+        get {
+            instance.access(keyPath: wrappedKeyPath)
+            return instance[keyPath: storageKeyPath].value
+        }
         set {
-            instance[keyPath: storageKeyPath].apply(newValue) { instance.objectWillChange.send() }
+            instance[keyPath: storageKeyPath].apply(newValue) { change in
+                instance.withMutation(keyPath: wrappedKeyPath) { change() }
+            }
         }
     }
 }

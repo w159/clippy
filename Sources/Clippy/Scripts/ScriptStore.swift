@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 /// One finished run, as remembered by the history list. Output text lives in
 /// memory only: script output can contain client data, so the optional
@@ -24,7 +24,8 @@ struct ScriptRunRecord: Identifiable, Codable, Equatable {
 /// Persists the user's scripts as a JSON file. Decoupled from the clip database
 /// since scripts are a small, separate concern. Injectable file URL for tests.
 @MainActor
-final class ScriptStore: ObservableObject {
+@Observable
+final class ScriptStore {
     static let shared = ScriptStore()
 
     /// Runs remembered per script.
@@ -32,12 +33,12 @@ final class ScriptStore: ObservableObject {
     /// UserDefaults key for the optional on-disk run history (metadata only).
     static let persistHistoryKey = "scripts.persistRunHistory"
 
-    @Published private(set) var scripts: [Script] = []
+    private(set) var scripts: [Script] = []
     /// Newest first, at most `historyLimit` per script.
-    @Published private(set) var history: [ScriptRunRecord] = []
+    private(set) var history: [ScriptRunRecord] = []
     /// Set when entries were moved to a quarantine file; the Settings view
     /// shows it once so a bad entry never disappears silently.
-    @Published var quarantineNotice: String?
+    var quarantineNotice: String?
 
     private let store: JSONFileStore<Script>
     /// Kept so add/update can verify the on-disk write actually landed (the
@@ -46,10 +47,10 @@ final class ScriptStore: ObservableObject {
     /// silently dropping a save on a full disk or permission loss.
     private let fileURL: URL
     private let defaults: UserDefaults
-    private var lastSanitizedModification: Date?
+    @ObservationIgnored private var lastSanitizedModification: Date?
 
     /// When true the run history metadata is written next to scripts.json.
-    var persistHistory: Bool {
+    @ObservationIgnored var persistHistory: Bool {
         didSet {
             defaults.set(persistHistory, forKey: Self.persistHistoryKey)
             if persistHistory { saveHistory() } else { try? FileManager.default.removeItem(at: historyURL) }

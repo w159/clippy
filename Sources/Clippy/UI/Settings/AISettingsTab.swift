@@ -4,9 +4,9 @@ import SwiftUI
 // The AI settings tab.
 
 struct AISettingsTab: View {
-    @ObservedObject private var settings = AppSettings.shared
-    @ObservedObject private var store = AIProviderStore.shared
-    @StateObject private var model = AIProviderManagerModel()
+    @Bindable private var settings = AppSettings.shared
+    private var store = AIProviderStore.shared
+    @State private var model = AIProviderManagerModel()
     @State private var showActions = false
 
     var body: some View {

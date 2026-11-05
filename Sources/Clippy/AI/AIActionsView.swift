@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Observation
 
 /// Drives one AI action through its lifecycle (running -> proposal -> applied or
 /// failed) and publishes state for a sheet. Building the service from settings,
@@ -7,7 +8,8 @@ import AppKit
 /// a one-liner. The actual write happens in the caller's `onApply`, after the
 /// user approves: the preview + confirm contract.
 @MainActor
-final class AIActionRunner: ObservableObject {
+@Observable
+final class AIActionRunner {
     enum Phase: Equatable {
         case idle
         case running
@@ -15,14 +17,14 @@ final class AIActionRunner: ObservableObject {
         case failed(String)
     }
 
-    @Published var phase: Phase = .idle
+    var phase: Phase = .idle
     /// Text streamed so far by `run(action:on:instruction:)`, shown while running.
-    @Published private(set) var partialText = ""
+    private(set) var partialText = ""
 
     /// The in-flight action task so a user can cancel a long run (audit [MEDIUM]).
-    private var runningTask: Task<Void, Never>?
+    @ObservationIgnored private var runningTask: Task<Void, Never>?
     /// The last work closure, kept so the failed phase can offer Retry.
-    private var lastWork: ((AIService) async throws -> AIProposal?)?
+    @ObservationIgnored private var lastWork: ((AIService) async throws -> AIProposal?)?
 
     var isPresenting: Bool {
         switch phase { case .idle: return false; default: return true }
@@ -89,9 +91,9 @@ final class AIActionRunner: ObservableObject {
 /// The preview + confirm surface. Shows progress, the proposed change (with a
 /// before/after when the action edits existing content), and Apply / Cancel.
 struct AIActionSheet: View {
-    @ObservedObject var runner: AIActionRunner
+    var runner: AIActionRunner
     // Theme tokens so the sheet's surfaces/text track a theme switch like the panel.
-    @ObservedObject private var settings = AppSettings.shared
+    private var settings = AppSettings.shared
     private var tokens: ThemeTokens { settings.theme }
     /// Called with the approved text when the user taps Apply.
     let onApply: (AIProposal) -> Void

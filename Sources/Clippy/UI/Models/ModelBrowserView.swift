@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ModelBrowserView: View {
-    @ObservedObject var model: ModelBrowserViewModel
+    @Bindable var model: ModelBrowserViewModel
     @Environment(\.clippyTokens) private var tokens
     @FocusState private var searchFocused: Bool
     @State private var confirmMeasure = false

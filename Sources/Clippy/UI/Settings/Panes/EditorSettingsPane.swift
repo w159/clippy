@@ -3,7 +3,7 @@ import SwiftUI
 /// Editor settings: font size, line numbers, and code/prose behavior, with a live sample.
 struct EditorSettingsPane: View {
     @Environment(\.clippyTokens) private var tokens
-    @ObservedObject private var preferences = EditorPreferences.shared
+    @Bindable private var preferences = EditorPreferences.shared
     @State private var notice: PaneNotice?
 
     /// Creates the pane.

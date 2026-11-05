@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 // MARK: - Content hosting
@@ -35,14 +34,11 @@ extension PanelController {
     /// Swaps the lock view for the clip list when the lock opens, and back to the
     /// lock view if it re-engages while the panel is visible.
     func observeLockState() {
-        lockCancellable = AppLock.shared.$isLocked
-            .removeDuplicates()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] locked in
-                guard let self, let panel = self.panel, panel.isVisible,
-                      locked != self.showsLockView else { return }
-                self.installContent(in: panel, locked: locked)
-            }
+        observeChanges(of: { AppLock.shared.isLocked }) { [weak self] locked in
+            guard let self, let panel = self.panel, panel.isVisible,
+                  locked != self.showsLockView else { return }
+            self.installContent(in: panel, locked: locked)
+        }
     }
 
     /// Hosts SwiftUI content with a clear layer and no titlebar safe area, so the
