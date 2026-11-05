@@ -101,10 +101,23 @@ final class PanelHarnessTests: XCTestCase {
     }
 
     func present(_ window: NSWindow) {
-        window.makeKeyAndOrderFront(nil)
         self.window = window
+        makeKeyInActiveApp(window)
         pump(seconds: 0.5)
         if !window.isKeyWindow { print("HARNESS warning: window is not key") }
+    }
+
+    /// Accent controls draw grey while the app is inactive or the window is not key. Activate the app, make the
+    /// window key and wait (bounded) for both so captures show the controls as a user sees them.
+    func makeKeyInActiveApp(_ window: NSWindow) {
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        let end = Date().addingTimeInterval(3)
+        while !(window.isKeyWindow && NSApp.isActive), Date() < end {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            if !NSApp.isActive { NSApp.activate() }
+            if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+        }
     }
 
     // MARK: - Run loop and events
@@ -209,6 +222,7 @@ final class PanelHarnessTests: XCTestCase {
     /// `compositedOnly` is kept for existing call sites; every screenshot now prefers the composited capture.
     func screenshot(_ name: String, compositedOnly: Bool = false) {
         guard let view = window.contentView else { return }
+        if !(window.isKeyWindow && NSApp.isActive) { makeKeyInActiveApp(window) }
         window.orderFrontRegardless()
         pump(seconds: 0.4)
         let target = shotDirectory.appendingPathComponent("\(name).png")

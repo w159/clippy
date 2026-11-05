@@ -85,19 +85,30 @@ struct IconPickerView: View {
             .labelsHidden()
 
             if iconTab == .symbol {
-                TextField("Search symbols", text: $symbolQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                searchField(prompt: "Search symbols", text: $symbolQuery)
             } else if iconTab == .emoji {
                 // The emoji tab previously had no search while symbols did. Emojis
                 // lack system names, so we match against the keyword list above.
-                TextField("Search emoji", text: $emojiQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
+                searchField(prompt: "Search emoji", text: $emojiQuery)
             }
 
             iconGrid
         }
+    }
+
+    /// One full-width field with a leading magnifier and the prompt inside it. The label is hidden so a grouped
+    /// Form does not lay it out as a separate leading title.
+    private func searchField(prompt: String, text: Binding<String>) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField(prompt, text: text, prompt: Text(prompt))
+                .textFieldStyle(.plain)
+                .labelsHidden()
+        }
+        .font(.callout)
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Grid
@@ -189,10 +200,7 @@ struct IconPickerView: View {
 
     private func selectedBackground(isSelected: Bool) -> AnyShapeStyle {
         guard isSelected else { return AnyShapeStyle(.clear) }
-        if let hex = accentHex {
-            return AnyShapeStyle(Color(hexString: hex).opacity(0.25))
-        }
-        return AnyShapeStyle(Color.clippyAccent.opacity(0.25))
+        return AnyShapeStyle(Color.clippyAccent.opacity(0.2))
     }
 }
 

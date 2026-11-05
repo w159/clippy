@@ -21,7 +21,12 @@ struct PaneEmptyState: View {
         ContentUnavailableView {
             Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: systemImage) }
         } description: {
-            if let message { Text(message).foregroundStyle(.secondary) }
+            if let message {
+                Text(message).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         } actions: {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)

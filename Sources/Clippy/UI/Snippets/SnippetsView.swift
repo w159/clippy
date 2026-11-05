@@ -105,6 +105,7 @@ struct SnippetsView: View {
             VStack(spacing: 6) {
                 Text(title).font(.headline).foregroundStyle(.primary)
                 Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
                 Button(actionTitle, action: action).buttonStyle(.glassProminent).controlSize(.small)
             }
             .padding(.horizontal, 8)

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Onboarding buttons now draw in the accent color when the window is active; snippets empty state text wraps inside the list column; the category icon picker uses the app accent for the selected symbol and has a single full-width search field.
 - Panel redesign for macOS 26 Liquid Glass: the header is a floating glass strip with the section title, a large capsule search field and round glass icon buttons grouped together; the hairline rules and opaque bars are gone and the panel sits on a system material.
 - Sidebar is a source-list column: larger rows with an SF Symbol per collection, counts trailing in secondary text, and a solid accent highlight on the selected row.
 - Clip rows are rounded cards (12 pt) with a 38 pt colored kind or app tile, a medium-weight title over a caption line, and an accent wash on hover and selection.
