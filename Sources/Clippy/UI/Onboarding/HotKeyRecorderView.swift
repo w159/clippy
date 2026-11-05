@@ -94,11 +94,12 @@ private struct HotKeyRecorderButtonStyle: ButtonStyle {
     let tokens: ClippyTokens
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: ClippyRadius.control)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        let active = isFocused || isRecording
         return configuration.label
-            .background(shape.fill(configuration.isPressed ? tokens.selection : (isHovered ? tokens.surfaceElevated : tokens.surfaceInset)))
-            .overlay(shape.stroke(isFocused || isRecording ? tokens.focusRing : tokens.stroke,
-                                  lineWidth: isFocused || isRecording ? 2 : 1))
+            .background(shape.fill(active ? AnyShapeStyle(Color.accentColor.opacity(0.14))
+                                          : AnyShapeStyle(.quaternary.opacity(configuration.isPressed ? 1 : (isHovered ? 0.8 : 0.5)))))
+            .overlay { if active { shape.stroke(Color.accentColor, lineWidth: 2) } }
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .contentShape(shape)
     }

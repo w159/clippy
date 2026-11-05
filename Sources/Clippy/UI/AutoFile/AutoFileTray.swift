@@ -12,7 +12,6 @@ struct AutoFileTrayItem: Identifiable, Equatable {
 /// user actions; the tray never files anything by itself. Suggestions come
 /// from on-device embeddings only.
 struct AutoFileTray: View {
-    @Environment(\.clippyTokens) private var tokens
     let items: [AutoFileTrayItem]
     let onAccept: (AutoFileSuggestion) -> Void
     let onDismiss: (AutoFileSuggestion) -> Void
@@ -30,8 +29,10 @@ struct AutoFileTray: View {
     var body: some View {
         if !items.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: tokens.metrics.space.two) {
-                    ForEach(items) { item in chip(item) }
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(items) { item in chip(item) }
+                    }
                 }
             }
             .accessibilityElement(children: .contain)
@@ -40,7 +41,7 @@ struct AutoFileTray: View {
     }
 
     private func chip(_ item: AutoFileTrayItem) -> some View {
-        HStack(spacing: tokens.metrics.space.one) {
+        HStack(spacing: 6) {
             Button { onAccept(item.suggestion) } label: {
                 Label("File under \(item.categoryName)", systemImage: "tray.and.arrow.down")
             }
@@ -51,9 +52,9 @@ struct AutoFileTray: View {
                 .accessibilityLabel("Dismiss suggestion for \(item.categoryName)")
         }
         .font(.caption)
-        .foregroundStyle(tokens.textSecondary)
-        .padding(.horizontal, tokens.metrics.space.two)
-        .padding(.vertical, tokens.metrics.space.one)
-        .background(tokens.surfaceInset, in: Capsule())
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: Capsule())
     }
 }

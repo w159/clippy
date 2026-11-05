@@ -88,7 +88,7 @@ final class EditorWindowController: NSObject, NSWindowDelegate {
         // Each clip is its own window; native tabbing is off so tab-group state never lingers.
         window.tabbingMode = .disallowed
         window.minSize = NSSize(width: 520, height: isImage ? 460 : 380)
-        window.titlebarAppearsTransparent = false
+        window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
         // Frame autosave per clip kind: text and image editors remember their own size.
         window.setFrameAutosaveName(isImage ? "ClippyImageEditorWindow" : "ClippyTextEditorWindow")

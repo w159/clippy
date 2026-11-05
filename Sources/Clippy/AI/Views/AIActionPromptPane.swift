@@ -4,23 +4,24 @@ import SwiftUI
 struct AIActionPromptPane: View {
     @Binding var template: String
     let issues: [AIActionTemplateValidator.Issue]
-    @Environment(\.clippyTokens) private var tokens
 
     var body: some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
-            Text("Prompt template").font(.headline).foregroundStyle(tokens.textPrimary)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Prompt template").font(.headline)
             TextEditor(text: $template)
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(tokens.textPrimary)
+                .font(.body.monospaced())
                 .scrollContentBackground(.hidden)
-                .padding(tokens.metrics.space.two)
+                .padding(10)
                 .frame(minHeight: 150, maxHeight: 220)
-                .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
-                .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm)
-                    .strokeBorder(AIActionTemplateValidator.hasErrors(issues) ? tokens.danger : tokens.strokeStrong, lineWidth: 1))
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    if AIActionTemplateValidator.hasErrors(issues) {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.red.opacity(0.7), lineWidth: 1.5)
+                    }
+                }
                 .accessibilityLabel("Prompt template")
-            HStack(spacing: tokens.metrics.space.two) {
-                Text("Insert").font(.caption).foregroundStyle(tokens.textSecondary)
+            HStack(spacing: 8) {
+                Text("Insert").font(.caption).foregroundStyle(.secondary)
                 ForEach(AIActionEditorSupport.variables) { variable in
                     FilterChip(model: FilterChipModel(id: variable.id, title: variable.token, systemImage: "curlybraces",
                                                       accessibilityValue: variable.summary),
@@ -33,7 +34,7 @@ struct AIActionPromptPane: View {
             ForEach(issues) { issue in
                 Label(issue.message, systemImage: issue.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(issue.severity == .error ? tokens.danger : tokens.warning)
+                    .foregroundStyle(issue.severity == .error ? Color.red : Color.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
