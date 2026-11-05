@@ -57,10 +57,12 @@ struct ClipRowView: View {
                 if comfortable { metaLine }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutProbe("row.text")
             trailingSlot
         }
         .padding(.horizontal, 8)
         .padding(.vertical, comfortable ? 3 : 2)
+        .overlay(alignment: .trailing) { hoverActionsOverlay }
         .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
         .overlay(
@@ -247,18 +249,25 @@ struct ClipRowView: View {
     // MARK: - Trailing slot (metadata crossfades with actions)
 
     private var trailingSlot: some View {
-        ZStack(alignment: .trailing) {
-            ViewThatFits(in: .horizontal) {
-                metadata(showApp: true)
-                metadata(showApp: false)
-            }
-            .opacity(showsActions ? 0 : 1)
-            hoverActions
-                .opacity(showsActions ? 1 : 0)
-                .allowsHitTesting(showsActions)
+        ViewThatFits(in: .horizontal) {
+            metadata(showApp: true)
+            metadata(showApp: false)
         }
+        .opacity(showsActions ? 0 : 1)
         .fixedSize(horizontal: true, vertical: false)
         .layoutPriority(3)
+    }
+
+    /// Hover actions float over the row's trailing edge instead of reserving their width, so
+    /// titles keep the full row; they sit on the row's own fill and cover the text beneath.
+    private var hoverActionsOverlay: some View {
+        hoverActions
+            .padding(.leading, 8)
+            .padding(.trailing, 8)
+            .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
+            .opacity(showsActions ? 1 : 0)
+            .allowsHitTesting(showsActions)
     }
 
     private func metadata(showApp: Bool) -> some View {

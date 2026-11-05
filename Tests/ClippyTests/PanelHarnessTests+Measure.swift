@@ -53,7 +53,7 @@ extension PanelHarnessTests {
         LayoutProbe.shared.reset()
         try openPanel(appearance: .aqua, size: Self.defaultPanelSize)
         pump(until: "layout probes reported") {
-            ["header", "search", "footer", "row.comfortable", "row.tile", "sidebar.row", "detail"]
+            ["header", "search", "footer", "row.comfortable", "row.tile", "sidebar.row", "detail", "list.column", "row.text"]
                 .allSatisfy { LayoutProbe.shared.frames[$0] != nil }
         }
         pump(seconds: 0.4)
@@ -70,6 +70,9 @@ extension PanelHarnessTests {
         emit("row.comfortable.height \(format(comfortable.height)) pt")
         emit("sidebar.row.height \(format(sidebarRow.height)) pt")
         emit("detail.pane.width \(format(detail.width)) pt")
+        let listColumn = require("list.column"), rowText = require("row.text")
+        emit("list.column.width \(format(listColumn.width)) pt")
+        emit("row.text.width \(format(rowText.width)) pt")
         emit("row.tile.size \(format(tile.size)) pt")
 
         screenshot("50-panel-default-light")
@@ -115,5 +118,7 @@ extension PanelHarnessTests {
         XCTAssertLessThanOrEqual(compact.height, 28.5, "compact row")
         XCTAssertLessThanOrEqual(sidebarRow.height, 30, "sidebar row")
         XCTAssertLessThanOrEqual(tile.width, 28.5, "row tile")
+        XCTAssertGreaterThanOrEqual(listColumn.width, 300, "clip list column at the default panel size")
+        XCTAssertGreaterThanOrEqual(rowText.width, 200, "row title area at the default panel size")
     }
 }
