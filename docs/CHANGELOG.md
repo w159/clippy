@@ -6,6 +6,10 @@
 - Header is one 44 pt row: section title and count, a 26 pt search field instead of the 38 pt capsule, and 24 pt glass icon buttons. The footer is 28 pt with small key hints and the multi-select bar is slimmer.
 - Clip rows are native size: comfortable rows are 42 pt with a 28 pt tile, compact rows are 28 pt, with 2 pt between rows, 8 pt list padding and 8 pt corners. Sidebar rows are 28 pt with 8 pt padding and the icon rail is 44 pt wide. The expanded sidebar now fits beside the detail pane at the default size.
 - Detail pane is tighter: 260 pt wide by default, 12 pt padding, a 32 pt kind tile, caption metadata and regular-size Paste and Quick Look buttons. The command palette is smaller (480 pt wide) with regular-size text, and the empty states use the standard size.
+- Settings, onboarding, editors and sheets at native size: Settings opens at 715x540 like System Settings, with 20 pt sidebar tiles, a 215 pt sidebar and compact rows; onboarding is a 600x460 window with a 48 pt hero symbol, a regular title and regular buttons; every large control size is gone, the clip editors, AI actions, assistant, 1Password, scripts, snippets, OCR, translate and paste stack views use default fonts, 12-16 pt padding and 10 pt corners, and sheets are smaller. The model browser opens at 880x520.
+
+## v2.4.0 - 2026-11-05 - macOS 26 redesign and Swift 6.3
+
 - About pane links ("Clippy on GitHub", "Report an issue") now use the Clippy accent color instead of system blue.
 - Onboarding buttons now draw in the accent color when the window is active; snippets empty state text wraps inside the list column; the category icon picker uses the app accent for the selected symbol and has a single full-width search field.
 - Panel redesign for macOS 26 Liquid Glass: the header is a floating glass strip with the section title, a large capsule search field and round glass icon buttons grouped together; the hairline rules and opaque bars are gone and the panel sits on a system material.
