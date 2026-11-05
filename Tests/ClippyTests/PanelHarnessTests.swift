@@ -188,10 +188,19 @@ final class PanelHarnessTests: XCTestCase {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
-        guard (try? VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])) != nil else { return [] }
-        return (request.results ?? []).compactMap { observation in
+        // Native-size 13 pt text is below Vision's default minimum text height (1/32 of the image).
+        request.minimumTextHeight = 0.008
+        do {
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        } catch {
+            print("HARNESS ocr failed: \(error)")
+            return []
+        }
+        let lines = (request.results ?? []).compactMap { observation in
             observation.topCandidates(1).first.map { RecognizedLine(text: $0.string, box: observation.boundingBox) }
         }
+        if lines.isEmpty { print("HARNESS ocr found no text in a \(cgImage.width)x\(cgImage.height) px render") }
+        return lines
     }
 
     private func isShown(_ fragment: String) -> Bool {
