@@ -90,8 +90,7 @@ struct CategoryEditorView: View {
                     IconPickerView(
                         iconKind: $iconKind,
                         iconValue: $iconValue,
-                        knownBundleIDs: knownBundleIDs,
-                        accentHex: colorHex
+                        knownBundleIDs: knownBundleIDs
                     )
                 }
             }

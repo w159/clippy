@@ -27,7 +27,7 @@ final class PanelHarnessTests: XCTestCase {
         try FileManager.default.createDirectory(at: shotDirectory, withIntermediateDirectories: true)
         print("HARNESS screenshots: \(shotDirectory.path)")
         NSApplication.shared.setActivationPolicy(.regular)
-        NSApp.activate()
+        forceActivate()
     }
 
     override func tearDown() async throws {
@@ -109,15 +109,22 @@ final class PanelHarnessTests: XCTestCase {
         if !window.isKeyWindow { print("HARNESS warning: window is not key (appActive=\(NSApp.isActive))") }
     }
 
+    /// Cooperative `NSApp.activate()` does not take focus from Finder on CI runners. Force it, and fall back to
+    /// `NSRunningApplication.activate(options:)` when the process is still inactive.
+    func forceActivate() {
+        NSApp.activate(ignoringOtherApps: true)
+        if !NSApp.isActive { _ = NSRunningApplication.current.activate(options: [.activateAllWindows]) }
+    }
+
     /// Accent controls draw grey while the app is inactive or the window is not key. Activate the app, make the
     /// window key and wait (bounded) for both so captures show the controls as a user sees them.
     func makeKeyInActiveApp(_ window: NSWindow) {
-        NSApp.activate()
+        forceActivate()
         window.makeKeyAndOrderFront(nil)
         let end = Date().addingTimeInterval(3)
         while !(window.isKeyWindow && NSApp.isActive), Date() < end {
             RunLoop.main.run(until: Date().addingTimeInterval(0.02))
-            if !NSApp.isActive { NSApp.activate() }
+            if !NSApp.isActive { forceActivate() }
             if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
         }
     }

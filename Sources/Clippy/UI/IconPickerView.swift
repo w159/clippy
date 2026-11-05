@@ -8,15 +8,10 @@ import SwiftUI
 ///
 /// `knownBundleIDs` feeds the Apps tab. Pass an empty array to show the
 /// "Copy something from an app..." placeholder.
-///
-/// `accentHex` tints the selected-cell background the same way CategoryEditorView
-/// does; pass nil to fall back to a plain `.accentColor` tint.
 struct IconPickerView: View {
     @Binding var iconKind: CategoryIconKind
     @Binding var iconValue: String
     var knownBundleIDs: [String] = []
-    /// Optional hex string used to colorize the selected cell background.
-    var accentHex: String? = nil
 
     @State private var iconTab: CategoryIconKind
     @State private var symbolQuery: String = ""
@@ -25,13 +20,11 @@ struct IconPickerView: View {
     init(
         iconKind: Binding<CategoryIconKind>,
         iconValue: Binding<String>,
-        knownBundleIDs: [String] = [],
-        accentHex: String? = nil
+        knownBundleIDs: [String] = []
     ) {
         _iconKind = iconKind
         _iconValue = iconValue
         self.knownBundleIDs = knownBundleIDs
-        self.accentHex = accentHex
         // Start the tab on whatever kind is already selected.
         _iconTab = State(initialValue: iconKind.wrappedValue)
     }
