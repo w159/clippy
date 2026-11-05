@@ -193,12 +193,12 @@ struct McpPreviewSheet: View {
                 SettingsNote(value.fileExists ? "Existing file; other servers are preserved." : "The file would be created.")
                 ScrollView { Text(value.diff.isEmpty ? "No changes." : value.diff).font(.system(.caption, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
-                    .frame(height: 180)
+                    .frame(height: 140)
             }
             HStack { Spacer(); Button("Done", action: onClose).buttonStyle(.accent).keyboardShortcut(.defaultAction) }
         }
-        .padding(20)
-        .frame(width: 520)
+        .padding(16)
+        .frame(width: 460)
         .task {
             let target = client
             let value = await Task.detached { Result { try McpInstallService.preview(target, port: port) } }.value

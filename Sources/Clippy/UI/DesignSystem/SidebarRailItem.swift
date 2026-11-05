@@ -25,12 +25,12 @@ struct SidebarRailItem: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 16, weight: selected ? .semibold : .medium))
+                .font(.body.weight(selected ? .semibold : .medium))
                 .foregroundStyle(selected ? tokens.onAccent : .secondary)
-                .frame(width: 44, height: 38)
-                .background(selected ? tokens.accent : hovered ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay { if focused { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(tokens.focusRing, lineWidth: 2).padding(-2) } }
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 36, height: 28)
+                .background(selected ? tokens.accent : hovered ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay { if focused { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(tokens.focusRing, lineWidth: 2).padding(-2) } }
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .focused($focused)

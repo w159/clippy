@@ -163,8 +163,8 @@ struct AIActionsManagerView: View {
         HStack(spacing: 12) {
             ActionIconView(kind: action.iconKind, value: action.symbolName)
                 .foregroundStyle(Color.clippyAccent)
-                .frame(width: 34, height: 34)
-                .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .frame(width: 28, height: 28)
+                .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
@@ -204,7 +204,7 @@ struct AIActionsManagerView: View {
         }
         .padding(12)
         .background(hoveredActionID == action.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.quaternary.opacity(0.5)),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hoveredActionID = $0 ? action.id : (hoveredActionID == action.id ? nil : hoveredActionID) }
         .accessibilityElement(children: .contain)
         .help(dispositionHelp(for: action.outputDisposition))

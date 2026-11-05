@@ -57,7 +57,7 @@ struct AIActionTestPanel: View {
             .padding(12)
         }
         .frame(maxHeight: .infinity)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityLabel("Test output")
         .accessibilityAddTraits(.updatesFrequently)
     }

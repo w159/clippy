@@ -116,7 +116,7 @@ struct CategoryEditorView: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || duplicateNameMessage != nil)
                 }
             }
-            .padding(.horizontal, 16).padding(.bottom, 14).padding(.top, 4)
+            .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 4)
         }
         .frame(width: 340)
     }

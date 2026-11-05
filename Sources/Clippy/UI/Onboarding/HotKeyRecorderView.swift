@@ -144,5 +144,5 @@ private struct RecorderKeyCatcher: NSViewRepresentable {
 
 #Preview("Hotkey recorder") {
     VStack { ForEach(HotKeyAction.allCases, id: \.self) { HotKeyRecorderView(action: $0) } }
-        .padding(20).frame(width: 460)
+        .padding(16).frame(width: 420)
 }

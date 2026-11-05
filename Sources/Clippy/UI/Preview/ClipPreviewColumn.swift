@@ -45,10 +45,10 @@ struct ClipPreviewColumn: View {
             resizeHandle
             content
                 .frame(width: width)
-                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .shadow(color: .black.opacity(0.10), radius: 10, y: 3)
+                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .layoutProbe("detail")
         }
-        .padding(.trailing, 12)
+        .padding(.trailing, 8)
         .padding(.bottom, 4)
     }
 
@@ -73,17 +73,17 @@ struct ClipPreviewColumn: View {
         let item = ClipPreviewProvider.item(for: clip, isSensitive: { _ in sensitive })
         let visual: ClipVisualKind? = sensitive ? nil : ClipPreviewProvider.visual(for: clip)
         let meta = ClipPreviewMetadata.make(for: clip, item: item, query: query, sensitive: sensitive, kindLabel: visual?.label)
-        return VStack(alignment: .leading, spacing: tokens.metrics.space.three) {
+        return VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
             header(for: clip, item: item, visual: visual)
             contentCard(item: item)
             metadataGrid(meta)
             actionBar(sensitive: sensitive)
         }
-        .padding(tokens.metrics.space.four)
+        .padding(tokens.metrics.space.three)
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: clip.id)
     }
 
-    /// 40pt kind tile, title (2 lines) and "App \u{00B7} time" subtitle.
+    /// 32pt kind tile, title (2 lines) and "App \u{00B7} time" subtitle.
     private func header(for clip: Clip, item: ClipPreviewItem, visual: ClipVisualKind?) -> some View {
         let hue: Color = {
             guard let visual else { return tokens.textSecondary }
@@ -92,13 +92,13 @@ struct ClipPreviewColumn: View {
         }()
         let time = RelativeTime.string(for: clip.createdAt)
         let subtitle = visual == nil ? time : [clip.sourceAppName, time].compactMap { $0 }.joined(separator: " \u{00B7} ")
-        return HStack(alignment: .top, spacing: tokens.metrics.space.three) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return HStack(alignment: .top, spacing: tokens.metrics.space.two) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(visual == nil ? tokens.surfaceInset : hue.opacity(0.18))
-                .frame(width: 52, height: 52)
+                .frame(width: 32, height: 32)
                 .overlay {
                     Image(systemName: visual?.symbol ?? "lock.fill")
-                        .font(.title2.weight(.semibold))
+                        .font(.body.weight(.semibold))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(hue)
                 }
@@ -109,7 +109,7 @@ struct ClipPreviewColumn: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -130,19 +130,19 @@ struct ClipPreviewColumn: View {
 
     /// Content in a rounded card on the design-system surface that fills the free height.
     private func contentCard(item: ClipPreviewItem) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         return ScrollView { ClipPreviewView(item: item, lineLimit: 60, contentFontSize: 13) }
-            .padding(tokens.metrics.space.three)
+            .padding(tokens.metrics.space.two)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color.primary.opacity(0.05), in: shape)
     }
 
     private func metadataGrid(_ meta: ClipPreviewMetadata) -> some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: tokens.metrics.space.three, verticalSpacing: tokens.metrics.space.one) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: tokens.metrics.space.two, verticalSpacing: 2) {
             ForEach(Array(meta.rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    Text(row.label).font(.callout).foregroundStyle(.secondary)
-                    Text(row.value).font(.callout).foregroundStyle(.primary)
+                    Text(row.label).font(.caption).foregroundStyle(.secondary)
+                    Text(row.value).font(.caption).foregroundStyle(.primary)
                         .textSelection(.enabled).lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -159,7 +159,6 @@ struct ClipPreviewColumn: View {
                 }
                 .buttonStyle(.glassProminent)
                 .tint(tokens.accent)
-                .controlSize(.large)
                 .accessibilityLabel("Paste selected clip")
             }
             if let onQuickLook, !sensitive {
@@ -167,7 +166,6 @@ struct ClipPreviewColumn: View {
                     Label("Quick Look", systemImage: "eye").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass).tint(nil)
-                .controlSize(.large)
                 .accessibilityLabel("Quick Look selected clip")
             }
         }

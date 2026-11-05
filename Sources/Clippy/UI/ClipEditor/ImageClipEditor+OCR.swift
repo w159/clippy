@@ -27,11 +27,11 @@ extension ImageClipEditor {
     /// Spinner scrim with Cancel while recognition runs.
     var ocrScrim: some View {
         VStack(spacing: 10) {
-            ProgressView().controlSize(.large)
+            ProgressView()
             Text("Extracting text\u{2026}").font(.callout).foregroundStyle(dsTokens.textPrimary)
             Button("Cancel") { cancelExtractText() }
         }
-        .padding(20)
+        .padding(12)
         .background(dsTokens.surfaceElevated, in: RoundedRectangle(cornerRadius: dsTokens.metrics.radius.md))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Extracting text")

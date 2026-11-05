@@ -4,7 +4,7 @@ import SwiftUI
 /// selection, focus ring and drop indicator. Behavior is supplied by the pane.
 struct SidebarRow<Icon: View>: View {
     @Environment(\.clippyTokens) private var tokens
-    @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 36
+    @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 28
     @State private var hovered = false
     @FocusState private var fieldFocused: Bool
     @FocusState.Binding var focus: SidebarRowID?
@@ -50,7 +50,7 @@ struct SidebarRow<Icon: View>: View {
         self.icon = icon()
     }
 
-    private var radius: CGFloat { 10 }
+    private var radius: CGFloat { 8 }
     private var isFocused: Bool { focus == rowID }
 
     var body: some View {
@@ -60,7 +60,7 @@ struct SidebarRow<Icon: View>: View {
             Spacer(minLength: 2)
             if let count, count > 0 { countBadge(count) }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .frame(minHeight: minimumHeight)
         .background(rowFill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
         .overlay { indicatorOverlay }
@@ -80,6 +80,7 @@ struct SidebarRow<Icon: View>: View {
         .accessibilityLabel(accessibilityText)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityValue(dropValue)
+        .layoutProbe("sidebar.row")
     }
 
     private var rowFill: Color {
@@ -114,13 +115,13 @@ struct SidebarRow<Icon: View>: View {
             Text(title)
                 .font(isSelected ? .body.weight(.semibold) : .body)
                 .foregroundStyle(isSelected ? tokens.onAccent : .primary)
-                .lineLimit(2)
+                .lineLimit(1)
         }
     }
 
     private func countBadge(_ value: Int) -> some View {
         Text("\(value)")
-            .font(.callout)
+            .font(.caption)
             .monospacedDigit()
             .foregroundStyle(isSelected ? tokens.onAccent.opacity(0.85) : Color.secondary)
     }

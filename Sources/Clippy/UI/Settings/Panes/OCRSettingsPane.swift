@@ -67,7 +67,7 @@ struct OCRSettingsPane: View {
                     }
                 }
                 .disabled(languages.isEmpty)
-                .frame(minHeight: 32)
+                .frame(minHeight: 24)
             }
         }
     }

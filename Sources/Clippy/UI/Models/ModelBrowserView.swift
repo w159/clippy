@@ -22,7 +22,7 @@ struct ModelBrowserView: View {
         }
         .padding(tokens.metrics.space.four)
         .foregroundStyle(tokens.textPrimary)
-        .frame(minWidth: 720, minHeight: 440)
+        .frame(minWidth: 600, minHeight: 400)
         .background(tokens.surface)
         .preferredColorScheme(tokens.legacy.isDark ? .dark : .light)
         .background {

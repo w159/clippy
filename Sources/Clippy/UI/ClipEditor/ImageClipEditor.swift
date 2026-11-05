@@ -101,13 +101,13 @@ struct ImageClipEditor: View {
             toolbar
             if let ocrNotice { ocrBanner(ocrNotice) }
             canvas
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             statusBar
             footer
         }
-        .frame(minWidth: 520, minHeight: 460)
+        .frame(minWidth: 480, minHeight: 380)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             // Wire the title-bar close button to the same dirty/save logic as
@@ -175,7 +175,6 @@ struct ImageClipEditor: View {
                         .fixedSize()
                         .disabled(!isDirty || isSaving)
                 }
-                .controlSize(.large)
             }
             Button("") { save { if $0 { onClose() } } }
                 .keyboardShortcut("s", modifiers: .command)

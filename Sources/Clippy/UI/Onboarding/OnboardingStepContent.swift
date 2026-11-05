@@ -30,13 +30,13 @@ struct OnboardingStepContent: View {
             Image(systemName: symbol)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 56, height: 56)
+                .frame(width: 48, height: 48)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.clippyAccent)
                 .symbolEffect(.bounce, options: .nonRepeating, value: heroTick)
                 .padding(.bottom, 6)
                 .accessibilityHidden(true)
-            Text(title).font(.largeTitle.weight(.bold)).multilineTextAlignment(.center)
+            Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(detail).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -49,8 +49,8 @@ struct OnboardingStepContent: View {
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) { content() }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(12)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     /// A permission row: title on the left, live status on the right.
@@ -85,7 +85,7 @@ struct OnboardingStepContent: View {
     }
 
     private var welcome: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             hero("paperclip", "Your clipboard, remembered",
                  "Clippy keeps what you copy so you can paste it again. This short tour sets up permissions, optional features and your shortcut. " +
                      "Every step can be skipped and changed later in Settings.")
@@ -123,7 +123,6 @@ struct OnboardingStepContent: View {
             if !viewModel.accessibilityTrusted {
                 Button("Grant Access") { viewModel.grantAccessibility() }
                     .buttonStyle(.glass).tint(nil)
-                    .controlSize(.large)
                 note("This updates automatically when you return from System Settings.")
             }
         }
@@ -219,7 +218,6 @@ struct OnboardingStepContent: View {
                     }
                 }
                 .buttonStyle(.glass).tint(nil)
-                .controlSize(.large)
                 .disabled(viewModel.requestingNotifications)
             }
         }

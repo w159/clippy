@@ -45,7 +45,6 @@ extension TextClipEditor {
                         .fixedSize()
                         .disabled(!isDirty || clipDeleted)
                 }
-                .controlSize(.large)
             }
             // Cmd-S save path. The NSTextView swallows Return, so the
             // .defaultAction shortcut above is unreachable while the body
@@ -79,7 +78,7 @@ extension TextClipEditor {
             }
             if settings.aiEnabled { aiMenu }
         }
-        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 6)
+        .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 6)
     }
 
     /// Caret, counts, encoding, language and source.

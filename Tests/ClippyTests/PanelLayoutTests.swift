@@ -15,9 +15,9 @@ final class PanelLayoutTests: XCTestCase {
     /// Width is rail + divider + card + gutters; height is header + rows + footer.
     func testMinimumSizeTable() {
         let cases = [
-            SizeCase(rail: 52, card: 180, gutters: 20, rowHeight: 32, expected: CGSize(width: 280, height: 200)),
-            SizeCase(rail: 52, card: 240, gutters: 20, rowHeight: 40, expected: CGSize(width: 313, height: 224)),
-            SizeCase(rail: 0, card: 300, gutters: 0, rowHeight: 10, expected: CGSize(width: 301, height: 134))
+            SizeCase(rail: 52, card: 180, gutters: 20, rowHeight: 32, expected: CGSize(width: 280, height: 168)),
+            SizeCase(rail: 52, card: 240, gutters: 20, rowHeight: 40, expected: CGSize(width: 313, height: 192)),
+            SizeCase(rail: 0, card: 300, gutters: 0, rowHeight: 10, expected: CGSize(width: 301, height: 102))
         ]
         for item in cases {
             let size = PanelLayout.minimumSize(
@@ -70,6 +70,30 @@ final class PanelLayoutTests: XCTestCase {
         let large = CGSize(width: 640, height: 480)
         XCTAssertEqual(PanelLayout.clampUp(large, toMinimum: minimum), large)
         XCTAssertEqual(PanelLayout.clampUp(CGSize(width: CGFloat.nan, height: -4), toMinimum: minimum), minimum)
+    }
+
+    /// Density targets: native-sized chrome, not the oversized 2.4.0 numbers (64 / 40 / 60).
+    func testChromeStaysNativeSized() {
+        XCTAssertLessThanOrEqual(PanelLayout.headerHeight, 44)
+        XCTAssertLessThanOrEqual(PanelLayout.footerHeight, 28)
+        XCTAssertLessThanOrEqual(GridMetrics.comfortableRowHeight, 44)
+        XCTAssertGreaterThanOrEqual(GridMetrics.comfortableRowHeight, 40)
+        XCTAssertEqual(GridMetrics.compactRowHeight, 28)
+        XCTAssertEqual(GridMetrics.listPadding, 8)
+        XCTAssertEqual(GridMetrics.rowSpacing, 2)
+    }
+
+    /// The default panel is 760 x 480: wide enough for the detail pane, no taller than 2.2.0's 480.
+    func testDefaultPanelSizeFitsTheDetailPane() {
+        XCTAssertEqual(AppSettings.defaultPanelWidth, 760)
+        XCTAssertEqual(AppSettings.defaultPanelHeight, 480)
+        XCTAssertTrue(PreviewColumnPreferences.isVisible(panelWidth: AppSettings.defaultPanelWidth, enabled: true))
+        XCTAssertFalse(SidebarMetrics.collapsesForPreview(
+            panelWidth: AppSettings.defaultPanelWidth, reservedWidth: PreviewColumnPreferences.defaultWidth,
+            sidebarWidth: SidebarMetrics.defaultWidth), "the expanded sidebar fits beside the detail pane at the default size")
+        let minimum = PanelLayout.standardMinimumSize
+        XCTAssertLessThan(minimum.width, AppSettings.defaultPanelWidth)
+        XCTAssertLessThan(minimum.height, AppSettings.defaultPanelHeight)
     }
 
     /// The real-metrics minimum fits the rail plus one card.

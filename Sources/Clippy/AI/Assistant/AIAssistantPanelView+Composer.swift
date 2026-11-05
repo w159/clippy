@@ -56,11 +56,11 @@ extension AssistantPanelBody {
                         if streaming { viewModel.stop() } else { viewModel.send() }
                     } label: {
                         Image(systemName: streaming ? "stop.circle.fill" : "arrow.up.circle.fill")
-                            .font(.title)
+                            .font(.title3)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(streaming || canSend ? Color.clippyAccent : Color.secondary)
                             .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
-                            .frame(minWidth: 28, minHeight: 28)
+                            .frame(minWidth: 24, minHeight: 24)
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: .command)
@@ -68,8 +68,8 @@ extension AssistantPanelBody {
                     .accessibilityLabel(streaming ? "Stop" : "Send")
                     .disabled(!streaming && !canSend)
                 }
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .padding(.horizontal, 16)
             Text(streaming ? "Esc stops the reply" : "Return sends")

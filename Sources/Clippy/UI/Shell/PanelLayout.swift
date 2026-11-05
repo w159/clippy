@@ -6,9 +6,9 @@ import CoreGraphics
 enum PanelLayout {
     /// Height of the floating header strip: one row holding the title, the search field and the controls.
     /// (The filter-chip row appears below it only while searching or filtering.)
-    static let headerHeight: CGFloat = 64
+    static let headerHeight: CGFloat = 44
     /// Height of the shortcut footer.
-    static let footerHeight: CGFloat = 40
+    static let footerHeight: CGFloat = 28
     /// Width floor for the panel: the narrowest width at which the header controls
     /// (search field + toggles) stay usable. It is also the historical `minSize.width`,
     /// so `minimumSize` never returns a narrower panel even when rail + card + gutters

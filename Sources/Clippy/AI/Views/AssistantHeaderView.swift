@@ -15,7 +15,7 @@ struct AssistantHeaderView: View {
         VStack(spacing: 0) {
             HStack(spacing: tokens.metrics.space.two) {
                 Image(systemName: "sparkles")
-                    .font(.title3)
+                    .font(.headline)
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.clippyAccent)
                     .symbolEffect(.variableColor, isActive: !reduceMotion && viewModel.state == .streaming)
@@ -74,9 +74,9 @@ struct AssistantEmptyView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: tokens.metrics.space.four) {
-                Image(systemName: "sparkles").resizable().scaledToFit().frame(width: 44, height: 44)
+                Image(systemName: "sparkles").resizable().scaledToFit().frame(width: 32, height: 32)
                     .symbolRenderingMode(.hierarchical).foregroundStyle(Color.clippyAccent).accessibilityHidden(true)
-                Text("Ask the assistant about your clips").font(.title3.weight(.semibold)).foregroundStyle(tokens.textPrimary)
+                Text("Ask the assistant about your clips").font(.headline).foregroundStyle(tokens.textPrimary)
                 Text("Try one of these, or type your own.").font(.callout).foregroundStyle(tokens.textSecondary)
                 VStack(spacing: tokens.metrics.space.two) {
                     ForEach(AssistantPresentation.suggestions(toolsSupported: toolsSupported, hasAttachedClip: hasAttachedClip), id: \.self) { prompt in
@@ -88,16 +88,16 @@ struct AssistantEmptyView: View {
                             }
                             .padding(.horizontal, tokens.metrics.space.three)
                             .padding(.vertical, tokens.metrics.space.two)
-                            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Ask: \(prompt)")
                     }
                 }
-                .frame(maxWidth: 420)
+                .frame(maxWidth: 380)
             }
-            .padding(tokens.metrics.space.six)
+            .padding(tokens.metrics.space.four)
             .frame(maxWidth: .infinity)
         }
         .background(tokens.surface)

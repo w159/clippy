@@ -33,7 +33,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     /// are hidden because they would float over the card's header. Skip for now is
     /// the cancel action, so Escape closes the window as the close button did.
     static func makeWindow<Content: View>(rootView: Content) -> NSWindow {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 460),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = "Welcome to Clippy"
         window.titlebarAppearsTransparent = true

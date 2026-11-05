@@ -77,9 +77,9 @@ struct InstructionSheet: View {
                         .disabled(trimmed.isEmpty)
                 }
             }
-            .padding(.horizontal, 16).padding(.bottom, 14).padding(.top, 4)
+            .padding(.horizontal, 16).padding(.bottom, 12).padding(.top, 4)
         }
-        .frame(width: 400)
+        .frame(width: 360)
     }
 
     private func run() {
@@ -119,9 +119,9 @@ struct EditorCompareSheet: View {
                         .keyboardShortcut(.cancelAction)
                 }
             }
-            .padding(.horizontal, 16).padding(.bottom, 14)
+            .padding(.horizontal, 16).padding(.bottom, 12)
         }
-        .frame(minWidth: 640, minHeight: 360)
+        .frame(minWidth: 560, minHeight: 300)
     }
 
     private func pane(_ heading: String, text: String) -> some View {
@@ -136,6 +136,6 @@ struct EditorCompareSheet: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

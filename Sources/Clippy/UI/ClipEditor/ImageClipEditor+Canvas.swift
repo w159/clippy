@@ -52,7 +52,6 @@ extension ImageClipEditor {
     var imageLoadError: some View {
         ContentUnavailableView("Could not load the image", systemImage: "exclamationmark.triangle",
                                description: Text("The file may have been moved or deleted. You can still rename the clip."))
-            .padding(24)
     }
 
     /// Chooses move / resize / create from where the drag began, then edits the image-space selection.

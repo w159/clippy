@@ -27,7 +27,7 @@ extension SettingsPaneID {
     }
 }
 
-/// A 26 pt rounded square with a white symbol on the pane color.
+/// A 20 pt rounded square with a white symbol on the pane color.
 struct SettingsSidebarTile: View {
     let pane: SettingsPaneID
 
@@ -35,8 +35,8 @@ struct SettingsSidebarTile: View {
         Image(systemName: pane.icon)
             .font(.callout.weight(.medium))
             .foregroundStyle(.white)
-            .frame(width: 26, height: 26)
-            .background(pane.tileColor.gradient, in: RoundedRectangle(cornerRadius: 6.5, style: .continuous))
+            .frame(width: 20, height: 20)
+            .background(pane.tileColor.gradient, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             .accessibilityHidden(true)
     }
 }

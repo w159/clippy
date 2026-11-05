@@ -8,7 +8,7 @@ struct LockView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 12) {
             Image(systemName: "lock.fill")
                 .resizable()
                 .scaledToFit()
@@ -18,7 +18,7 @@ struct LockView: View {
                 .accessibilityHidden(true)
             VStack(spacing: 6) {
                 Text("Clippy is locked")
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                 if lock.lastAttemptFailed {
                     Label("Authentication failed or was cancelled.", systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
@@ -39,7 +39,6 @@ struct LockView: View {
                         .keyboardShortcut(.defaultAction)
                         .disabled(lock.isAuthenticating)
                 }
-                .controlSize(.large)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

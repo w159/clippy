@@ -61,7 +61,7 @@ final class PanelHarnessTests: XCTestCase {
         return ClipStore(database: db, pasteboard: NSPasteboard(name: NSPasteboard.Name("ClippyHarness-\(UUID())")))
     }
 
-    private func openPanel(appearance: NSAppearance.Name) throws {
+    func openPanel(appearance: NSAppearance.Name, size: NSSize = NSSize(width: 1000, height: 620)) throws {
         store = try seededStore()
         pasted = []
         pastedMany = []
@@ -76,7 +76,7 @@ final class PanelHarnessTests: XCTestCase {
             onClose: {},
             onOpenSettings: {}
         )
-        show(view.clippyDesignSystem(), size: NSSize(width: 1000, height: 620), appearance: appearance, panelChrome: true)
+        show(view.clippyDesignSystem(), size: size, appearance: appearance, panelChrome: true)
         pump(until: "clips loaded") { self.store.clips.count == 8 && !self.store.categories.isEmpty }
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
@@ -172,26 +172,53 @@ final class PanelHarnessTests: XCTestCase {
     }
 
     /// The SwiftUI tree is not reachable through `accessibilityChildren` of the
-    /// hosting view, so assertions read what is actually drawn: render the content
-    /// view at 2x and run text recognition over it.
+    /// hosting view, so assertions read what is actually drawn: capture the window as the window server
+    /// composites it (what a user sees, Liquid Glass included), falling back to rendering the content view at
+    /// 2x, and run text recognition over it.
     private func recognizedLines() -> [RecognizedLine] {
         guard let view = window?.contentView else { return [] }
+        var source = "window"
+        var image = windowCaptureImage()
+        if image == nil {
+            source = "cache"
+            image = cacheDisplayImage(of: view)
+        }
+        guard let cgImage = image else { return [] }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        // Native-size 13 pt text is below Vision's default minimum text height (1/32 of the image).
+        request.minimumTextHeight = 0.008
+        do {
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        } catch {
+            print("HARNESS ocr failed: \(error)")
+            return []
+        }
+        let lines = (request.results ?? []).compactMap { observation in
+            observation.topCandidates(1).first.map { RecognizedLine(text: $0.string, box: observation.boundingBox) }
+        }
+        if lines.isEmpty { print("HARNESS ocr found no text in a \(cgImage.width)x\(cgImage.height) px \(source) render") }
+        return lines
+    }
+
+    private func windowCaptureImage() -> CGImage? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("clippy-ocr-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard captureWindow(to: url), let image = NSImage(contentsOf: url) else { return nil }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
+    private func cacheDisplayImage(of view: NSView) -> CGImage? {
         let bounds = view.bounds
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
-        else { return [] }
+        else { return nil }
         rep.size = bounds.size
         view.cacheDisplay(in: bounds, to: rep)
-        guard let cgImage = rep.cgImage else { return [] }
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = false
-        guard (try? VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])) != nil else { return [] }
-        return (request.results ?? []).compactMap { observation in
-            observation.topCandidates(1).first.map { RecognizedLine(text: $0.string, box: observation.boundingBox) }
-        }
+        return rep.cgImage
     }
 
     private func isShown(_ fragment: String) -> Bool {
@@ -478,7 +505,7 @@ final class PanelHarnessTests: XCTestCase {
 
     func testSettingsAndOnboardingScreenshots() throws {
         for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
-            show(SettingsView(), size: NSSize(width: 1000, height: 700), appearance: appearance)
+            show(SettingsView(), size: Self.settingsWindowSize, appearance: appearance)
             pump(seconds: 0.8)
             // cacheDisplay cannot draw the split view's sidebar material.
             screenshot("07-settings-\(suffix)", compositedOnly: true)

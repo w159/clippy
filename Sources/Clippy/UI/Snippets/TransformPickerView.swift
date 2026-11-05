@@ -68,7 +68,7 @@ struct TransformPickerView: View {
                     .keyboardShortcut(.defaultAction).disabled(!canApply(preview))
             }
         }
-        .frame(minWidth: 720, idealWidth: 760, minHeight: 460)
+        .frame(minWidth: 620, idealWidth: 660, minHeight: 380)
         .onAppear { searchFocused = true; query = ""; chainIDs = []; regexPattern = ""; regexTemplate = ""; pendingAction = nil; confirmSensitive = false; confirmReplace = false; didApply = false }
         .confirmationDialog("This clip looks sensitive", isPresented: $confirmSensitive, titleVisibility: .visible) {
             Button("Transform anyway", role: .destructive) { runPending() }

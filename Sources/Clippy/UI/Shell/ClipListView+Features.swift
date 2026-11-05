@@ -76,6 +76,7 @@ extension ClipListView {
                 mainPane
                 autoFileTray
             }
+            .layoutProbe("list.column")
             if showsPreviewColumn {
                 ClipPreviewColumn(
                     clip: selectedClip, query: store.query,

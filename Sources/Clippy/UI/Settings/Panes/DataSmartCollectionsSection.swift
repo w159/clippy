@@ -109,7 +109,7 @@ struct SmartCollectionEditorSheet: View {
                 Button("Save", action: save).buttonStyle(.accent).keyboardShortcut(.defaultAction)
             }
         }
-        .frame(width: 520)
+        .frame(width: 440)
         .onAppear { if let collection { draft = SmartCollectionDraft(collection: collection) } }
     }
 

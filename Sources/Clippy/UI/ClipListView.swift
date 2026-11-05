@@ -201,7 +201,7 @@ struct ClipListView: View {
             footer
         }
         .background(ThemedPanelBackground(tokens: tokens, opacity: settings.panelOpacity))
-        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.xl, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.lg, style: .continuous))
         .tint(tokens.accent)
         .overlay { paletteOverlay }
         .background(paletteShortcut)

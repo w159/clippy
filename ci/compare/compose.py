@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Side-by-side screenshots of Clippy 2.2.0, 2.3.0 and the current build.
+"""Side-by-side screenshots of Clippy 2.2.0, 2.4.0 and the current build.
 
 Used by the "Version comparison" job in .github/workflows/ci.yml. For every
 screen and appearance it writes compare-<screen>-<light|dark>.png with three
-columns labelled "2.2.0", "2.3.0" and "New", drawn at one shared scale (never
-upscaled) and top-aligned, so a larger window looks larger. A version that has
-no such screen gets a "not in this version" placeholder. It also writes
-compare-overview.png, the panel and Settings General rows stacked.
+columns labelled "2.2.0", "2.4.0" and "New", top-aligned, at actual size: one
+screenshot pixel is one image pixel, nothing is scaled, so a larger window looks
+larger and a padded layout looks padded. All three versions are captured by the
+same harness on the same runner, so they share one capture scale (2x on a
+Retina runner); the caption on every image says which, and each column label
+gives its pixel size. A version that has no such screen gets a "not in this
+version" placeholder. It also writes compare-overview.png, the default-size
+panel and Settings General rows stacked, also unscaled.
 
 Each version names its files differently, so SCREENS below maps every shared
 screen key to the file name each version uses ({a} is "light" or "dark").
 A new screen needs one row there and nothing else.
 
-    compose.py --v220 DIR --v230 DIR --new DIR --out DIR
+    compose.py --v220 DIR --v240 DIR --new DIR --out DIR
 """
 
 import argparse
@@ -22,10 +26,13 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 APPEARANCES = ("light", "dark")
-COLUMNS = (("2.2.0", "v220"), ("2.3.0", "v230"), ("New", "new"))
+COLUMNS = (("2.2.0", "v220"), ("2.4.0", "v240"), ("New", "new"))
+
+# Default panel width in points (AppSettings.defaultPanelWidth); used only to name the capture scale in captions.
+DEFAULT_PANEL_WIDTH_PT = 760
 
 # Settings panes: SettingsPaneID.allCases (Sources/Clippy/UI/Settings/SettingsPaneRegistry.swift),
-# identical at b8aa9a0, dfc8ea3 and the current branch.
+# identical at b8aa9a0, v2.4.0 (f1c1035) and the current branch.
 PANES = (
     "general",
     "appearance",
@@ -48,25 +55,32 @@ PANES = (
 
 
 def both(name):
-    """2.3.0 and the current harness (PanelHarnessTests) name their files alike."""
-    return {"v230": name, "new": name}
+    """2.4.0 and the current harness (PanelHarnessTests) name their files alike."""
+    return {"v240": name, "new": name}
 
 
 # key -> {version: file name stem, or {appearance: stem}}. A missing version means the screen
 # does not exist there. 2.2.0 has no UI harness; its stems come from ci/before-2.2.0.
 SCREENS = {
+    # Each version's panel at its own default size: 2.2.0 640x480, 2.4.0 920x560, New 760x480.
+    "panel-default-size": {
+        "v220": "before-panel-history-{a}",
+        "v240": "50-panel-default-{a}",
+        "new": "50-panel-default-{a}",
+    },
+    # The same 1000x620 window in every version (the harness's standard panel shot), for like-for-like detail.
     "panel-history": {
         "v220": "before-panel-history-{a}",
-        "v230": {"light": "01-panel-light", "dark": "04-panel-dark"},
+        "v240": {"light": "01-panel-light", "dark": "04-panel-dark"},
         "new": {"light": "01-panel-light", "dark": "04-panel-dark"},
     },
     "panel-search": {
         "v220": "before-panel-search-{a}",
-        "v230": {"light": "02-search-results-light", "dark": "05-search-results-dark"},
+        "v240": {"light": "02-search-results-light", "dark": "05-search-results-dark"},
         "new": {"light": "02-search-results-light", "dark": "05-search-results-dark"},
     },
     "panel-no-results": {
-        "v230": {"light": "03-no-results-light", "dark": "06-no-results-dark"},
+        "v240": {"light": "03-no-results-light", "dark": "06-no-results-dark"},
         "new": {"light": "03-no-results-light", "dark": "06-no-results-dark"},
     },
     "onboarding": {"v220": "before-onboarding-{a}", **both("08-onboarding-{a}")},
@@ -94,9 +108,7 @@ for _pane in PANES:
         **both(f"10-settings-{_pane}-{{a}}"),
     }
 
-MAX_COLUMN_WIDTH = 1000  # px; wider screenshots are scaled down together
-OVERVIEW_WIDTH = 2400
-OVERVIEW_ROWS = ("panel-history", "settings-general")
+OVERVIEW_ROWS = ("panel-default-size", "settings-general")
 BACKGROUND = (128, 128, 128, 255)
 INK = (255, 255, 255, 255)
 PLACEHOLDER = (96, 96, 96, 255)
@@ -149,31 +161,27 @@ def centered(draw, box, text, fnt, fill):
     )
 
 
-def compose(images, title):
-    """images: three PIL images or None, in COLUMNS order. Returns the composed image."""
+def compose(images, title, scale_note):
+    """images: three PIL images or None, in COLUMNS order. Returns the composed image, unscaled."""
     present = [i for i in images if i is not None]
-    scale = min(1.0, MAX_COLUMN_WIDTH / max(i.width for i in present))
-    drawn = [
-        i.resize(
-            (max(1, round(i.width * scale)), max(1, round(i.height * scale))),
-            Image.LANCZOS,
-        )
-        if i is not None
-        else None
-        for i in images
-    ]
-    cell_w = max(d.width for d in drawn if d is not None)
-    cell_h = max(d.height for d in drawn if d is not None)
+    cell_w = max(i.width for i in present)
+    cell_h = max(i.height for i in present)
     pad, label_h, title_h = 24, 56, 48
-    width = len(drawn) * cell_w + (len(drawn) + 1) * pad
+    width = len(images) * cell_w + (len(images) + 1) * pad
     height = title_h + label_h + cell_h + 2 * pad
     canvas = Image.new("RGBA", (width, height), BACKGROUND)
     draw = ImageDraw.Draw(canvas)
-    draw.text((pad, pad // 2), title, font=font(24), fill=INK)
+    draw.text(
+        (pad, pad // 2),
+        f"{title}  |  actual size, 1 screenshot pixel = 1 image pixel, no scaling{scale_note}",
+        font=font(24),
+        fill=INK,
+    )
     label_font, note_font = font(34), font(26)
-    for index, ((label, _), shot) in enumerate(zip(COLUMNS, drawn)):
+    for index, ((label, _), shot) in enumerate(zip(COLUMNS, images)):
         x = pad + index * (cell_w + pad)
-        draw.text((x, title_h + 4), label, font=label_font, fill=INK)
+        size = "" if shot is None else f"   {shot.width}x{shot.height} px"
+        draw.text((x, title_h + 4), label + size, font=label_font, fill=INK)
         top = title_h + label_h
         if shot is None:
             box = (x, top, x + cell_w, top + cell_h)
@@ -185,29 +193,29 @@ def compose(images, title):
 
 
 def overview(rows, path):
-    """Stacks composed rows at one width (never upscaled)."""
-    target = min(OVERVIEW_WIDTH, max(r.width for r in rows))
-    scaled = []
-    for row in rows:
-        ratio = min(1.0, target / row.width)
-        scaled.append(
-            row.resize(
-                (round(row.width * ratio), round(row.height * ratio)), Image.LANCZOS
-            )
-        )
+    """Stacks composed rows, unscaled, left-aligned."""
     sheet = Image.new(
         "RGBA",
-        (max(r.width for r in scaled), sum(r.height for r in scaled)),
+        (max(r.width for r in rows), sum(r.height for r in rows)),
         BACKGROUND,
     )
     y = 0
-    for row in scaled:
+    for row in rows:
         sheet.alpha_composite(row, (0, y))
         y += row.height
     sheet.save(path)
     print(
         f"wrote {os.path.basename(path)} ({sheet.width}x{sheet.height}) from {len(rows)} rows"
     )
+
+
+def capture_scale(directory):
+    """Pixels per point of the captures, from the default-size panel shot of the current build."""
+    stem = SCREENS["panel-default-size"]["new"].format(a="light")
+    image = find(directory, stem)
+    if image is None:
+        return None
+    return image.width / DEFAULT_PANEL_WIDTH_PT
 
 
 def main():
@@ -225,6 +233,13 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     directories = {version: getattr(args, version) for _, version in COLUMNS}
 
+    scale = capture_scale(directories["new"])
+    scale_note = (
+        ""
+        if scale is None
+        else f"  |  captures are {scale:g}x ({'Retina' if scale > 1.5 else 'standard'}), all three columns alike"
+    )
+    print(f"capture scale: {scale_note.strip(' |') or 'unknown'}")
     composed, report, overview_rows = 0, [], {}
     for key, spec in SCREENS.items():
         for appearance in APPEARANCES:
@@ -239,12 +254,12 @@ def main():
             )
             if all(i is None for i in images):
                 continue
-            row = compose(images, f"{key} ({appearance})")
+            row = compose(images, f"{key} ({appearance})", scale_note)
             row.save(os.path.join(args.out, f"compare-{key}-{appearance}.png"))
             composed += 1
             if key in OVERVIEW_ROWS:
                 overview_rows[(key, appearance)] = row
-    print("found in 2.2.0 / 2.3.0 / New (x = found, - = missing)")
+    print("found in 2.2.0 / 2.4.0 / New (x = found, - = missing)")
     print("\n".join(report))
     print(f"composed {composed} comparison images")
 

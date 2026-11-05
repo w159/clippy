@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Compact (~32pt) and comfortable (two-line) clip row (LAY-08). Shares the
+/// Compact (28pt) and comfortable (two-line, 42pt) clip row (LAY-08). Shares the
 /// model, accessibility contract and masking rules with `ClipCardView`.
 struct ClipRowView: View {
     let clip: Clip
@@ -52,22 +52,24 @@ struct ClipRowView: View {
     var body: some View {
         HStack(spacing: 8) {
             leadingGlyph
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 1) {
                 if isRenaming { renameField } else { contentLine }
                 if comfortable { metaLine }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutProbe("row.text")
             trailingSlot
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 12)
-        .padding(.vertical, comfortable ? 4 : 2)
-        .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight + 4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, comfortable ? 3 : 2)
+        .overlay(alignment: .trailing) { hoverActionsOverlay }
+        .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous)
                 .strokeBorder(tokens.accent.opacity(0.7), lineWidth: model.isSelected ? 1.5 : 0)
         )
+        .layoutProbe(comfortable ? "row.comfortable" : "row.compact")
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovering = hovering
@@ -84,45 +86,46 @@ struct ClipRowView: View {
     // MARK: - Pieces
 
     /// Rows are rounded cards: calm elevated fill at rest, accent wash on hover and selection.
-    static let rowRadius: CGFloat = 12
+    static let rowRadius: CGFloat = 8
 
     private var rowBackground: Color {
         if model.isSelected { return tokens.accent.opacity(0.18) }
         return isHovering ? tokens.accent.opacity(0.10) : tokens.surfaceElevated
     }
 
-    private var glyphSide: CGFloat { comfortable ? 38 : 24 }
+    private var glyphSide: CGFloat { comfortable ? 28 : 20 }
 
     /// Source app icon, when icons are on and the app is known.
     private var appIcon: NSImage? {
         settings.showAppIcons ? AppIconProvider.shared.icon(forBundleID: clip.sourceAppBundleID) : nil
     }
 
-    /// Comfortable rows: a 32pt rounded tile. App icon with a kind badge in its corner,
+    /// Comfortable rows: a 28pt rounded tile. App icon with a kind badge in its corner,
     /// or the kind symbol on a tile tinted with the kind color.
     private var kindTile: some View {
-        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
         return ZStack(alignment: .bottomTrailing) {
             if !model.isSensitive, let icon = appIcon {
-                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 38, height: 38)
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 28, height: 28)
                 Image(systemName: visual.symbol)
-                    .font(.system(size: 7, weight: .bold))
+                    .font(.system(size: 6, weight: .bold))
                     .foregroundStyle(onHue)
-                    .frame(width: 14, height: 14)
+                    .frame(width: 11, height: 11)
                     .background(hue, in: Circle())
-                    .offset(x: 3, y: 3)
+                    .offset(x: 2, y: 2)
             } else {
                 shape.fill(tileFill)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 28, height: 28)
                     .overlay {
                         Image(systemName: visual.symbol)
-                            .font(.title3.weight(.semibold))
+                            .font(.callout.weight(.semibold))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(tileSymbol)
                     }
             }
         }
-        .frame(width: 38, height: 38)
+        .frame(width: 28, height: 28)
+        .layoutProbe("row.tile")
         .accessibilityHidden(true)
         .help(visual.label)
     }
@@ -151,8 +154,8 @@ struct ClipRowView: View {
                 }
             }
             .frame(width: glyphSide, height: glyphSide)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: comfortable ? 11 : ClippyRadius.xs, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: comfortable ? 11 : ClippyRadius.xs, style: .continuous))
+            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: comfortable ? 7 : ClippyRadius.xs, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: comfortable ? 7 : ClippyRadius.xs, style: .continuous))
             .task(id: clip.thumbFilename) {
                 guard let name = clip.thumbFilename else { return }
                 thumbnail = ClipCardView.cachedThumbnail(for: name)
@@ -163,7 +166,8 @@ struct ClipRowView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(model.isSensitive ? tokens.textSecondary : hue)
-                .frame(width: 24)
+                .frame(width: 20, height: 20)
+                .layoutProbe("row.glyph")
                 .accessibilityHidden(true)
                 .help(visual.label)
         }
@@ -239,24 +243,31 @@ struct ClipRowView: View {
             },
             onCancel: { isRenaming = false }
         )
-        .frame(minHeight: 18)
+        .frame(minHeight: 16)
     }
 
     // MARK: - Trailing slot (metadata crossfades with actions)
 
     private var trailingSlot: some View {
-        ZStack(alignment: .trailing) {
-            ViewThatFits(in: .horizontal) {
-                metadata(showApp: true)
-                metadata(showApp: false)
-            }
-            .opacity(showsActions ? 0 : 1)
-            hoverActions
-                .opacity(showsActions ? 1 : 0)
-                .allowsHitTesting(showsActions)
+        ViewThatFits(in: .horizontal) {
+            metadata(showApp: true)
+            metadata(showApp: false)
         }
+        .opacity(showsActions ? 0 : 1)
         .fixedSize(horizontal: true, vertical: false)
         .layoutPriority(3)
+    }
+
+    /// Hover actions float over the row's trailing edge instead of reserving their width, so
+    /// titles keep the full row; they sit on the row's own fill and cover the text beneath.
+    private var hoverActionsOverlay: some View {
+        hoverActions
+            .padding(.leading, 8)
+            .padding(.trailing, 8)
+            .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: Self.rowRadius, style: .continuous))
+            .opacity(showsActions ? 1 : 0)
+            .allowsHitTesting(showsActions)
     }
 
     private func metadata(showApp: Bool) -> some View {

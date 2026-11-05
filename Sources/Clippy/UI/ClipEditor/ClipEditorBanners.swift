@@ -38,7 +38,7 @@ struct EditorConflictBanner: View {
         .buttonStyle(.glass).tint(nil)
         .controlSize(.small)
         .padding(12)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
@@ -83,7 +83,7 @@ struct EditorPendingBar: View {
             }
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .padding(.horizontal, 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Staged AI actions")

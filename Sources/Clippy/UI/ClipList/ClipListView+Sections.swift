@@ -54,7 +54,6 @@ extension ClipListView {
     func sectionedListBody(width: CGFloat, prefs: GridPreferences) -> some View {
         let columns = GridMetrics.columnCount(forWidth: width, preferred: prefs.columnMode, density: prefs.density)
         let gridItems = Array(repeating: GridItem(.flexible(), spacing: GridMetrics.spacing), count: columns)
-        let density = prefs.density
         // Snapshot the visible clips once per body evaluation: sections,
         // metadata, the trailing-drop guard, and the footer all previously
         // re-ran the visibleClips filter/join within a single redraw.
@@ -66,7 +65,7 @@ extension ClipListView {
         let metadata = cardMetadata(for: clips)
         return ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: density == .compact ? 4 : 6, pinnedViews: []) {
+                LazyVStack(spacing: GridMetrics.rowSpacing, pinnedViews: []) {
                     Color.clear.frame(height: 0).id(Self.topAnchorID)
                     ForEach(sections(for: clips)) { section in
                         if !section.title.isEmpty {
@@ -177,15 +176,15 @@ extension ClipListView {
     func sectionHeader(_ title: String, count: Int) -> some View {
         HStack(spacing: 6) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text("\(count)")
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
             Spacer(minLength: 0)
         }
-        .padding(.top, 10)
+        .padding(.top, 8)
         .padding(.bottom, 2)
         .padding(.horizontal, 6)
         .accessibilityElement(children: .combine)

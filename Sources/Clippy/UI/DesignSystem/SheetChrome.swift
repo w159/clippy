@@ -14,10 +14,10 @@ struct ClippySheet<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: tokens.metrics.space.four) {
-            Text(title).font(.title2.weight(.semibold)).foregroundStyle(tokens.textPrimary)
+            Text(title).font(.title3.weight(.semibold)).foregroundStyle(tokens.textPrimary)
             content
         }
-        .padding(tokens.metrics.space.five)
+        .padding(tokens.metrics.space.four)
         .background(tokens.surface)
         .frame(minWidth: 320, minHeight: 180)
     }

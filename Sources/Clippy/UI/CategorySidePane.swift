@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The category sidebar. Expanded it shows Library / Categories / Tools groups;
-/// with `isRail` it renders the 52pt `CategoryRail`. Category rows accept clip
+/// with `isRail` it renders the 44pt `CategoryRail`. Category rows accept clip
 /// drops (file) and category drops (reorder), rename inline, and are keyboard
 /// operable. Row views live in `CategorySidePane+Rows`, behavior in `+Actions`.
 struct CategorySidePane: View {
@@ -100,7 +100,7 @@ struct CategorySidePane: View {
     private var expanded: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     sectionHeader("Library", .library)
                     if isOpen(.library) { historyRow }
                     sectionHeader("Categories", .categories, count: store.categories.count, addLabel: "New category") { isCreating = true }
@@ -121,7 +121,7 @@ struct CategorySidePane: View {
                         }
                     }
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .padding(.top, 4)
             }
             .accessibilityRotor("Categories") {
@@ -129,7 +129,7 @@ struct CategorySidePane: View {
                     AccessibilityRotorEntry(Text(category.name), id: category.id ?? -1, in: rotorNamespace)
                 }
             }
-            newCategoryRow.padding(.horizontal, 10).padding(.bottom, 10)
+            newCategoryRow.padding(.horizontal, 8).padding(.bottom, 8)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)

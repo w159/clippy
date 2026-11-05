@@ -35,7 +35,7 @@ extension CategorySidePane {
                 Button(action: onAdd) {
                     Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
                         // The bare 10pt glyph was a ~12pt hit target.
-                        .frame(width: 20, height: 20)
+                        .frame(width: 18, height: 18)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -44,9 +44,9 @@ extension CategorySidePane {
             }
         }
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.top, 14)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
     }
 
     func indicator(for row: SidebarDropRow) -> SidebarDropIndicator {

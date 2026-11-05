@@ -2,14 +2,14 @@ import CoreGraphics
 import Foundation
 
 /// Persisted state of the optional preview column (LAY-11).
-/// UserDefaults keys: `preview.column.enabled` (Bool, default true) and `preview.column.width` (Double, default 300).
+/// UserDefaults keys: `preview.column.enabled` (Bool, default true) and `preview.column.width` (Double, default 260).
 enum PreviewColumnPreferences {
     /// Narrowest column.
-    static let minWidth: CGFloat = 240
+    static let minWidth: CGFloat = 220
     /// Widest column.
     static let maxWidth: CGFloat = 520
     /// Default column width.
-    static let defaultWidth: CGFloat = 300
+    static let defaultWidth: CGFloat = 260
     /// Panel width from which the column may appear.
     static let minPanelWidth: CGFloat = 760
     /// The column is on until the user turns it off.
