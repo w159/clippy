@@ -4,6 +4,7 @@ import XCTest
 
 /// 2.3.1: the default theme is Clean Light again, and an existing database with pending
 /// migrations is backed up before they run.
+@MainActor
 final class UpgradeSafetyTests: XCTestCase {
     func testRegisteredThemeDefaultIsCleanLight() throws {
         let name = "clippy-defaults-\(UUID().uuidString)"
