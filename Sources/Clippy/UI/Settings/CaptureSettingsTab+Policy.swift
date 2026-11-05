@@ -25,7 +25,7 @@ struct CapturePolicySnapshot: Equatable {
 
 /// Capture-on-launch toggle.
 struct CaptureLaunchRow: View {
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var captureOnLaunch = CapturePreferences.captureOnLaunch
 
     var body: some View {
@@ -44,7 +44,7 @@ struct CaptureLaunchRow: View {
 /// Sensitive auto-clear, type blocklist and per-app paste profiles.
 struct CapturePolicySections: View {
     @Environment(\.clippyTokens) private var tokens
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var clearSeconds = CapturePreferences.sensitiveAutoClearSeconds
     @State private var deletesHistory = CapturePreferences.autoClearDeletesHistory
     @State private var blocklist = CapturePreferences.typeBlocklist

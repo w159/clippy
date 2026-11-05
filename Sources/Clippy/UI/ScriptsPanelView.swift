@@ -14,9 +14,9 @@ struct ScriptsPanelView: View {
     var store: ClipStore
     let onOpenSettings: () -> Void
 
-    private var scriptStore = ScriptStore.shared
-    private var settings = AppSettings.shared
-    private var center = ScriptRunCenter.shared
+    private let scriptStore = ScriptStore.shared
+    private let settings = AppSettings.shared
+    private let center = ScriptRunCenter.shared
 
     /// Scripts the user has already confirmed once this session.
     @State private var confirmedScripts: Set<UUID> = []

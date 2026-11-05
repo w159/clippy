@@ -37,7 +37,7 @@ struct CodeEditorView: View {
     /// Reports the selection (UTF-16 range) after every caret move; nil to ignore.
     var onSelectionChange: ((NSRange) -> Void)?
 
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.clippyTokens) private var designTokens
 
     init(text: Binding<String>,

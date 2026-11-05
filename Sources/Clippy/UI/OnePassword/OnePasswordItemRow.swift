@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Collapsed item row: category icon, title, category label and an expand chevron.
 struct OnePasswordItemRow: View {
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let item: OPItem
     let isExpanded: Bool

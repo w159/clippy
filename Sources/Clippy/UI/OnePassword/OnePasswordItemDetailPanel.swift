@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Expanded item detail: loading, error, or sectioned field rows.
 struct OnePasswordItemDetailPanel: View {
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let loading: Bool
     let error: String?

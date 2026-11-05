@@ -93,7 +93,7 @@ final class AIActionRunner {
 struct AIActionSheet: View {
     var runner: AIActionRunner
     // Theme tokens so the sheet's surfaces/text track a theme switch like the panel.
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     private var tokens: ThemeTokens { settings.theme }
     /// Called with the approved text when the user taps Apply.
     let onApply: (AIProposal) -> Void

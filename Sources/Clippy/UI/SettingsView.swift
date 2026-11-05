@@ -4,7 +4,7 @@ import SwiftUI
 /// The settings window: a sidebar of panes with search (SET-09), or a pushing list when
 /// the window is compact. Each pane footer offers reset, export and import.
 struct SettingsView: View {
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var model: SettingsShellModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hostWindow: NSWindow?

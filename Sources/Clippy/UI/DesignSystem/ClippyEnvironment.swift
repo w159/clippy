@@ -51,7 +51,7 @@ extension View {
 
 /// Resolves settings at the root, with environment-driven accessibility preferences.
 private struct ClippyDesignSystemEnvironment: ViewModifier {
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var colorScheme
 

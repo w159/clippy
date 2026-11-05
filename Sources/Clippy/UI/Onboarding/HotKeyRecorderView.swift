@@ -17,9 +17,9 @@ private final class ActiveHotKeyRecorder {
 struct HotKeyRecorderView: View {
     /// The action being bound.
     let action: HotKeyAction
-    private var center = HotKeyCenter.shared
+    private let center = HotKeyCenter.shared
     @Environment(\.clippyTokens) private var tokens
-    private var recorder = ActiveHotKeyRecorder.shared
+    private let recorder = ActiveHotKeyRecorder.shared
     @State private var isHovered = false
     @State private var warning: String?
     @FocusState private var fieldFocused: Bool

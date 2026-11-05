@@ -20,7 +20,7 @@ struct ScriptRunResultView: View {
     var saveClip: (String) -> Bool
     var onDismiss: (() -> Void)?
 
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @State private var shownStream: ScriptOutputStream?
     @State private var saveTask: Task<Void, Never>?
     private var tokens: ThemeTokens { settings.theme }

@@ -3,7 +3,7 @@ import SwiftUI
 struct AIConnectionTestSection: View {
     var model: AIProviderManagerModel
     let providerID: UUID
-    private var health = AIHealth.shared
+    private let health = AIHealth.shared
 
     var body: some View {
         PaneSection("Test connection") {

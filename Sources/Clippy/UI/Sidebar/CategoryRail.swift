@@ -5,8 +5,8 @@ import SwiftUI
 struct CategoryRail: View {
     @Environment(\.clippyTokens) private var tokens
     var store: ClipStore
-    private var settings = AppSettings.shared
-    private var scriptStore = ScriptStore.shared
+    private let settings = AppSettings.shared
+    private let scriptStore = ScriptStore.shared
     @Binding var selection: PanelSelection
     @Binding var hover: SidebarDropRow?
     let historyCount: Int

@@ -5,7 +5,7 @@ import SwiftUI
 
 struct AISettingsTab: View {
     @Bindable private var settings = AppSettings.shared
-    private var store = AIProviderStore.shared
+    private let store = AIProviderStore.shared
     @State private var model = AIProviderManagerModel()
     @State private var showActions = false
 

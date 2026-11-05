@@ -31,7 +31,7 @@ struct ThemedPanelBackground: View {
     let tokens: ThemeTokens
     let opacity: Double
 
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.clippyTokens) private var clippyTokens

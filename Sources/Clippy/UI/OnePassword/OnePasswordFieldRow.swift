@@ -13,7 +13,7 @@ struct OnePasswordFieldRow: View {
     let autoClearSecs: Int
     let onAutoClear: () -> Void
 
-    private var settings = AppSettings.shared
+    private let settings = AppSettings.shared
     @Environment(\.clippyTokens) private var designTokens
     private var tokens: ThemeTokens { settings.theme }
 
