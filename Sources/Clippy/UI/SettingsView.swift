@@ -22,10 +22,9 @@ struct SettingsView: View {
                 if proxy.size.width < SettingsShellModel.compactBreakpoint { compactLayout } else { regularLayout }
             }
         }
-        .frame(minWidth: 640, minHeight: 480)
+        .frame(minWidth: 680, minHeight: 500)
         .clippyDesignSystem()
         .tint(ClippyTokens.resolve(from: settings.theme).accentInk)
-        .toggleStyle(AccentToggleStyle())
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
         .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
@@ -94,32 +93,28 @@ struct SettingsView: View {
         Group {
             if model.query.trimmingCharacters(in: .whitespaces).isEmpty {
                 ScrollViewReader { proxy in
-                    List {
+                    // System selection highlight. The search field above owns the keyboard and moves the
+                    // selection (Up/Down) or the search highlight (Return opens it).
+                    List(selection: paneSelection) {
                         ForEach(SettingsPaneSection.all) { section in
-                            Section(section.title) {
+                            Section {
                                 ForEach(section.panes) { pane in
-                                    PaneRow(pane: pane, isSelected: pane == model.selection) {
-                                        paneSelection.wrappedValue = pane
-                                        searchFocusToken += 1
-                                    }
-                                    .id(pane.id)
+                                    PaneRow(pane: pane).tag(pane).id(pane.id)
                                 }
                             }
                         }
                     }
-                    // No `selection:` binding: the system sidebar highlight is blue and ignores tint, so
-                    // rows draw `tokens.selection` themselves. The search field above owns the keyboard
-                    // and moves the selection (Up/Down) or the search highlight (Return opens it).
                     .onAppear { proxy.scrollTo(model.selection.id) }
-                    .onChange(of: model.selection) { _, pane in proxy.scrollTo(pane.id) }
+                    .onChange(of: model.selection) { _, pane in
+                        proxy.scrollTo(pane.id)
+                        searchFocusToken += 1
+                    }
                 }
             } else {
                 resultsList
             }
         }
         .listStyle(.sidebar)
-        .environment(\.sidebarRowSize, .small)
-        .controlSize(.small)
     }
 
     private func closeOrClearSearch() {
@@ -183,7 +178,13 @@ struct SettingsView: View {
         } else {
             List(hits) { hit in
                 SearchHitRow(hit: hit, isHighlighted: hit.id == hits[safe: highlightedHit]?.id) { model.jump(to: hit) }
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(hit.id == hits[safe: highlightedHit]?.id ? Color.accentColor.opacity(0.18) : Color.clear)
+                            .padding(.horizontal, 6)
+                    )
             }
+            .listStyle(.sidebar)
         }
     }
 
@@ -191,32 +192,23 @@ struct SettingsView: View {
 
     private var detail: some View {
         // Scripts is a full editor (its own list, toolbar and output drawer): give it the whole
-        // detail area instead of the title bar, footer and scroller that would clip it.
+        // detail area instead of the footer bar that would clip it.
         if model.selection == .scripts {
-            return AnyView(SettingsPaneRegistry.view(for: .scripts).background(settings.theme.panel).navigationTitle("Scripts"))
+            return AnyView(SettingsPaneRegistry.view(for: .scripts).navigationTitle("Scripts"))
         }
         return AnyView(paneDetail)
     }
 
     private var paneDetail: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                SettingsPaneRegistry.view(for: model.selection)
-                    .buttonStyle(.bordered)
-                    .task(id: model.selection) { await clearInitialTextFocus() }
-                    .scrollContentBackground(.hidden)
-                    .frame(maxWidth: model.selection.usesFormColumn ? SettingsPaneID.columnMaxWidth : .infinity, maxHeight: .infinity)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onChange(of: model.jumpToken) { _, _ in
-                        if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
-                    }
-            }
-            Divider()
-            footer
+        ScrollViewReader { proxy in
+            SettingsPaneRegistry.view(for: model.selection)
+                .task(id: model.selection) { await clearInitialTextFocus() }
+                .onChange(of: model.jumpToken) { _, _ in
+                    if let target = model.flashRow { withAnimation(ClippyMotion.animation(.standard, reduce: reduceMotion)) { proxy.scrollTo(target, anchor: .center) } }
+                }
         }
-        .background(settings.theme.panel)
-        // The pane title lives in the window's title bar instead of a second header row, which
-        // gives the content the vertical space the old row and dead title-bar band wasted.
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        // The pane title lives in the window toolbar, the same for every pane.
         .navigationTitle(model.selection.title)
     }
 
@@ -235,42 +227,44 @@ struct SettingsView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button("Reset this pane") { model.showResetConfirmation = true }
                 .disabled(!model.selection.isResettable)
             Button("Export\u{2026}") { model.exportPreferences() }
             Button("Import\u{2026}") { model.beginImport() }
             Spacer(minLength: 8)
-            if let status = model.status { StatusOutcomeLabel(outcome: status, successColor: settings.theme.success) }
+            if let status = model.status { StatusOutcomeLabel(outcome: status, successColor: .green) }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
         .controlSize(.small)
-        .tint(.secondary)
         .lineLimit(1)
-        .padding(.horizontal, 22).padding(.vertical, 8)
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 }
 
-/// One search result: opens its pane; the keyboard-highlighted row is tinted.
+/// One search result: opens its pane; the keyboard-highlighted row is tinted by the list row background.
 private struct SearchHitRow: View {
-    @Environment(\.clippyTokens) private var tokens
     let hit: SettingsSearchHit
     let isHighlighted: Bool
     let open: () -> Void
 
     var body: some View {
+        let pane = SettingsPaneID(rawValue: hit.entry.pane)
         Button(action: open) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(hit.entry.title)
-                Text(SettingsPaneID(rawValue: hit.entry.pane)?.title ?? hit.entry.pane)
-                    .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                if let pane { SettingsSidebarTile(pane: pane) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(hit.entry.title).font(.body)
+                    Text(pane?.title ?? hit.entry.pane)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 2)
-            .background(isHighlighted ? tokens.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
         }
-        .buttonStyle(FocusRingButtonStyle())
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
     }
 }
 
@@ -307,49 +301,33 @@ private extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
-/// Sidebar row: title in the primary text token so labels stay legible (>= 4.5:1) on every
-/// theme preset instead of the dimmed system sidebar secondary style.
+/// Sidebar row: colored symbol tile, pane name, and the New pill on recently added panes.
 private struct PaneRow: View {
-    @Environment(\.clippyTokens) private var tokens
     @AppStorage(SettingsSeenPanes.defaultsKey) private var seenPanes = ""
     let pane: SettingsPaneID
-    let isSelected: Bool
-    let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Label {
-                HStack(spacing: tokens.metrics.space.two) {
-                    Text(pane.title).foregroundStyle(tokens.textPrimary)
-                    if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
-                }
-            } icon: {
-                Image(systemName: pane.icon).foregroundStyle(tokens.textSecondary)
+        Label {
+            HStack(spacing: 6) {
+                Text(pane.title).font(.body)
+                if SettingsSeenPanes.showsNewPill(pane, seen: seenPanes) { NewPill() }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+        } icon: {
+            SettingsSidebarTile(pane: pane)
         }
-        .buttonStyle(.plain)
-        .listRowBackground(
-            RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous)
-                .fill(isSelected ? tokens.selection : Color.clear)
-                .padding(.horizontal, 6)
-        )
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(pane.title)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
 /// Small "NEW" marker on recently added panes.
 private struct NewPill: View {
-    @Environment(\.clippyTokens) private var tokens
-
     var body: some View {
         Text("NEW")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(tokens.accentText)
-            .padding(.horizontal, tokens.metrics.space.one + 1).padding(.vertical, 1)
-            .background(tokens.selection, in: Capsule())
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6).padding(.vertical, 1)
+            .background(Color.accentColor, in: Capsule())
             .accessibilityLabel("New")
     }
 }

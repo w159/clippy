@@ -16,9 +16,8 @@ struct PaneNotice: Equatable, Identifiable {
     static func info(_ message: String) -> PaneNotice { PaneNotice(message: message, severity: .neutral) }
 }
 
-/// Scrolling pane body with a title and an optional dismissible notice.
+/// Pane body: a grouped Form with an optional dismissible notice as its first section.
 struct PaneScroll<Content: View>: View {
-    @Environment(\.clippyTokens) private var tokens
     let title: LocalizedStringKey
     @Binding var notice: PaneNotice?
     let content: Content
@@ -31,27 +30,22 @@ struct PaneScroll<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: tokens.metrics.space.five) {
-                // The settings shell already renders the pane title above the pane; repeating it
-                // here duplicated the heading, so the title is exposed to accessibility only.
-                if let notice {
+        // The settings shell shows the pane title in the window toolbar; the title here is for accessibility only.
+        Form {
+            if let notice {
+                Section {
                     ClippyToast(notice.message, severity: notice.severity, dismiss: { self.notice = nil })
                 }
-                content
             }
-            .padding(tokens.metrics.space.five)
-            .frame(maxWidth: SettingsPaneID.columnMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
+            content
         }
-        .background(tokens.surface)
+        .formStyle(.grouped)
         .accessibilityLabel(Text(title))
     }
 }
 
-/// A titled group of 44pt settings rows with an optional footer explanation.
+/// A titled Form section with an optional footer explanation.
 struct PaneSection<Content: View>: View {
-    @Environment(\.clippyTokens) private var tokens
     let title: LocalizedStringKey
     let footer: String?
     let content: Content
@@ -64,19 +58,12 @@ struct PaneSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
+        Section {
+            content
+        } header: {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(tokens.textPrimary)
-                .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: 0) { content }
-                .padding(.horizontal, tokens.metrics.space.four)
-                .background(tokens.surfaceElevated, in: RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: ClippyRadius.card, style: .continuous).stroke(tokens.stroke.opacity(0.5), lineWidth: 0.5))
-            if let footer {
-                Text(footer).font(.caption).foregroundStyle(tokens.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        } footer: {
+            if let footer { Text(footer) }
         }
     }
 }

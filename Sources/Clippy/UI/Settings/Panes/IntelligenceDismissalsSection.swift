@@ -18,7 +18,6 @@ struct IntelligenceDismissalsSection: View {
                 Button("Restore All\u{2026}") { confirmRestore = true }
                     .disabled(neverCount + demotedCount + apps.count == 0)
             }
-            Divider()
             if apps.isEmpty {
                 SettingsRow(title: "Excluded apps", detail: Text("No apps excluded.")) { EmptyView() }
             } else {
@@ -27,7 +26,6 @@ struct IntelligenceDismissalsSection: View {
                         Button("Remove") { remove(bundleID) }
                             .accessibilityLabel("Stop excluding \(bundleID)")
                     }
-                    Divider()
                 }
             }
         }

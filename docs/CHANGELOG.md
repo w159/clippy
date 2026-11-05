@@ -8,6 +8,7 @@
 - Detail pane is an inset rounded card with a large kind tile, headline title, a calm content well, a metadata grid, a prominent glass Paste button and a glass Quick Look button.
 - Footer key hints are small glass capsules; the multi-select bar floats as a glass capsule.
 - Command palette is a larger glass panel with a capsule search field, grouped results with tinted symbol tiles and an accent selection; empty and no-results states use the system unavailable-content layout.
+- Settings window rebuilt to look like System Settings on macOS 26: the sidebar shows a colored rounded-square symbol tile for every pane with the system selection highlight and a search field on top, every pane is a grouped Form (rounded inset groups, section headers and footers, system toggles, pickers and steppers; no custom card borders), the pane title sits in the window toolbar, and Reset, Export and Import float on glass buttons at the bottom. The New pill is now a small accent capsule.
 - Built with Swift 6.3; app state uses the Observation framework (`@Observable`) instead of Combine `ObservableObject`.
 - Settings keyboard: the sidebar search field takes focus when Settings opens; Up/Down move between panes (or search hits while searching), Return opens the highlighted hit, Esc clears the search then closes the window, Cmd-1..9 jump to panes; focus returns to the search field after a pane opens.
 - The New pill on a Settings pane now clears as soon as that pane is shown, including from search, and stays cleared after relaunch.

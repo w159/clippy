@@ -18,14 +18,13 @@ extension EnvironmentValues {
 
 /// Explanatory caption under a row, in the secondary text role.
 struct SettingsNote: View {
-    @Environment(\.clippyTokens) private var tokens
     private let text: Text
 
     init(_ text: String) { self.text = Text(text) }
     init(_ text: Text) { self.text = text }
 
     var body: some View {
-        text.font(.caption).foregroundStyle(tokens.textSecondary).fixedSize(horizontal: false, vertical: true)
+        text.font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 }
 

@@ -18,11 +18,9 @@ struct DataMaintenanceSection: View {
             SettingsRow(title: "Integrity check", detail: Text(integrityText ?? "Verifies the database structure.")) {
                 Button("Check") { run { try Self.integrity() } set: { integrityText = $0 } }.disabled(busy)
             }
-            Divider()
             SettingsRow(title: "Compact database", detail: Text(vacuumText ?? "Reclaims unused space (VACUUM).")) {
                 Button("Compact") { run { try Self.vacuum() } set: { vacuumText = $0 } }.disabled(busy)
             }
-            Divider()
             SettingsRow(title: "Orphaned media", detail: Text(orphanText ?? "Finds media files no clip uses.")) {
                 HStack {
                     Button("Scan") { scan() }.disabled(busy)

@@ -27,7 +27,6 @@ struct SecurityAppLockSection: View {
                             AppLock.shared.preferencesChanged()
                         }
                 }
-                Divider()
                 SettingsRow(title: "Lock after idle", detail: Text("\(idleMinutes) minute\(idleMinutes == 1 ? "" : "s")"), enabled: enabled && !idleForced) {
                     Stepper("Lock after idle", value: $idleMinutes, in: AppLockPreferences.idleRange).labelsHidden()
                         .onChange(of: idleMinutes) { _, value in
@@ -35,7 +34,6 @@ struct SecurityAppLockSection: View {
                             AppLock.shared.preferencesChanged()
                         }
                 }
-                Divider()
                 SettingsRow(title: "Test authentication", detail: Text("Checks that Touch ID or your password works. Does not lock the app.")) {
                     Button(testing ? "Waiting\u{2026}" : "Test") { runTest() }.disabled(testing)
                 }
@@ -53,7 +51,6 @@ struct SecurityAppLockSection: View {
                     SettingsRow(title: LocalizedStringKey(key)) {
                         Image(systemName: "lock.fill").foregroundStyle(tokens.textSecondary).accessibilityLabel("Locked")
                     }
-                    Divider()
                 }
             }
         }

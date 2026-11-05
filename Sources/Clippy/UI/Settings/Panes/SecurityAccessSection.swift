@@ -33,7 +33,6 @@ struct SecurityAccessSection: View {
                         .foregroundStyle(sandbox.isAvailable ? tokens.success : tokens.warning)
                         .accessibilityLabel(sandbox.isAvailable ? "Available" : "Unavailable")
                 }
-                Divider()
                 SettingsRow(title: "Sandboxed scripts", detail: Text("\(scriptSandboxCount.enabled) of \(scriptSandboxCount.total) scripts")) {
                     Button("Recheck") { SandboxRunner.resetCache(); sandbox = SandboxRunner.preflight() }
                 }
@@ -58,13 +57,11 @@ struct SecurityAccessSection: View {
         PaneSection("Paste profiles", footer: "Terminals and code editors paste plain text by default. Your overrides win over the built-in list.") {
             SettingsRow(title: "Built-in plain-text apps", detail: Text("\(PasteProfiles.builtInPlainTextBundleIDs.count) terminals and editors")) { EmptyView() }
             ForEach(overrides.sorted { $0.key < $1.key }, id: \.key) { key, mode in
-                Divider()
                 SettingsRow(title: LocalizedStringKey(key), detail: Text(mode == .plainText ? "Always plain text" : "Always rich text")) {
                     Button("Remove") { PasteProfiles.setMode(.automatic, forBundleID: key); overrides = PasteProfiles.overrides }
                 }
             }
             if overrides.isEmpty {
-                Divider()
                 SettingsRow(title: "No custom overrides", detail: Text("Add per-app overrides from the panel's paste menu.")) { EmptyView() }
             }
         }
@@ -76,7 +73,6 @@ struct SecurityAccessSection: View {
                 SettingsRow(title: LocalizedStringKey(type)) {
                     Button("Remove") { blocklist.removeAll { $0 == type }; CapturePreferences.typeBlocklist = blocklist }
                 }
-                Divider()
             }
             SettingsRow(title: "Add type") {
                 HStack {

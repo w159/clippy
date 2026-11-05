@@ -18,7 +18,6 @@ struct DataStorageSection: View {
                     Stepper("Clip limit", value: $ceiling, in: StorageCeiling.minimum...1_000_000, step: 500).labelsHidden()
                         .onChange(of: ceiling) { _, value in StorageCeiling.current = value; reloadUsage() }
                 }
-                Divider()
                 SettingsRow(title: "Current usage", detail: Text(usageDetail)) {
                     if usage?.isNearCeiling == true {
                         Label("Near limit", systemImage: "exclamationmark.triangle.fill").foregroundStyle(tokens.warning)

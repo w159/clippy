@@ -18,11 +18,9 @@ struct SecurityAuditSection: View {
             SettingsRow(title: "Entries", detail: Text(entryCount.map { "\($0) recorded" } ?? "Counting\u{2026}")) {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AuditLog.shared.directory]) }
             }
-            Divider()
             SettingsRow(title: "Verify integrity", detail: verificationText) {
                 Button(verifying ? "Verifying\u{2026}" : "Verify") { verify() }.disabled(verifying)
             }
-            Divider()
             SettingsRow(title: "Export") {
                 HStack {
                     Button("JSON\u{2026}") { export(.json) }

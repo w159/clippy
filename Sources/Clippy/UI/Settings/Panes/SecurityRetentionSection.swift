@@ -27,17 +27,13 @@ struct SecurityRetentionSection: View {
                 Toggle("Apply retention rules", isOn: Binding(get: { model.rules.isEnabled }, set: { value in edit { $0.setEnabled(value) } })).labelsHidden()
             }
             Group {
-                Divider()
                 optionalRow(title: "Forget after", unit: "day", value: $forgetDays, isOn: model.rules.forgetAfterDays != nil,
                             range: RetentionRuleEditorModel.dayRange) { model, enable in try model.setForgetAfter(days: enable ? forgetDays : nil) }
-                Divider()
                 optionalRow(title: "Auto-expire sensitive clips", unit: "hour", value: $sensitiveHours, isOn: model.rules.sensitiveTTLHours != nil,
                             range: RetentionRuleEditorModel.hourRange) { model, enable in try model.setSensitiveTTL(hours: enable ? sensitiveHours : nil) }
-                Divider()
                 SettingsRow(title: "Include categorized clips") {
                     Toggle("Include categorized clips", isOn: Binding(get: { model.rules.includeCategorized }, set: { value in edit { $0.setIncludeCategorized(value) } })).labelsHidden()
                 }
-                Divider()
                 kindRules
                 appRules
                 actions
@@ -68,7 +64,6 @@ struct SecurityRetentionSection: View {
                 SettingsRow(title: LocalizedStringKey("\(row.key.capitalized) clips"), detail: Text("Forget after \(row.days) days")) {
                     Button("Remove") { edit { $0.removeKindRule(row.key) } }.accessibilityLabel("Remove \(row.key) rule")
                 }
-                Divider()
             }
             SettingsRow(title: "Add type rule") {
                 HStack {
@@ -79,7 +74,6 @@ struct SecurityRetentionSection: View {
                     Button("Add") { editThrowing({ try $0.addKindRule(kind: newKind, days: newKindDays) }) }
                 }
             }
-            Divider()
         }
     }
 
@@ -89,7 +83,6 @@ struct SecurityRetentionSection: View {
                 SettingsRow(title: LocalizedStringKey(row.key), detail: Text("Forget after \(row.days) days")) {
                     Button("Remove") { edit { $0.removeAppRule(row.key) } }.accessibilityLabel("Remove rule for \(row.key)")
                 }
-                Divider()
             }
             SettingsRow(title: "Add app rule") {
                 HStack {
@@ -100,7 +93,6 @@ struct SecurityRetentionSection: View {
                     }
                 }
             }
-            Divider()
         }
     }
 

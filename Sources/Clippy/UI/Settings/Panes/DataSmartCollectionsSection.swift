@@ -21,7 +21,6 @@ struct DataSmartCollectionsSection: View {
         PaneSection("Smart collections", footer: "Rules that group clips automatically by type, source app, text pattern, age or sensitivity.") {
             if collections.isEmpty && !loadFailed {
                 SettingsRow(title: "No smart collections") { EmptyView() }
-                Divider()
             }
             ForEach(collections) { collection in
                 SettingsRow(title: LocalizedStringKey(collection.name), detail: Text(SmartCollectionDraft.summary(of: collection.rule))) {
@@ -30,7 +29,6 @@ struct DataSmartCollectionsSection: View {
                         Button("Delete\u{2026}") { deleting = collection }
                     }
                 }
-                Divider()
             }
             SettingsRow(title: "New smart collection") {
                 Button("New\u{2026}") { editing = EditTarget(collection: nil) }

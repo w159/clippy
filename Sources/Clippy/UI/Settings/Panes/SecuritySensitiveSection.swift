@@ -17,12 +17,10 @@ struct SecuritySensitiveSection: View {
             SettingsRow(title: "Manual overrides", detail: Text(loaded ? "\(overrideCount) clip\(overrideCount == 1 ? "" : "s")" : "Counting\u{2026}")) {
                 Button("Clear Overrides\u{2026}") { confirmClear = true }.disabled(overrideCount == 0)
             }
-            Divider()
             SettingsRow(title: "Auto-clear sensitive clips", detail: Text(autoClear == 0 ? "Off" : "After \(autoClear) seconds")) {
                 Stepper("Auto-clear sensitive clips", value: $autoClear, in: 0...600, step: 5).labelsHidden()
                     .onChange(of: autoClear) { _, value in CapturePreferences.sensitiveAutoClearSeconds = value }
             }
-            Divider()
             SettingsRow(title: "Also delete from history", detail: Text("Otherwise the secret stays in history after the clipboard clears."), enabled: autoClear > 0) {
                 Toggle("Also delete from history", isOn: $deletesHistory).labelsHidden()
                     .onChange(of: deletesHistory) { _, value in CapturePreferences.autoClearDeletesHistory = value }

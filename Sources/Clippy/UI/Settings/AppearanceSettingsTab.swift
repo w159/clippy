@@ -202,7 +202,7 @@ struct AppearanceSettingsTab: View {
                 .overlay {
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(SettingsTypography.swatchCheck(settings))
+                            .font(.caption2.weight(.bold))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(AccentSwatchContrast.markColor(for: theme.color, isDark: tokens.scheme == .dark))
                     }
