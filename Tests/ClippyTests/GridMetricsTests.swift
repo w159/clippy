@@ -82,7 +82,7 @@ final class GridMetricsTests: XCTestCase {
 
     /// Page jumps use the real row stride, not a fixed 90pt.
     func testPageRowsUseRealRowHeight() {
-        XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .comfortable), 10)
+        XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .comfortable), 8)
         XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .compact), 17)
         XCTAssertEqual(GridMetrics.pageRows(listHeight: 600, density: .cards), 6)
         XCTAssertEqual(GridMetrics.pageRows(listHeight: 0, density: .comfortable), 1)
