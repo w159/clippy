@@ -20,17 +20,34 @@ extension ClipListView {
         }
     }
 
-    /// Title bar with drag region, section title, count and quick toggles.
+    /// Single top row with drag region, section title, count, the search field (panes
+    /// that search) and quick toggles.
+    @ViewBuilder
     var panelHeader: some View {
-        PanelHeaderView(
-            sectionTitle: sectionTitle,
-            clipCount: SearchFieldPolicy.showsSearchField(for: selection) ? visibleClips.count : nil,
-            isPinned: settings.panelPinned,
-            onTogglePin: { settings.panelPinned.toggle() },
-            onToggleSidebar: { NotificationCenter.default.post(name: .clippyToggleSidebar, object: nil) },
-            onOpenSettings: onOpenSettings,
-            onClose: onClose
-        )
+        if SearchFieldPolicy.showsSearchField(for: selection) {
+            PanelHeaderView(
+                sectionTitle: sectionTitle,
+                clipCount: visibleClips.count,
+                isPinned: settings.panelPinned,
+                onTogglePin: { settings.panelPinned.toggle() },
+                onToggleSidebar: { NotificationCenter.default.post(name: .clippyToggleSidebar, object: nil) },
+                onOpenSettings: onOpenSettings,
+                onClose: onClose,
+                search: { headerSearchField }
+            )
+            .background(tokens.headerBar.opacity(settings.panelOpacity))
+        } else {
+            PanelHeaderView(
+                sectionTitle: sectionTitle,
+                clipCount: nil,
+                isPinned: settings.panelPinned,
+                onTogglePin: { settings.panelPinned.toggle() },
+                onToggleSidebar: { NotificationCenter.default.post(name: .clippyToggleSidebar, object: nil) },
+                onOpenSettings: onOpenSettings,
+                onClose: onClose
+            )
+            .background(tokens.headerBar.opacity(settings.panelOpacity))
+        }
     }
 
     /// Persistent banners for search and observation failures, each with Try Again.
@@ -63,6 +80,7 @@ extension ClipListView {
     var splitContent: some View {
         SidebarSplitView(
             minContentWidth: GridMetrics.minCardWidth + GridMetrics.listPadding * 2 + GridMetrics.spacing,
+            reservedTrailingWidth: showsPreviewColumn ? PreviewColumnPreferences.width() : 0,
             sidebar: { isRail in
                 CategorySidePane(store: store, selection: $selection, isRail: isRail, smartCollections: smartCollections)
             },

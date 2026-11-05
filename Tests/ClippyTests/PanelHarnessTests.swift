@@ -76,7 +76,7 @@ final class PanelHarnessTests: XCTestCase {
             onClose: {},
             onOpenSettings: {}
         )
-        show(view.clippyDesignSystem(), size: NSSize(width: 820, height: 600), appearance: appearance, panelChrome: true)
+        show(view.clippyDesignSystem(), size: NSSize(width: 1000, height: 620), appearance: appearance, panelChrome: true)
         pump(until: "clips loaded") { self.store.clips.count == 8 && !self.store.categories.isEmpty }
         pump(until: "search field focused") { self.window.firstResponder is NSTextView }
     }
@@ -241,6 +241,7 @@ final class PanelHarnessTests: XCTestCase {
     func testSearchFlowsInTheRealPanel() throws {
         try openPanel(appearance: .aqua)
         screenshot("01-panel-light")
+        screenshot("panel-history-detail")
         assertNotShown("Quarterly invoice", "a filed clip stays out of History while browsing")
 
         // 1. Typing searches, and a filed clip is found from History.

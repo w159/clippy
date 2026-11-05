@@ -55,7 +55,7 @@ struct ClipRowView: View {
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
-        .frame(minHeight: comfortable ? 48 : GridMetrics.compactRowHeight)
+        .frame(minHeight: comfortable ? GridMetrics.comfortableRowHeight : GridMetrics.compactRowHeight)
         .background(rowBackground)
         .clipShape(RoundedRectangle(cornerRadius: ClippyRadius.control, style: .continuous))
         .overlay(
@@ -82,9 +82,47 @@ struct ClipRowView: View {
         model.isSelected ? tokens.selection : (isHovering ? tokens.textPrimary.opacity(0.06) : Color.clear)
     }
 
+    private var glyphSide: CGFloat { comfortable ? 32 : 24 }
+
+    /// Source app icon, when icons are on and the app is known.
+    private var appIcon: NSImage? {
+        settings.showAppIcons ? AppIconProvider.shared.icon(forBundleID: clip.sourceAppBundleID) : nil
+    }
+
+    /// Comfortable rows: a 32pt rounded tile. App icon with a kind badge in its corner,
+    /// or the kind symbol on a tile tinted with the kind color.
+    private var kindTile: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        return ZStack(alignment: .bottomTrailing) {
+            if !model.isSensitive, let icon = appIcon {
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 32, height: 32)
+                Image(systemName: kind.iconName)
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .frame(width: 14, height: 14)
+                    .background(hue, in: Circle())
+                    .offset(x: 3, y: 3)
+            } else {
+                shape.fill(model.isSensitive ? tokens.surfaceInset : hue.opacity(0.16))
+                    .frame(width: 32, height: 32)
+                    .overlay {
+                        Image(systemName: model.isSensitive ? "lock.fill" : kind.iconName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(model.isSensitive ? tokens.textSecondary : hue)
+                    }
+            }
+        }
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+        .help(model.isSensitive ? "Sensitive" : kind.label)
+    }
+
     @ViewBuilder
     private var leadingGlyph: some View {
-        if model.isImageLike, !model.isSensitive {
+        if comfortable, !(model.isImageLike && !model.isSensitive) {
+            kindTile
+        } else if model.isImageLike, !model.isSensitive {
             Group {
                 if let thumbnail {
                     Image(nsImage: thumbnail).resizable().scaledToFit()
@@ -92,8 +130,9 @@ struct ClipRowView: View {
                     Image(systemName: "photo").foregroundStyle(tokens.textSecondary)
                 }
             }
-            .frame(width: 24, height: 24)
-            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: ClippyRadius.xs, style: .continuous))
+            .frame(width: glyphSide, height: glyphSide)
+            .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: comfortable ? 8 : ClippyRadius.xs, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: comfortable ? 8 : ClippyRadius.xs, style: .continuous))
             .task(id: clip.thumbFilename) {
                 guard let name = clip.thumbFilename else { return }
                 thumbnail = ClipCardView.cachedThumbnail(for: name)
@@ -129,7 +168,7 @@ struct ClipRowView: View {
             Text(HighlightedPreview.attributed(text, query: query, color: tokens.accent))
                 .font(PanelTypography.body(settings))
                 .foregroundStyle(tokens.textPrimary)
-                .lineLimit(comfortable ? 2 : 1)
+                .lineLimit(1)
                 .truncationMode(.tail)
         }
     }
@@ -146,12 +185,21 @@ struct ClipRowView: View {
 
     private var metaLine: some View {
         HStack(spacing: 6) {
-            if let name = clip.sourceAppName { Text(name).lineLimit(1) }
-            Text(model.kindLabel)
+            if let name = clip.sourceAppName {
+                Text(name).lineLimit(1)
+                metaDot
+            }
+            Text(RelativeTime.string(for: clip.createdAt)).monospacedDigit().lineLimit(1).fixedSize()
+            metaDot
+            Text(model.kindLabel).lineLimit(1)
             if model.matchedInOCR { ClippyBadge("OCR match") }
         }
         .font(PanelTypography.micro(settings))
         .foregroundStyle(tokens.textSecondary)
+    }
+
+    private var metaDot: some View {
+        Text("\u{00B7}").accessibilityHidden(true)
     }
 
     private var renameField: some View {
@@ -202,12 +250,14 @@ struct ClipRowView: View {
                     .accessibilityHidden(true)
             }
             if let digit = model.quickPasteDigit { KeyCap("\u{2325}\u{2318}\(digit)") }
-            Text(RelativeTime.string(for: clip.createdAt))
-                .font(PanelTypography.metadata(settings))
-                .foregroundStyle(tokens.textSecondary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize()
+            if !comfortable {
+                Text(RelativeTime.string(for: clip.createdAt))
+                    .font(PanelTypography.metadata(settings))
+                    .foregroundStyle(tokens.textSecondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+            }
         }
     }
 

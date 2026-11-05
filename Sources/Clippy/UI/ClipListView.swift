@@ -131,7 +131,7 @@ struct ClipListView: View {
     /// Smart collections shown in the sidebar; its rule filters History.
     @StateObject var smartCollections = SmartCollectionSelection()
     /// Preview column opt-in, observed so the Settings pane and palette toggles apply live.
-    @AppStorage(PreviewColumnPreferences.enabledKey) var previewColumnEnabled = false
+    @AppStorage(PreviewColumnPreferences.enabledKey) var previewColumnEnabled = PreviewColumnPreferences.defaultEnabled
 
     /// Active theme token table; every color below reads from this.
     var tokens: ThemeTokens { settings.theme }
@@ -195,7 +195,7 @@ struct ClipListView: View {
         VStack(spacing: 0) {
             panelHeader
             Divider()
-            if SearchFieldPolicy.showsSearchField(for: selection) { searchBar }
+            if SearchFieldPolicy.showsSearchField(for: selection), showsSearchExtras { searchBar }
             errorBanners
             splitContent
             Divider()

@@ -1,10 +1,10 @@
 import SwiftUI
 import AppKit
 
-/// The panel's title bar: paperclip mark, "Clippy" wordmark and section title on the left,
-/// sidebar / density / pin / settings / close controls on the right. The whole
-/// strip is a window drag region (PNL-01); only the controls are hit-testable.
-struct PanelHeaderView: View {
+/// The panel's single 44pt top row: section title and count on the left, the search
+/// field filling the middle, sidebar / pin / more / close controls on the right. The whole
+/// strip is a window drag region (PNL-01); only the field and the controls are hit-testable.
+struct PanelHeaderView<Search: View>: View {
     /// Title of the pane being shown (section title).
     var sectionTitle: String = ""
     /// Number of clips in the pane; nil hides the count.
@@ -14,6 +14,8 @@ struct PanelHeaderView: View {
     let onToggleSidebar: () -> Void
     let onOpenSettings: () -> Void
     let onClose: () -> Void
+    /// The search field shown between title and controls; empty for panes without search.
+    private let search: Search
 
     @ObservedObject private var grid = GridPreferences.shared
     @Environment(\.clippyTokens) private var tokens
@@ -22,18 +24,38 @@ struct PanelHeaderView: View {
 
     private let settings = AppSettings.shared
 
+    /// Creates the header; `search` is the field that fills the middle of the row.
+    init(
+        sectionTitle: String = "", clipCount: Int? = nil, isPinned: Bool,
+        onTogglePin: @escaping () -> Void, onToggleSidebar: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void, onClose: @escaping () -> Void,
+        @ViewBuilder search: () -> Search
+    ) {
+        self.sectionTitle = sectionTitle
+        self.clipCount = clipCount
+        self.isPinned = isPinned
+        self.onTogglePin = onTogglePin
+        self.onToggleSidebar = onToggleSidebar
+        self.onOpenSettings = onOpenSettings
+        self.onClose = onClose
+        self.search = search()
+    }
+
     var body: some View {
         ZStack {
             HStack(spacing: tokens.metrics.space.one) {
-                Image(nsImage: StatusBarIcon.image())
-                    .renderingMode(.template)
-                    .resizable()
-                    .frame(width: 16, height: 16)
-                    .foregroundStyle(tokens.accent)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
                 sectionLabel
-                Spacer(minLength: 0)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
+                if Search.self == EmptyView.self {
+                    Spacer(minLength: 0)
+                } else {
+                    search
+                        .padding(.horizontal, tokens.metrics.space.two)
+                        .frame(height: 30)
+                        .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm))
+                        .frame(minWidth: 120, maxWidth: .infinity)
+                }
                 IconButton("sidebar.left", label: "Toggle sidebar", help: "Show or hide the sidebar", action: onToggleSidebar)
                 IconButton(isPinned ? "pin.fill" : "pin", label: isPinned ? "Unpin panel" : "Pin panel",
                            help: isPinned ? "Unpin panel" : "Pin panel", state: isPinned ? .selected : .rest,
@@ -43,9 +65,9 @@ struct PanelHeaderView: View {
                 overflowMenu
                 IconButton("xmark", label: "Close", action: onClose)
             }
-            .padding(.horizontal, tokens.metrics.space.two)
+            .padding(.horizontal, tokens.metrics.space.three)
         }
-        .frame(height: 36)
+        .frame(height: PanelLayout.headerHeight)
         // Any area not covered by a control starts a window drag.
         .background(WindowDragRegion())
     }
@@ -55,7 +77,7 @@ struct PanelHeaderView: View {
     private var sectionLabel: some View {
         if !sectionTitle.isEmpty {
             Text(sectionTitle)
-                .font(.callout.weight(.semibold))
+                .font(.headline)
                 .foregroundStyle(tokens.textPrimary)
                 .lineLimit(1)
                 .allowsHitTesting(false)
@@ -114,5 +136,17 @@ struct PanelHeaderView: View {
                 Text(title)
             }
         }
+    }
+}
+
+extension PanelHeaderView where Search == EmptyView {
+    /// Header for panes without a search field.
+    init(
+        sectionTitle: String = "", clipCount: Int? = nil, isPinned: Bool,
+        onTogglePin: @escaping () -> Void, onToggleSidebar: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void, onClose: @escaping () -> Void
+    ) {
+        self.init(sectionTitle: sectionTitle, clipCount: clipCount, isPinned: isPinned, onTogglePin: onTogglePin,
+                  onToggleSidebar: onToggleSidebar, onOpenSettings: onOpenSettings, onClose: onClose) { EmptyView() }
     }
 }

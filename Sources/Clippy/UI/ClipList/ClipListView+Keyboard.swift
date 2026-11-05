@@ -16,7 +16,7 @@ extension ClipListView {
     func gridNavigator(for clips: [Clip]) -> GridNavigator {
         let columns = selection == .suggestions ? 1 : currentColumnCount()
         let lengths = selection == .suggestions ? [clips.count] : sections(for: clips).map { $0.rows.count }
-        return GridNavigator(columns: columns, sectionLengths: lengths, pageRows: max(1, Int(listHeight / 90)))
+        return GridNavigator(columns: columns, sectionLengths: lengths, pageRows: GridMetrics.pageRows(listHeight: listHeight, density: GridPreferences.shared.density))
     }
 
     /// Reconciles the range model with mutations that bypassed it.

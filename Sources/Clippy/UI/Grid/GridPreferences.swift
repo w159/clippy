@@ -57,7 +57,7 @@ enum ClipDensity: String, CaseIterable {
 ///
 /// UserDefaults keys (all prefixed `grid.`): `grid.columnMode` (`auto` or
 /// `fixed:N`, default `auto`) and `grid.density` (`compact`, `comfortable`,
-/// `cards`, default `compact`).
+/// `cards`, default `comfortable` when nothing is stored).
 @MainActor
 final class GridPreferences: ObservableObject {
     /// Process-wide instance used by the panel.
@@ -84,6 +84,6 @@ final class GridPreferences: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         columnMode = GridColumnMode(storageValue: defaults.string(forKey: Self.columnModeKey))
-        density = defaults.string(forKey: Self.densityKey).flatMap(ClipDensity.init(rawValue:)) ?? .compact
+        density = defaults.string(forKey: Self.densityKey).flatMap(ClipDensity.init(rawValue:)) ?? .comfortable
     }
 }

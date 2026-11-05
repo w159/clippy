@@ -13,6 +13,26 @@ enum GridMetrics {
     static let listPadding: CGFloat = 10
     /// Compact row height (LAY-08).
     static let compactRowHeight: CGFloat = 32
+    /// Comfortable (two-line, 32pt tile) row height.
+    static let comfortableRowHeight: CGFloat = 52
+    /// Typical card height, used to size a page jump in the cards density.
+    static let cardPageStride: CGFloat = 90
+
+    /// Vertical distance from one row to the next for `density` (row height plus gap).
+    static func rowStride(for density: ClipDensity) -> CGFloat {
+        switch density {
+        case .compact: return compactRowHeight + 2
+        case .comfortable: return comfortableRowHeight + spacing
+        case .cards: return cardPageStride
+        }
+    }
+
+    /// Rows a Page Up/Down moves in a list `listHeight` points tall; at least one.
+    static func pageRows(listHeight: CGFloat, density: ClipDensity) -> Int {
+        guard listHeight.isFinite, listHeight > 0 else { return 1 }
+        return max(1, Int(listHeight / rowStride(for: density)))
+    }
+
     /// Upper bound so absurd widths never create hairline columns of cards.
     static let maxColumns = 12
 

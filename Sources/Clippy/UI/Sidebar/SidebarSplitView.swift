@@ -14,16 +14,19 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
     @State private var grabberHovered = false
 
     private let minContentWidth: CGFloat
+    private let reservedTrailingWidth: CGFloat
     private let sidebar: (_ isRail: Bool) -> Sidebar
     private let content: Content
 
     /// Creates the split; `minContentWidth` reserves room for at least one card.
     init(
         minContentWidth: CGFloat,
+        reservedTrailingWidth: CGFloat = 0,
         @ViewBuilder sidebar: @escaping (_ isRail: Bool) -> Sidebar,
         @ViewBuilder content: () -> Content
     ) {
         self.minContentWidth = minContentWidth
+        self.reservedTrailingWidth = reservedTrailingWidth
         self.sidebar = sidebar
         self.content = content()
     }
@@ -32,6 +35,9 @@ struct SidebarSplitView<Sidebar: View, Content: View>: View {
         GeometryReader { proxy in
             let panelWidth = proxy.size.width
             let isRail = SidebarMetrics.showsRail(isCollapsed: preferences.isCollapsed, panelWidth: panelWidth)
+                || SidebarMetrics.collapsesForPreview(
+                    panelWidth: panelWidth, reservedWidth: reservedTrailingWidth,
+                    sidebarWidth: currentWidth(panelWidth: panelWidth))
             let width = displayWidth(isRail: isRail, panelWidth: panelWidth)
             HStack(spacing: 0) {
                 sidebar(isRail)

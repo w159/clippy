@@ -34,10 +34,10 @@ final class AppSettings: ObservableObject {
     @AppDefault(Keys.positionMode, default: PanelPositionMode.caret)
     var positionMode: PanelPositionMode
 
-    @AppDefault(Keys.panelWidth, default: 640.0)
+    @AppDefault(Keys.panelWidth, default: AppSettings.defaultPanelWidth)
     var panelWidth: Double
 
-    @AppDefault(Keys.panelHeight, default: 480.0)
+    @AppDefault(Keys.panelHeight, default: AppSettings.defaultPanelHeight)
     var panelHeight: Double
 
     @AppDefault(Keys.rememberPanelSize, default: true)
@@ -525,6 +525,7 @@ final class AppSettings: ObservableObject {
         // before the user has touched a setting. @AppDefault reads .standard
         // directly, so this must happen before any wrapper is accessed.
         Self.registerDefaults(defaults)
+        Self.bumpSavedPanelSize(defaults)
 
         // Init loads only the properties that cannot be expressed as a plain
         // @AppDefault read: those requiring range clamping or migration logic.

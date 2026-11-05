@@ -4,8 +4,9 @@ import CoreGraphics
 /// icon rail, one grid card and the chrome still fit (PNL-03). Inputs are
 /// passed in so the derivation is testable without the sidebar or grid types.
 enum PanelLayout {
-    /// Height of the header (search row, chip row and section title).
-    static let headerHeight: CGFloat = 112
+    /// Height of the header: one row holding the title, the search field and the controls.
+    /// (The filter-chip row appears below it only while searching or filtering.)
+    static let headerHeight: CGFloat = 44
     /// Height of the shortcut footer.
     static let footerHeight: CGFloat = 32
     /// Width floor for the panel: the narrowest width at which the header controls
