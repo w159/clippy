@@ -144,7 +144,7 @@ struct OnePasswordView: View {
                 if filteredItems.isEmpty {
                     ContentUnavailableView(searchQuery.isEmpty ? "No items in this vault." : "No items match this search.",
                                            systemImage: searchQuery.isEmpty ? "key" : "magnifyingglass")
-                        .frame(maxWidth: .infinity).padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
                 }
                 ForEach(filteredItems) { item in
                     OnePasswordItemRow(item: item, isExpanded: expandedItemID == item.id,
@@ -190,7 +190,7 @@ struct OnePasswordView: View {
             .padding(.horizontal, 12).padding(.bottom, 10)
         }
         .disabled(isCreating)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Actions
@@ -246,5 +246,5 @@ struct OnePasswordView: View {
 
 #Preview("1Password") {
     OnePasswordView()
-        .frame(width: 720, height: 520)
+        .frame(width: 560, height: 440)
 }

@@ -108,7 +108,7 @@ struct AssistantPanelBody: View {
     /// Title-only header shown while AI features are off (no provider chip, tools or clear buttons).
     private var aiOffHeader: some View {
         HStack(spacing: 8) {
-            Image(systemName: "sparkles").font(.title3).symbolRenderingMode(.hierarchical)
+            Image(systemName: "sparkles").font(.headline).symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.clippyAccent).accessibilityHidden(true)
             Text("AI Assistant").font(.title3.weight(.semibold)).lineLimit(1)
             Spacer(minLength: 0)
@@ -162,5 +162,5 @@ struct AssistantPanelBody: View {
 
 #Preview("Assistant") {
     AIAssistantPanelView(store: ClipStore(database: ClipDatabase.shared), onOpenSettings: {})
-        .frame(width: 520, height: 640)
+        .frame(width: 440, height: 560)
 }

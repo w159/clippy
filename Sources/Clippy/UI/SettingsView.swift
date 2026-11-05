@@ -22,11 +22,11 @@ struct SettingsView: View {
                 if proxy.size.width < SettingsShellModel.compactBreakpoint { compactLayout } else { regularLayout }
             }
         }
-        .frame(minWidth: 680, minHeight: 500)
+        .frame(minWidth: 620, minHeight: 440)
         .clippyDesignSystem()
         .environment(\.settingsFlashRow, model.flashRow)
         .background(WindowAppearanceApplier(appearance: Theme.nsAppearance(settings)))
-        .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v2"))
+        .background(SettingsWindowFrameSaver(name: "ClippySettingsWindow.v3"))
         .background(SettingsWindowReader { hostWindow = $0 })
         .background(PaneShortcutButtons { paneSelection.wrappedValue = $0 })
         // Inside the sidebar search field, Esc is handled by the field's delegate, which clears the
@@ -50,7 +50,7 @@ struct SettingsView: View {
     private var regularLayout: some View {
         NavigationSplitView {
             paneList
-                .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 260)
+                .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
         } detail: {
             detail
         }
@@ -317,7 +317,7 @@ private struct ImportSummarySheet: View {
                     Text("\(describe(change.old)) \u{2192} \(describe(change.new))").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .frame(minHeight: 140)
+            .frame(minHeight: 120)
             if !pending.plan.requiresConfirmation.isEmpty {
                 Text("Security-relevant settings (off unless ticked)").font(.subheadline.weight(.semibold))
                 ForEach(pending.plan.requiresConfirmation, id: \.key) { change in
@@ -334,8 +334,8 @@ private struct ImportSummarySheet: View {
                     .disabled(pending.plan.changes.isEmpty && confirmed.isEmpty)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .padding(16)
+        .frame(width: 420)
     }
 
     private func confirmBinding(_ key: String) -> Binding<Bool> {
@@ -357,9 +357,11 @@ private struct ImportSummarySheet: View {
     }
 }
 
-/// Persists and restores the hosting window's frame under `name`.
+/// Persists and restores the hosting window's frame under `name`. With no saved frame the window
+/// opens at System Settings proportions (about 715 pt wide) instead of the host's larger default.
 struct SettingsWindowFrameSaver: NSViewRepresentable {
     let name: String
+    static let defaultContentSize = NSSize(width: 715, height: 540)
 
     func makeNSView(context: Context) -> NSView { NSView() }
 
@@ -367,6 +369,11 @@ struct SettingsWindowFrameSaver: NSViewRepresentable {
         let autosaveName = name
         Task { @MainActor in
             guard let window = view.window, window.frameAutosaveName != autosaveName else { return }
+            let hasSavedFrame = UserDefaults.standard.object(forKey: "NSWindow Frame \(autosaveName)") != nil
+            if !hasSavedFrame {
+                window.setContentSize(Self.defaultContentSize)
+                window.center()
+            }
             window.setFrameAutosaveName(autosaveName)
         }
     }
@@ -384,4 +391,4 @@ extension Bundle {
     }
 }
 
-#Preview("Settings window") { SettingsView().frame(width: 780, height: 580) }
+#Preview("Settings window") { SettingsView().frame(width: 715, height: 540) }

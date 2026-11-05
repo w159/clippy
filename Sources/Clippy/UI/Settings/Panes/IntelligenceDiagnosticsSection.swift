@@ -22,7 +22,7 @@ struct IntelligenceDiagnosticsSection: View {
                         cell(row.timeoutsText, width: 60)
                         cell(row.skippedText, width: 110, warn: row.isSkipped)
                     }
-                    .frame(minHeight: 32)
+                    .frame(minHeight: 24)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(row.bundleID), average \(row.averageText), \(row.timeoutsText) timeouts, skipped \(row.skippedText)")
                 }
@@ -47,7 +47,7 @@ struct IntelligenceDiagnosticsSection: View {
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(tokens.textSecondary)
-        .frame(minHeight: 28)
+        .frame(minHeight: 24)
         .accessibilityHidden(true)
     }
 

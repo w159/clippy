@@ -65,7 +65,7 @@ struct AISettingsTab: View {
                 Divider()
                 AIActionsManagerView()
             }
-            .frame(minWidth: 520, idealWidth: 640, maxWidth: .infinity, minHeight: 380, idealHeight: 520, maxHeight: .infinity)
+            .frame(minWidth: 480, idealWidth: 560, maxWidth: .infinity, minHeight: 340, idealHeight: 440, maxHeight: .infinity)
             .clippyDesignSystem()
         }
     }

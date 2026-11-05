@@ -146,7 +146,7 @@ struct TextClipEditor: View {
                 ColorSwatchStrip(colors: colors)
             }
             editingSurface
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             if !pendingEffects.isEmpty {
@@ -157,7 +157,7 @@ struct TextClipEditor: View {
             statusBar
             footer
         }
-        .frame(minWidth: 520, minHeight: 380)
+        .frame(minWidth: 480, minHeight: 320)
         .background(Color(nsColor: .windowBackgroundColor))
         .task(id: StatusKey(text: text, selection: selectionRange)) {
             try? await Task.sleep(for: .milliseconds(60))

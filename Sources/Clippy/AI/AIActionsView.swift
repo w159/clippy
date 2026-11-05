@@ -99,12 +99,12 @@ struct AIActionSheet: View {
     let onApply: (AIProposal) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             content
         }
         .foregroundStyle(tokens.textPrimary)
-        .padding(24)
-        .frame(minWidth: 460, idealWidth: 480)
+        .padding(16)
+        .frame(minWidth: 400, idealWidth: 440)
     }
 
     @ViewBuilder
@@ -114,7 +114,7 @@ struct AIActionSheet: View {
             EmptyView()
         case .running:
             // Reserve the result area before the first token arrives; streaming then fills it in place.
-            box(runner.partialText, minHeight: 180)
+            box(runner.partialText, minHeight: 140)
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 Text("Asking the model\u{2026}")
@@ -126,7 +126,7 @@ struct AIActionSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 24)
+            .padding(.vertical, 12)
         case .failed(let message):
             ContentUnavailableView {
                 Label("AI action failed", systemImage: "exclamationmark.triangle")
@@ -163,7 +163,6 @@ struct AIActionSheet: View {
                     .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
                 }
-                .controlSize(.large)
             }
         }
     }
@@ -179,7 +178,7 @@ struct AIActionSheet: View {
             }
             .frame(minHeight: minHeight, maxHeight: 220)
             .padding(12)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             // Audit [POLISH]: copy-button overlay on each diff/proposal box.
             if !text.isEmpty {
                 ClipboardCopyButton(text: text, tokens: tokens)
@@ -202,7 +201,7 @@ struct AIActionSheet: View {
             }
             .frame(maxHeight: 180)
             .padding(12)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Text("Result").font(.caption.weight(.semibold)).foregroundStyle(tokens.textSecondary)
             box(proposed)
         }

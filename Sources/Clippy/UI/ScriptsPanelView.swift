@@ -179,7 +179,7 @@ private struct ScriptRowView: View {
             }
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .confirmationDialog(
             "Run \"\(script.name.isEmpty ? "Untitled" : script.name)\"?",
             isPresented: $pendingRun,
@@ -199,7 +199,7 @@ private struct ScriptRowView: View {
             Image(systemName: "terminal")
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.clippyAccent)
-                .frame(width: 34, height: 34)
+                .frame(width: 28, height: 28)
                 .background(Color.clippyAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {

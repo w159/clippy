@@ -44,7 +44,7 @@ struct DescribeImageSheet: View {
                 content
             }
         }
-        .frame(minWidth: 420, idealWidth: 480)
+        .frame(minWidth: 380, idealWidth: 420)
         .onAppear {
             resetForPresentation()
             if !isSensitive { startAnalysis() }

@@ -32,7 +32,7 @@ struct SuggestionRowChrome<Card: View>: View {
             .padding(.horizontal, tokens.metrics.space.one)
         }
         .padding(6)
-        .background(isTop ? Color.clippyAccent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(isTop ? Color.clippyAccent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovered = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Paste") { onPaste(false) }

@@ -49,7 +49,7 @@ struct SnippetsView: View {
                         Image(systemName: "text.badge.plus")
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(item.isEnabled ? Color.clippyAccent : Color.secondary)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 28, height: 28)
                             .background((item.isEnabled ? Color.clippyAccent : Color.secondary).opacity(0.14),
                                         in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         VStack(alignment: .leading, spacing: 1) {

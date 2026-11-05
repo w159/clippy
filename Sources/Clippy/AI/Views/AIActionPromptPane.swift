@@ -13,10 +13,10 @@ struct AIActionPromptPane: View {
                 .scrollContentBackground(.hidden)
                 .padding(10)
                 .frame(minHeight: 150, maxHeight: 220)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay {
                     if AIActionTemplateValidator.hasErrors(issues) {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.red.opacity(0.7), lineWidth: 1.5)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.red.opacity(0.7), lineWidth: 1.5)
                     }
                 }
                 .accessibilityLabel("Prompt template")

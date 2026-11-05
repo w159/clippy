@@ -85,7 +85,7 @@ struct PasteStackTray: View {
         return HStack(spacing: 10) {
             Image(systemName: Self.symbol(for: item.clip))
                 .foregroundStyle(isNext ? Color.clippyAccent : Color.secondary)
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 28)
                 .background((isNext ? Color.clippyAccent : Color.secondary).opacity(0.15), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(Self.title(for: item.clip)).lineLimit(2).truncationMode(.tail)

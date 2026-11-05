@@ -110,7 +110,7 @@ extension ScriptsView {
         }
         .foregroundStyle(.secondary)
         .padding(10)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .padding(.horizontal, 12)
     }
 

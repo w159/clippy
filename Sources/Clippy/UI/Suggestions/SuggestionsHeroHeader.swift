@@ -13,7 +13,7 @@ struct SuggestionsHeroHeader: View {
     var body: some View {
         HStack(spacing: tokens.metrics.space.two) {
             Image(systemName: "sparkles")
-                .font(.title3)
+                .font(.headline)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.clippyAccent)
                 .accessibilityHidden(true)

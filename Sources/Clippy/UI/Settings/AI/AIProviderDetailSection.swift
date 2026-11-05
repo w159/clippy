@@ -96,7 +96,7 @@ struct AIProviderDetailSection: View {
                 }
             }
             .disabled(locked(.model))
-            .frame(minHeight: 32)
+            .frame(minHeight: 24)
             .padding(.bottom, 8)
         }
     }

@@ -67,7 +67,7 @@ struct SettingsSecretField: View {
         }
         .padding(.leading, tokens.metrics.space.three)
         .padding(.trailing, tokens.metrics.space.one)
-        .frame(minHeight: 32)
+        .frame(minHeight: 24)
         .background(tokens.surfaceInset, in: RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: tokens.metrics.radius.sm, style: .continuous).stroke(tokens.stroke, lineWidth: 1))
     }

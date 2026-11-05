@@ -55,7 +55,7 @@ struct TranslateClipSheet: View {
             case .allowed: content
             }
         }
-        .frame(minWidth: 440, idealWidth: 480)
+        .frame(minWidth: 400, idealWidth: 440)
         .onAppear { resetForPresentation() }
         .onChange(of: clipID) { _, _ in resetForPresentation() }
         .onChange(of: target) { _, _ in

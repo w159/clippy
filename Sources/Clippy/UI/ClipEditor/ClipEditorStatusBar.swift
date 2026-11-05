@@ -19,7 +19,7 @@ struct EditorStatusBarView: View {
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(tokens.textSecondary)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status")

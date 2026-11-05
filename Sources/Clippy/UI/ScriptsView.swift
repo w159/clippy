@@ -208,7 +208,7 @@ struct ScriptOptionsForm: View {
             ScriptSandboxControls(scriptID: script.id)
             Toggle("Enabled", isOn: $script.isEnabled)
         }
-        .padding(14)
+        .padding(12)
         .frame(width: 380)
     }
 

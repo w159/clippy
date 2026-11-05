@@ -27,7 +27,7 @@ struct OCRResultView: View {
             footer
         }
         .padding(tokens.metrics.space.four)
-        .frame(minWidth: 460, idealWidth: 480)
+        .frame(minWidth: 400, idealWidth: 440)
         .onChange(of: result.id) { _, _ in
             monospaced = false
             status = nil

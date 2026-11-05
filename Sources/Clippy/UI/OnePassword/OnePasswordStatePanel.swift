@@ -20,12 +20,11 @@ struct OnePasswordStatePanel: View {
         Group {
             if case .loading = state {
                 VStack(spacing: 12) {
-                    ProgressView().controlSize(.large)
+                    ProgressView()
                     Text(title).font(.headline)
                     Text(message).font(.callout).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView {
@@ -43,14 +42,13 @@ struct OnePasswordStatePanel: View {
     @ViewBuilder private var action: some View {
         switch state {
         case .notInstalled, .empty, .error:
-            Button(stateTitle, action: retry).buttonStyle(.glassProminent).controlSize(.large)
+            Button(stateTitle, action: retry).buttonStyle(.glassProminent)
         case .needsSignIn:
             Button(action: signIn) {
                 if signingIn { ProgressView().controlSize(.small) }
                 else { Text("Sign in with op signin") }
             }
             .buttonStyle(.glassProminent)
-            .controlSize(.large)
             .disabled(signingIn)
         case .loading:
             ProgressView("Reading vault\u{2026}").controlSize(.small)

@@ -7,17 +7,17 @@ struct OnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.clippyTokens) private var tokens
 
-    private let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 OnboardingStepContent(viewModel: viewModel)
-                    .frame(maxWidth: 460)
+                    .frame(maxWidth: 420)
                     .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 32)
-                    .padding(.top, 44)
-                    .padding(.bottom, 16)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 28)
+                    .padding(.bottom, 12)
                     .id(viewModel.model.current)
                     .transition(.opacity)
             }
@@ -25,7 +25,7 @@ struct OnboardingView: View {
             .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: viewModel.model.current)
             footer
         }
-        .frame(minWidth: 640, idealWidth: 720, minHeight: 480, idealHeight: 520)
+        .frame(minWidth: 560, idealWidth: 600, minHeight: 420, idealHeight: 460)
         .background {
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
@@ -74,13 +74,12 @@ struct OnboardingView: View {
                         .keyboardShortcut(.defaultAction)
                 }
             }
-            .controlSize(.large)
         }
-        .padding(.horizontal, 24).padding(.vertical, 16)
+        .padding(.horizontal, 20).padding(.vertical, 12)
     }
 }
 
 #Preview("Onboarding") {
     OnboardingView(viewModel: OnboardingViewModel(defaults: UserDefaults(suiteName: "onboarding.preview") ?? .standard))
-        .frame(width: 720, height: 520)
+        .frame(width: 600, height: 460)
 }
