@@ -26,6 +26,59 @@ struct ClipPreviewMetadata: Equatable {
     }
 }
 
+/// Single-entry memo for the preview column's derived values, keyed by the clip's id and the fields
+/// the preview reads (a change stamp), the search query and sensitivity.
+final class PreviewDetailCache {
+    struct Key: Equatable {
+        let id: Int64?
+        let createdAt: Date
+        /// Cheap content stamp (hash, not the SHA-256 `Clip.contentKey`, which is too slow per key press).
+        let textStamp: Int
+        let pixelWidth: Int?
+        let pixelHeight: Int?
+        let userTitle: String?
+        let sourceAppName: String?
+        let byteSize: Int?
+        let mediaFilename: String?
+        let filePath: String?
+        let ocrCount: Int?
+        let query: String
+        let sensitive: Bool
+
+        init(clip: Clip, query: String, sensitive: Bool) {
+            id = clip.id
+            createdAt = clip.createdAt
+            textStamp = clip.contentText.hashValue
+            pixelWidth = clip.pixelWidth
+            pixelHeight = clip.pixelHeight
+            userTitle = clip.userTitle
+            sourceAppName = clip.sourceAppName
+            byteSize = clip.byteSize
+            mediaFilename = clip.mediaFilename
+            filePath = clip.filePath
+            ocrCount = clip.ocrText?.count
+            self.query = query
+            self.sensitive = sensitive
+        }
+    }
+
+    struct Entry {
+        let item: ClipPreviewItem
+        let visual: ClipVisualKind?
+        let meta: ClipPreviewMetadata
+    }
+
+    private var key: Key?
+    private var cached: Entry?
+
+    func entry(for key: Key) -> Entry? { self.key == key ? cached : nil }
+
+    func store(_ entry: Entry, for key: Key) {
+        self.key = key
+        cached = entry
+    }
+}
+
 /// Optional right-hand preview column (LAY-11). Show it with
 /// `PreviewColumnPreferences.isVisible(panelWidth:enabled:)`; the width is user-resizable and persisted.
 struct ClipPreviewColumn: View {
@@ -39,6 +92,9 @@ struct ClipPreviewColumn: View {
     var onPaste: (() -> Void)?
     @State private var width = PreviewColumnPreferences.width()
     @State private var dragStartWidth: CGFloat?
+    /// Item, kind tile and metadata of the last clip shown; a cursor move re-evaluates this body
+    /// but the same clip needs no re-classification. A reference type, so filling it is not a state write.
+    @State private var detailCache = PreviewDetailCache()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -70,9 +126,18 @@ struct ClipPreviewColumn: View {
 
     private func detail(for clip: Clip) -> some View {
         let sensitive = CardSensitivity.isSensitive(clip)
-        let item = ClipPreviewProvider.item(for: clip, isSensitive: { _ in sensitive })
-        let visual: ClipVisualKind? = sensitive ? nil : ClipPreviewProvider.visual(for: clip)
-        let meta = ClipPreviewMetadata.make(for: clip, item: item, query: query, sensitive: sensitive, kindLabel: visual?.label)
+        let key = PreviewDetailCache.Key(clip: clip, query: query, sensitive: sensitive)
+        let built: PreviewDetailCache.Entry
+        if let hit = detailCache.entry(for: key) {
+            built = hit
+        } else {
+            let item = ClipPreviewProvider.item(for: clip, isSensitive: { _ in sensitive })
+            let visual: ClipVisualKind? = sensitive ? nil : ClipPreviewProvider.visual(for: clip)
+            let meta = ClipPreviewMetadata.make(for: clip, item: item, query: query, sensitive: sensitive, kindLabel: visual?.label)
+            built = PreviewDetailCache.Entry(item: item, visual: visual, meta: meta)
+            detailCache.store(built, for: key)
+        }
+        let item = built.item, visual = built.visual, meta = built.meta
         return VStack(alignment: .leading, spacing: tokens.metrics.space.two) {
             header(for: clip, item: item, visual: visual)
             contentCard(item: item)
@@ -131,7 +196,7 @@ struct ClipPreviewColumn: View {
     /// Content in a rounded card on the design-system surface that fills the free height.
     private func contentCard(item: ClipPreviewItem) -> some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        return ScrollView { ClipPreviewView(item: item, lineLimit: 60, contentFontSize: 13) }
+        return ScrollView { ClipPreviewView(item: item, lineLimit: 60, contentFontSize: 13).equatable() }
             .padding(tokens.metrics.space.two)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color.primary.opacity(0.05), in: shape)

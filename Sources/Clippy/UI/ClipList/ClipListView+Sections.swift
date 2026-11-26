@@ -16,7 +16,30 @@ extension ClipListView {
 
     /// Takes the clip snapshot from `sectionedList` so `visibleClips` (a store
     /// filter/join) is evaluated once per redraw, not once per consumer.
+    ///
+    /// Memoized per (pane, query, store data version, header setting, day): a cursor move
+    /// changes none of them, so Up/Down no longer regroups and re-titles every clip.
+    /// `clips` must be this pane's `visibleClips`.
     func sections(for clips: [Clip]) -> [Section] {
+        guard isMemoizablePane else { return computeSections(for: clips) }
+        let key = SectionsCache.SectionsKey(
+            selection: selection, query: store.query, version: store.categoryPaneVersion, count: clips.count,
+            headers: settings.showSectionHeaders, day: Calendar.current.startOfDay(for: Date()))
+        if let hit = sectionsCache.sections(for: key) { return hit }
+        let result = computeSections(for: clips)
+        sectionsCache.storeSections(result, for: key)
+        return result
+    }
+
+    /// History and category panes are the ones whose clips `VisibleClipsCache` memoizes by store version.
+    private var isMemoizablePane: Bool {
+        switch selection {
+        case .history, .category: return features.smartClips == nil
+        default: return false
+        }
+    }
+
+    private func computeSections(for clips: [Clip]) -> [Section] {
         let rows = Array(clips.enumerated()).map { (index: $0.offset, clip: $0.element) }
         // Date headers only make sense for the chronological history.
         // Search results are in relevance order: date headers would repeat.
@@ -127,11 +150,12 @@ extension ClipListView {
             .focused($focusTarget, equals: .list)
             .onKeyPress(phases: [.down, .repeat]) { press in handleKey(press, from: .list) }
             .onChange(of: selectedIndex) { _, newIndex in
-                guard visibleClips.indices.contains(newIndex) else { return }
+                let current = visibleClips
+                guard current.indices.contains(newIndex) else { return }
                 // Keep the anchor id in sync so a DB pulse can re-index onto the
                 // same clip instead of jumping to the top.
-                anchoredClipID = visibleClips[newIndex].id
-                proxy.scrollTo(visibleClips[newIndex].id, anchor: nil)
+                anchoredClipID = current[newIndex].id
+                proxy.scrollTo(current[newIndex].id, anchor: nil)
             }
         }
     }
@@ -148,10 +172,23 @@ extension ClipListView {
         let isPinned: Bool
         let categoryColors: [Color]
         let pinnedCategory: Category?
-        let isSensitive: Bool
     }
 
+    /// Memoized like `sections(for:)`, plus the category list (color or order edits). Sensitivity is
+    /// deliberately not part of it: an override can flip without bumping the store version, and
+    /// `CardSensitivity.isSensitive` is already cached per clip.
     func cardMetadata(for clips: [Clip]) -> [Int64: CardMetadata] {
+        guard isMemoizablePane else { return computeCardMetadata(for: clips) }
+        let key = SectionsCache.MetadataKey(
+            selection: selection, query: store.query, version: store.categoryPaneVersion, count: clips.count,
+            categories: store.categories)
+        if let hit = sectionsCache.metadata(for: key) { return hit }
+        let result = computeCardMetadata(for: clips)
+        sectionsCache.storeMetadata(result, for: key)
+        return result
+    }
+
+    private func computeCardMetadata(for clips: [Clip]) -> [Int64: CardMetadata] {
         var map: [Int64: CardMetadata] = [:]
         for clip in clips {
             guard let id = clip.id else { continue }
@@ -168,8 +205,7 @@ extension ClipListView {
                 categoryColors: memberCats.map { Color(hexString: $0.colorHex) },
                 // categories is already (sortOrder, createdAt) ordered, so the
                 // first member matches store.firstCategory(for:).
-                pinnedCategory: memberCats.first,
-                isSensitive: CardSensitivity.isSensitive(clip)
+                pinnedCategory: memberCats.first
             )
         }
         return map
@@ -195,6 +231,51 @@ extension ClipListView {
     }
 }
 
+/// Single-entry memos for `ClipListView.sections(for:)` and `cardMetadata(for:)`. A reference
+/// type so filling it during `body` is not a state write (same pattern as `VisibleClipsCache`).
+final class SectionsCache {
+    struct SectionsKey: Equatable {
+        let selection: PanelSelection
+        let query: String
+        let version: Int
+        let count: Int
+        let headers: Bool
+        let day: Date
+    }
+
+    struct MetadataKey: Equatable {
+        let selection: PanelSelection
+        let query: String
+        let version: Int
+        let count: Int
+        let categories: [Category]
+    }
+
+    private var sectionsKey: SectionsKey?
+    private var cachedSections: [ClipListView.Section] = []
+    private var metadataKey: MetadataKey?
+    private var cachedMetadata: [Int64: ClipListView.CardMetadata] = [:]
+    /// Test seam: how many times each memo was refilled.
+    private(set) var sectionsMissCount = 0
+    private(set) var metadataMissCount = 0
+
+    func sections(for key: SectionsKey) -> [ClipListView.Section]? { sectionsKey == key ? cachedSections : nil }
+
+    func storeSections(_ sections: [ClipListView.Section], for key: SectionsKey) {
+        sectionsMissCount += 1
+        sectionsKey = key
+        cachedSections = sections
+    }
+
+    func metadata(for key: MetadataKey) -> [Int64: ClipListView.CardMetadata]? { metadataKey == key ? cachedMetadata : nil }
+
+    func storeMetadata(_ metadata: [Int64: ClipListView.CardMetadata], for key: MetadataKey) {
+        metadataMissCount += 1
+        metadataKey = key
+        cachedMetadata = metadata
+    }
+}
+
 /// Observes `GridPreferences` so only the list body re-renders on a density or
 /// column change; the parent view does not need to observe it.
 struct GridPreferencesReader<Content: View>: View {
@@ -207,3 +288,4 @@ struct GridPreferencesReader<Content: View>: View {
 
     var body: some View { content(prefs) }
 }
+

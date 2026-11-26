@@ -132,6 +132,8 @@ struct ClipListView: View {
     @State var smartCollections = SmartCollectionSelection()
     /// Memo for `clips(for:)`: sections, keyboard, counts and actions read it many times per render.
     @State var visibleCache = VisibleClipsCache()
+    /// Memo for `sections(for:)` and `cardMetadata(for:)`: neither depends on the cursor.
+    @State var sectionsCache = SectionsCache()
     /// Preview column opt-in, observed so the Settings pane and palette toggles apply live.
     @AppStorage(PreviewColumnPreferences.enabledKey) var previewColumnEnabled = PreviewColumnPreferences.defaultEnabled
 

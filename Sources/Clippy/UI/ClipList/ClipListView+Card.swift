@@ -91,7 +91,7 @@ extension ClipListView {
             clip: clip,
             isSelected: isSelected,
             isPinned: meta?.isPinned ?? store.isPinned(clip),
-            isSensitive: meta?.isSensitive ?? CardSensitivity.isSensitive(clip),
+            isSensitive: CardSensitivity.isSensitive(clip),
             isOCRRunning: store.ocrInFlightClipIDs.contains(clip.id ?? -1),
             query: store.query,
             isKeyRevealed: clip.id != nil && clip.id == revealedClipID

@@ -186,6 +186,12 @@ final class SearchStorePipelineTests: XCTestCase {
     func testCategoryPaneFindsWhatTheHistorySearchFinds() throws {
         let db = try makeTestDatabase(self)
         let store = ClipStore(database: db)
+        // The store's observations publish the (empty) database on their first delivery, which
+        // replaces `recents` and `categoryClipOrder`. Let both land before injecting test state,
+        // or the first search's wait spins the run loop and wipes it. The categories delivery
+        // bumps the pane version; the clip window delivery has no signal, so give it a beat.
+        waitFor("observations delivered") { store.categoryPaneVersion > 0 }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         let inWindow = clip(1, "unrelated words")
         let outside = clip(2, "other words")
         store.recents = [inWindow]

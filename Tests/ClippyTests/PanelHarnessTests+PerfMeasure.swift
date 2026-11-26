@@ -81,8 +81,14 @@ extension PanelHarnessTests {
             RunLoop.main.run(until: Date().addingTimeInterval(0.001))
         }
         let scrolled = perfMilliseconds(since: scrollStart)
+        // `press` itself pumps the run loop for 10 ms (KeyboardHarness.swift:62) and the loop adds 1 ms, so
+        // subtract that fixed 11 ms per press to leave the app's own cost.
+        let presses = max(1, rows - 1)
+        let perPress = max(0, scrolled / Double(presses) - 11)
         perfReport("scroll.ms", scrolled, "ms")
+        perfReport("scroll.perpress.ms", perPress, "ms")
         print("PERFMEASURE scroll.rows \(rows) rows")
+        XCTAssertLessThan(perPress, 100, "one Down Arrow must cost well under 100 ms of main-thread work")
         XCTAssertLessThan(scrolled, 120_000)
     }
 

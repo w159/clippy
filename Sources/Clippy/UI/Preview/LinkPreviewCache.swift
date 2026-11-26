@@ -11,7 +11,8 @@ struct LinkPreviewMetadata: Codable, Equatable {
 
 /// Disk cache of link metadata in the Caches directory, capped by total bytes and age.
 /// The clock and directory are injected so eviction is testable.
-final class LinkPreviewCache {
+/// Immutable after init and only touches its own files, so `entry(for:)` may run off the main actor.
+final class LinkPreviewCache: @unchecked Sendable {
     private let directory: URL
     private let maxBytes: Int
     private let maxAge: TimeInterval
