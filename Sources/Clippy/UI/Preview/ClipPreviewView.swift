@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Renders a `ClipPreviewItem` with design-system tokens. Sensitive clips render only a mask.
-struct ClipPreviewView: View, Equatable {
+struct ClipPreviewView: View, @MainActor Equatable {
     @Environment(\.clippyTokens) private var tokens
     let item: ClipPreviewItem
     /// Lines kept for code/text; nil = unlimited (large sheet).
