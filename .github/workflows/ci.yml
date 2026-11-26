@@ -60,7 +60,7 @@ jobs:
             - name: Perf numbers
               if: always()
               run: |
-                  grep -E 'PERF ' "$RUNNER_TEMP/swift-test.log" | sort -u | while IFS= read -r line; do echo "::notice title=Perf::$line"; done || true
+                  grep -E 'PERF |PERFMEASURE ' "$RUNNER_TEMP/swift-test.log" | sort -u | while IFS= read -r line; do echo "::notice title=Perf::$line"; done || true
 
     app:
         name: App bundle, UI harness and screenshots
