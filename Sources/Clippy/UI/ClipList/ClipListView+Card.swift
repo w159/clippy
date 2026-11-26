@@ -158,6 +158,7 @@ extension ClipListView {
                     isRenaming: renaming,
                     onRename: { store.renameClip(clip, userTitle: $0) }
                 )
+                .equatable()
             }
         }
         .id(clip.id)
