@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Search fixes: clicking a clip row or its hover buttons (Paste, Pin, Delete) works again while searching and while browsing; a double-click no longer swallows the hover buttons, and the row no longer drops its hover when the list resizes.
+- Search results now stay in relevance order, with no date headers while a query is active, so the first row, the keyboard cursor and Return all agree on the best match.
+- Searching inside a category pane now finds the same clips as searching History (text, title and recognized image text), scoped to that category.
+- A clip id repeated in a capture or search window no longer crashes the app.
+- Less lag while searching: new captures and text recognition writes re-run an active search at most about twice a second instead of on every write, and a newly captured match still appears.
+
 ## v2.4.1 - 2026-11-05 - Native Mac density
 
 - Density pass on the main panel (fixes the oversized look of 2.4.0): the default panel is 760x480 again instead of 920x560, and a saved size of exactly 920x560 (what 2.4.0 wrote) goes back to 760x480 once; any other size you chose is kept.

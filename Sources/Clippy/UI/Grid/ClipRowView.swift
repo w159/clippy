@@ -76,7 +76,6 @@ struct ClipRowView: View {
             if !hovering { revealHeld = false }
             if hovering, model.isImageLike { OCRWarmupPolicy.shared.noteImageVisible() }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in isHovering = false }
         .onDisappear { revealHeld = false }
         .onAppear { if model.isImageLike { OCRWarmupPolicy.shared.noteImageVisible() } }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsActions)

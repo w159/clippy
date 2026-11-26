@@ -158,12 +158,10 @@ struct ClipListView: View {
         switch selection {
         case .history:
             let shown = smartFiltered(HistoryPanePolicy.visible(store.clips, query: store.query, isFiled: { store.isPinned($0) }))
-            // Search results interleave days (word-start tier first, then newest-first
-            // within each tier). Group by day so each date header shows once and the
-            // keyboard order equals the visual order.
-            guard settings.showSectionHeaders, HistoryPanePolicy.isSearching(store.query) else { return shown }
-            return SearchSectionOrder.groupedByBucket(shown, bucket: { TimelineBucket.title(for: $0.createdAt) },
-                                                      date: { $0.createdAt })
+            // Search results keep the store's relevance order: no date regrouping, so the
+            // rows, the keyboard order and Return all use this one array (and no date
+            // headers are drawn while searching; see `sections(for:)`).
+            return shown
         case .category(let categoryID):
             return store.clipsForCategory(categoryID)
         case .onePassword:

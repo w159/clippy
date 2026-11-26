@@ -21,7 +21,10 @@ final class ClipStore {
         didSet { scheduleRefilter() }
     }
     /// Widened from private(set): ClipStore+Older (paged history) appends to it.
-    var clips: [Clip] = []
+    var clips: [Clip] = [] {
+        // The category pane filters by the search hits held here (see clipsForCategory).
+        didSet { categoryPaneVersion &+= 1 }
+    }
     /// Clips loaded past the resident window by `loadOlder(before:limit:)`, newest
     /// first, appended to `clips` in browse mode. Dropped by `resetOlder()`.
     var olderClips: [Clip] = []
@@ -44,7 +47,9 @@ final class ClipStore {
     /// is debounced or running; `hasPendingSearch` compares the two so Return
     /// pressed mid-typing can wait for the results it means instead of pasting
     /// the previous query's top clip.
-    private(set) var completedQuery = ""
+    private(set) var completedQuery = "" {
+        didSet { categoryPaneVersion &+= 1 }
+    }
     /// Last DB observation failure. Non-nil triggers an error banner with a
     /// Retry that re-starts the ValueObservation pipelines.
     var observationError: String?
@@ -90,10 +95,9 @@ final class ClipStore {
             // clipsForCategory call: the id lookup is hit several times per
             // redraw (sections, metadata, keyboard handling all query it).
             recentsByID = Dictionary(
-                uniqueKeysWithValues: recents.compactMap { clip in
-                    clip.id.map { ($0, clip) }
-                })
-            refilter()
+                recents.compactMap { clip in clip.id.map { ($0, clip) } },
+                uniquingKeysWith: { first, _ in first })
+            refilterAfterPulse()
             pruneOlder()
         }
     }
@@ -104,6 +108,10 @@ final class ClipStore {
     @ObservationIgnored private var searchDebounce: Task<Void, Never>?
     /// The in-flight FTS read, cancelled whenever the query or window changes.
     @ObservationIgnored private var searchTask: Task<Void, Never>?
+    /// The one pending pulse-driven refilter (see `refilterAfterPulse`).
+    @ObservationIgnored private var pulseRefilter: Task<Void, Never>?
+    /// Minimum spacing between pulse-driven searches while a query is active.
+    @ObservationIgnored var pulseRefilterDelay: TimeInterval = 0.4
     /// Monotonic generation for the async FTS search. Incremented on every
     /// refilter that kicks off a background read; the completion discards
     /// results from any earlier generation so a fast-typed query or a DB pulse
@@ -388,6 +396,8 @@ final class ClipStore {
         // Every keystroke invalidates whatever search is running or pending, so a
         // late result for the previous query can never land (KEY-02).
         invalidateSearch()
+        pulseRefilter?.cancel()
+        pulseRefilter = nil
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         searchDebounce?.cancel()
         if trimmed.isEmpty {
@@ -419,6 +429,27 @@ final class ClipStore {
         guard hasPendingSearch else { return }
         searchDebounce?.cancel()
         refilter()
+    }
+
+    /// While a query is active, a changed window (each capture, each OCR write) re-runs
+    /// the search, but never more than once per `pulseRefilterDelay`: pulses inside the
+    /// window share one trailing run that reads the newest window, so a newly captured
+    /// matching clip still lands. Browsing has nothing to search and refilters at once.
+    private func refilterAfterPulse() {
+        guard HistoryPanePolicy.isSearching(query) else {
+            pulseRefilter?.cancel()
+            pulseRefilter = nil
+            refilter()
+            return
+        }
+        guard pulseRefilter == nil else { return }
+        let delay = pulseRefilterDelay
+        pulseRefilter = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.pulseRefilter = nil
+            self.refilter()
+        }
     }
 
     /// Bump the generation and cancel the running search. Called on EVERY path

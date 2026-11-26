@@ -48,15 +48,10 @@ extension ClipListView {
         //   "they all execute when triggered, rather than competing for
         //   recognition ... without one preventing the other from executing."
         //   (developer.apple.com/documentation/swiftui/composing-swiftui-gestures)
-        // highPriorityGesture is used ONLY for the double-tap so SwiftUI waits
-        // for the double-click timeout before the count:1 tap commits, which
-        // stops the single-tap from firing on both clicks of a double-click
-        // (audit: single-tap fires on both clicks of a double-click paste). It
-        // is NOT applied to the count:1 tap: that stays .simultaneousGesture so
-        // the drag (which needs the press-and-move path) still coexists with
-        // single-click selection. The earlier "highPriorityGesture hard-blocks
-        // the drag" note applied to putting high priority on the tap that
-        // competes with the drag; the double-tap does not compete with it.
+        // The double-tap is also .simultaneousGesture, never .highPriorityGesture:
+        // a high-priority gesture on this container takes the press away from the
+        // hover overlay's Buttons (Paste, Pin, Delete), so they stopped working.
+        // The single tap only selects, which is idempotent on a double-click.
         //   Double-click -> paste/activate (configurable primary action)
         //   Cmd-click     -> toggle this clip in the multi-selection
         //   Shift-click   -> extend the multi-selection range from the anchor
@@ -65,7 +60,7 @@ extension ClipListView {
         .onHover { inside in
             if inside { hoveredClipID = clip.id } else if hoveredClipID == clip.id { hoveredClipID = nil }
         }
-        .highPriorityGesture(TapGesture(count: 2).onEnded { onPrimary(clip) })
+        .simultaneousGesture(TapGesture(count: 2).onEnded { onPrimary(clip) })
         .simultaneousGesture(TapGesture(count: 1).onEnded { handleCardTap(clip, at: index) })
         .contextMenu { cardContextMenu(for: clip) }
         .popover(

@@ -74,6 +74,9 @@ extension ClipStore {
     /// so the search bar scopes to the pane the user is viewing.
     func clipsForCategory(_ categoryID: Int64) -> [Clip] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The History search's hits for this very query (full text, OCR text, semantic
+        // fusion). Read before the cache so the pane re-renders when the search lands.
+        let searchHits = trimmed.isEmpty || completedQuery != trimmed ? [] : clips
         // Called several times per render (sections, counts, keyboard), so a
         // filtered pane is kept until the query or the data behind it changes.
         if !trimmed.isEmpty, let cache = categoryPaneCache, cache.query == trimmed,
@@ -85,15 +88,18 @@ extension ClipStore {
         // than `clips` (overwritten by FTS search results): otherwise an active
         // global search query makes category members that do not match the query
         // vanish from their own category pane.
+        let hitsByID = Dictionary(
+            searchHits.compactMap { clip in clip.id.map { ($0, clip) } }, uniquingKeysWith: { first, _ in first })
         let ordered: [Clip]
         if let orderedIDs = categoryClipOrder[categoryID] {
-            ordered = orderedIDs.compactMap { recentsByID[$0] }
+            ordered = orderedIDs.compactMap { recentsByID[$0] ?? hitsByID[$0] }
         } else {
             ordered = recents.filter { membership[$0.id ?? -1]?.contains(categoryID) == true }
         }
         guard !trimmed.isEmpty else { return ordered }
         let parsed = parsedLocalQuery(trimmed)
-        let filtered = ordered.filter { $0.matchesLocally(parsed) }
+        // A clip the History search found belongs here too, so both panes find the same clips.
+        let filtered = ordered.filter { hitsByID[$0.id ?? -1] != nil || $0.matchesLocally(parsed) }
         if let cache = categoryPaneCache, cache.query == trimmed, cache.version == categoryPaneVersion {
             categoryPaneCache?.results[categoryID] = filtered
         } else {

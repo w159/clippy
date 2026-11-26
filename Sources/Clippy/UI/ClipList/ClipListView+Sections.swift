@@ -19,7 +19,10 @@ extension ClipListView {
     func sections(for clips: [Clip]) -> [Section] {
         let rows = Array(clips.enumerated()).map { (index: $0.offset, clip: $0.element) }
         // Date headers only make sense for the chronological history.
-        guard settings.showSectionHeaders, selection == .history else {
+        // Search results are in relevance order: date headers would repeat.
+        guard settings.showSectionHeaders, selection == .history,
+            !HistoryPanePolicy.isSearching(store.query)
+        else {
             return [Section(id: "all", title: "", rows: rows)]
         }
 
