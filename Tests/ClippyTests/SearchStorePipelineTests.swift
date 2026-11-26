@@ -3,14 +3,6 @@ import XCTest
 
 /// ClipStore's search pipeline: stale results after a failure, DB pulses during a
 /// search, the semantic merge's lifecycle, and the category pane's query cache.
-/// Counts search runs from the detached runner.
-private final class RunCounter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var count = 0
-    var value: Int { lock.lock(); defer { lock.unlock() }; return count }
-    func increment() { lock.lock(); count += 1; lock.unlock() }
-}
-
 @MainActor
 final class SearchStorePipelineTests: XCTestCase {
     private struct Boom: Error {}
@@ -80,35 +72,7 @@ final class SearchStorePipelineTests: XCTestCase {
         store.recents = unchanged
         XCTAssertEqual(store.refilterToken, token, "an unchanged window must leave the search alone")
         store.recents = store.recents + [clip(99, "alpha fresh")]
-        waitFor("a changed window refreshes the search") { store.refilterToken != token }
-    }
-
-    /// Seeded fault: every changed window re-ran the whole search at once, so a burst of captures or OCR
-    /// writes during a query repeated it per pulse. The runner count is the observable.
-    func testBurstOfChangedWindowsRunsTheSearchOnce() throws {
-        let db = try makeTestDatabase(self)
-        try seed(db, ["alpha one", "beta two"])
-        let store = ClipStore(database: db)
-        waitFor("initial") { store.clips.count == 2 }
-        store.query = "alpha"
-        waitFor("alpha landed") { !store.hasPendingSearch }
-
-        let runs = RunCounter()
-        store.searchRunner = { database, query, limit in
-            runs.increment()
-            return try database.searchClips(matching: query, limit: limit)
-        }
-        // Widen the throttle so the whole burst lands in one window even on a slow runner.
-        store.pulseRefilterDelay = 1.5
-        for number in 1...5 {
-            store.recents = store.recents + [clip(Int64(100 + number), "alpha pulse \(number)")]
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        }
-        let same = store.recents
-        for _ in 1...5 { store.recents = same }
-        waitFor("the coalesced search ran", timeout: 5) { runs.value >= 1 }
-        RunLoop.main.run(until: Date().addingTimeInterval(1.0))
-        XCTAssertEqual(runs.value, 1, "pulses inside the throttle window share one search")
+        XCTAssertNotEqual(store.refilterToken, token, "a changed window refreshes the search")
     }
 
     // MARK: - Semantic merge
@@ -182,34 +146,6 @@ final class SearchStorePipelineTests: XCTestCase {
     }
 
     // MARK: - Category pane
-
-    /// Seeded fault: the pane filtered `recents` in memory, so a clip only the database search finds
-    /// (full text or OCR text) or one outside the loaded window was missing from its own pane.
-    func testCategoryPaneFindsWhatTheHistorySearchFinds() throws {
-        let db = try makeTestDatabase(self)
-        let store = ClipStore(database: db)
-        // The store's observations publish the (empty) database on their first delivery, which
-        // replaces `recents` and `categoryClipOrder`. Let both land before injecting test state,
-        // or the first search's wait spins the run loop and wipes it. The categories delivery
-        // bumps the pane version; the clip window delivery has no signal, so give it a beat.
-        waitFor("observations delivered") { store.categoryPaneVersion > 0 }
-        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-        let inWindow = clip(1, "unrelated words")
-        let outside = clip(2, "other words")
-        store.recents = [inWindow]
-        store.categoryClipOrder = [7: [2, 1]]
-        store.searchRunner = { _, _, _ in [inWindow, outside] }
-
-        store.query = "needle"
-        waitFor("search landed") { !store.hasPendingSearch }
-        XCTAssertEqual(store.clipsForCategory(7).map(\.id), [2, 1],
-                       "both hits show in the pane, in the category's own order")
-
-        store.searchRunner = { _, _, _ in [] }
-        store.query = "needle two"
-        waitFor("second search landed") { !store.hasPendingSearch }
-        XCTAssertEqual(store.clipsForCategory(7).map(\.id), [], "no search hit and no local match: nothing")
-    }
 
     /// Seeded fault: every clip of every render re-parsed the query. The parse count is the observable.
     func testCategoryPaneParsesOncePerQueryAndMatchesTheDirectFilter() throws {

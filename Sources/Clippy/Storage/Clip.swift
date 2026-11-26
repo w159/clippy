@@ -78,25 +78,11 @@ struct Clip: Identifiable, Equatable, Codable, FetchableRecord, MutablePersistab
     static func contentKey(kind: ClipContentKind, text: String, mediaFilename: String?, filePath: String?) -> String {
         switch kind {
         case .text:
-            return "t-" + hexString(SHA256.hash(data: Data(text.utf8)))
+            return "t-" + SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
         case .image, .file:
             if let mediaFilename { return "m-" + mediaFilename }
-            return "p-" + hexString(SHA256.hash(data: Data((filePath ?? text).utf8)))
+            return "p-" + SHA256.hash(data: Data((filePath ?? text).utf8)).map { String(format: "%02x", $0) }.joined()
         }
-    }
-
-    private static let hexDigits: [UInt8] = Array("0123456789abcdef".utf8)
-
-    /// Lowercase hex, identical to `String(format: "%02x")` per byte but without
-    /// a formatter call per byte (this runs per visible row per key press).
-    private static func hexString(_ digest: SHA256.Digest) -> String {
-        var out = [UInt8]()
-        out.reserveCapacity(SHA256.byteCount * 2)
-        for byte in digest {
-            out.append(hexDigits[Int(byte >> 4)])
-            out.append(hexDigits[Int(byte & 0x0f)])
-        }
-        return String(decoding: out, as: UTF8.self)
     }
 
     /// Whether the clip carries formatting. True for a light copy whose blobs

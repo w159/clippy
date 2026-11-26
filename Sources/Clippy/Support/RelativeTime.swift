@@ -14,30 +14,8 @@ enum RelativeTime {
     static func string(for date: Date, relativeTo reference: Date = Date()) -> String {
         let secondsElapsed = reference.timeIntervalSince(date)
         if secondsElapsed < 60 { return "now" }
-        // Building a relative format style per row per redraw is slow. The text only
-        // changes at minute-scale boundaries, so one result per date is reused for 10 s.
-        let stamp = date.timeIntervalSinceReferenceDate
-        let bucket = Int(reference.timeIntervalSinceReferenceDate / 10)
-        let key = "\(stamp)-\(bucket)" as NSString
-        if let hit = cache.object(forKey: key) { return hit as String }
-        let text = date.formatted(
+        return date.formatted(
             Date.RelativeFormatStyle(presentation: .numeric, unitsStyle: .narrow)
         )
-        cache.setObject(text as NSString, forKey: key)
-        return text
     }
-
-    private static let cache = RelativeTimeCache()
-}
-
-/// NSCache is thread-safe and evicts under memory pressure, so the wrapper is Sendable.
-private final class RelativeTimeCache: @unchecked Sendable {
-    private let storage: NSCache<NSString, NSString> = {
-        let cache = NSCache<NSString, NSString>()
-        cache.countLimit = 2000
-        return cache
-    }()
-
-    func object(forKey key: NSString) -> NSString? { storage.object(forKey: key) }
-    func setObject(_ value: NSString, forKey key: NSString) { storage.setObject(value, forKey: key) }
 }

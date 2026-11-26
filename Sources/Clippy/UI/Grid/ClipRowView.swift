@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Compact (28pt) and comfortable (two-line, 42pt) clip row (LAY-08). Shares the
 /// model, accessibility contract and masking rules with `ClipCardView`.
-struct ClipRowView: View, @MainActor Equatable {
+struct ClipRowView: View {
     let clip: Clip
     let model: ClipCardModel
     let density: ClipDensity
@@ -10,8 +10,6 @@ struct ClipRowView: View, @MainActor Equatable {
     let actions: ClipRowActions
     let isPinnedCategoryIcon: Category?
     @Binding var isRenaming: Bool
-    /// `isRenaming` as of `init`, for `==` (the live binding would always compare equal).
-    private let isRenamingAtInit: Bool
     let onRename: (String?) -> Void
 
     @Environment(\.clippyTokens) private var tokens
@@ -48,25 +46,7 @@ struct ClipRowView: View, @MainActor Equatable {
         self.visual = model.isSensitive ? ClipVisualKind(style: .text, label: "Sensitive", symbol: "lock.fill")
             : ClipPreviewProvider.visual(for: clip)
         self._isRenaming = isRenaming
-        self.isRenamingAtInit = isRenaming.wrappedValue
         self.onRename = onRename
-    }
-
-    /// Value inputs only, so `.equatable()` lets SwiftUI skip rows an arrow-key press did not
-    /// change. The `actions` closures and `onRename` are ignored: they capture only the row's own
-    /// clip and reference-backed state (store, `@State` storage), never the cursor index, so an
-    /// older closure set still acts on the right clip. Only whether `actions.edit`,
-    /// `extractText` and `findSimilar` are present is compared, since that changes the row menu.
-    /// `isRenaming` is compared through `isRenamingAtInit`, a snapshot taken in `init`, because
-    /// the live binding reads the same value on both sides; `@State` and `@Environment` (hover,
-    /// tokens) invalidate the row on their own.
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.clip == rhs.clip && lhs.model == rhs.model && lhs.density == rhs.density
-            && lhs.query == rhs.query && lhs.isPinnedCategoryIcon == rhs.isPinnedCategoryIcon
-            && lhs.isRenamingAtInit == rhs.isRenamingAtInit
-            && (lhs.actions.edit == nil) == (rhs.actions.edit == nil)
-            && (lhs.actions.extractText == nil) == (rhs.actions.extractText == nil)
-            && (lhs.actions.findSimilar == nil) == (rhs.actions.findSimilar == nil)
     }
 
     var body: some View {
@@ -96,6 +76,7 @@ struct ClipRowView: View, @MainActor Equatable {
             if !hovering { revealHeld = false }
             if hovering, model.isImageLike { OCRWarmupPolicy.shared.noteImageVisible() }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in isHovering = false }
         .onDisappear { revealHeld = false }
         .onAppear { if model.isImageLike { OCRWarmupPolicy.shared.noteImageVisible() } }
         .animation(ClippyMotion.animation(.quick, reduce: reduceMotion), value: showsActions)

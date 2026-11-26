@@ -133,7 +133,7 @@ extension ClipDatabase {
             // non-optional targetID so the signature matches.
             let newIDs = reorderIDs(ids, draggedID: id, before: targetID)
             // Build a lookup so we can avoid a linear scan per row.
-            let catByID = Dictionary(cats.compactMap { category in category.id.map { ($0, category) } }, uniquingKeysWith: { first, _ in first })
+            let catByID = Dictionary(uniqueKeysWithValues: cats.compactMap { category in category.id.map { ($0, category) } })
             for (index, catID) in newIDs.enumerated() {
                 guard var updated = catByID[catID], updated.sortOrder != index else { continue }
                 updated.sortOrder = index
@@ -270,7 +270,7 @@ extension ClipDatabase {
             // moveCategory's guard: skip rows whose current order already equals
             // the target order. `ids` is ordered by current sortOrder, so its
             // index IS the current order of each id.
-            let currentOrder = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+            let currentOrder = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
             for (order, id) in newIDs.enumerated() {
                 guard currentOrder[id] != order else { continue }
                 try db.execute(

@@ -60,9 +60,9 @@ extension ClipDatabase {
             }
             while found.count < limit {
                 let ids = try nextIDs(pageSize)
-                let byID = Dictionary(try Clip.fetchLight(db, ids: ids).compactMap { clip in
+                let byID = Dictionary(uniqueKeysWithValues: try Clip.fetchLight(db, ids: ids).compactMap { clip in
                     clip.id.map { ($0, clip) }
-                }, uniquingKeysWith: { first, _ in first })
+                })
                 let page = ids.compactMap { byID[$0] }
                 for clip in page where Self.passesKindFilter(clip, parsed) && Self.passesResidual(clip, plan.residual) {
                     found.append(clip)

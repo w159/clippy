@@ -130,10 +130,6 @@ struct ClipListView: View {
     @State var features = ClipListFeatureState()
     /// Smart collections shown in the sidebar; its rule filters History.
     @State var smartCollections = SmartCollectionSelection()
-    /// Memo for `clips(for:)`: sections, keyboard, counts and actions read it many times per render.
-    @State var visibleCache = VisibleClipsCache()
-    /// Memo for `sections(for:)` and `cardMetadata(for:)`: neither depends on the cursor.
-    @State var sectionsCache = SectionsCache()
     /// Preview column opt-in, observed so the Settings pane and palette toggles apply live.
     @AppStorage(PreviewColumnPreferences.enabledKey) var previewColumnEnabled = PreviewColumnPreferences.defaultEnabled
 
@@ -160,32 +156,14 @@ struct ClipListView: View {
     /// (for the assistant context chip) after `selection` has already changed.
     func clips(for selection: PanelSelection) -> [Clip] {
         switch selection {
-        case .history, .category:
-            // Read the observed inputs on every call (cheap) so SwiftUI keeps tracking them
-            // even when the memo answers; the memo itself is keyed by the store's data version.
-            _ = store.clips; _ = store.membership; _ = store.completedQuery; _ = store.categoryClipOrder
-            let memoizable = features.smartClips == nil
-            let query = store.query
-            let version = store.categoryPaneVersion
-            if memoizable, let hit = visibleCache.lookup(selection: selection, query: query, version: version) {
-                return hit
-            }
-            let result = computeClips(for: selection)
-            if memoizable { visibleCache.store(result, selection: selection, query: query, version: version) }
-            return result
-        default:
-            return computeClips(for: selection)
-        }
-    }
-
-    private func computeClips(for selection: PanelSelection) -> [Clip] {
-        switch selection {
         case .history:
             let shown = smartFiltered(HistoryPanePolicy.visible(store.clips, query: store.query, isFiled: { store.isPinned($0) }))
-            // Search results keep the store's relevance order: no date regrouping, so the
-            // rows, the keyboard order and Return all use this one array (and no date
-            // headers are drawn while searching; see `sections(for:)`).
-            return shown
+            // Search results interleave days (word-start tier first, then newest-first
+            // within each tier). Group by day so each date header shows once and the
+            // keyboard order equals the visual order.
+            guard settings.showSectionHeaders, HistoryPanePolicy.isSearching(store.query) else { return shown }
+            return SearchSectionOrder.groupedByBucket(shown, bucket: { TimelineBucket.title(for: $0.createdAt) },
+                                                      date: { $0.createdAt })
         case .category(let categoryID):
             return store.clipsForCategory(categoryID)
         case .onePassword:
@@ -368,30 +346,4 @@ struct ClipListView: View {
         }
     }
 
-}
-
-/// Single-entry memo for `ClipListView.clips(for:)`. A reference type so filling it
-/// during `body` is not a state write. Valid while selection, query and the store's
-/// `categoryPaneVersion` (bumped on every change to clips, membership, order and
-/// completed query) are unchanged.
-final class VisibleClipsCache {
-    private var selection: PanelSelection?
-    private var query = ""
-    private var version = -1
-    private var clips: [Clip] = []
-    /// Test seam: how many times the memo was refilled.
-    private(set) var missCount = 0
-
-    func lookup(selection: PanelSelection, query: String, version: Int) -> [Clip]? {
-        guard self.selection == selection, self.query == query, self.version == version else { return nil }
-        return clips
-    }
-
-    func store(_ clips: [Clip], selection: PanelSelection, query: String, version: Int) {
-        missCount += 1
-        self.selection = selection
-        self.query = query
-        self.version = version
-        self.clips = clips
-    }
 }

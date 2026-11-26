@@ -60,11 +60,7 @@ final class LinkPreviewService {
     func metadata(for url: URL, sensitive: Bool) async -> LinkPreviewMetadata? {
         guard isEnabled(), !sensitive, let clean = LinkURLSanitizer.sanitized(url), let host = clean.host,
               LinkPreviewPreferences.isHostAllowed(host, allow: allow(), deny: deny()) else { return nil }
-        // The disk read (and JSON decode) stays off the main thread: selecting a link clip must not block on it.
-        let cache = self.cache
-        if let cached = await Task.detached(priority: .userInitiated, operation: { cache.entry(for: clean) }).value {
-            return cached
-        }
+        if let cached = cache.entry(for: clean) { return cached }
         guard let fetched = try? await fetcher.fetch(clean, timeout: Self.timeout) else { return nil }
         cache.store(fetched, for: clean)
         return fetched
