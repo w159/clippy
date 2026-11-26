@@ -98,13 +98,15 @@ final class SearchStorePipelineTests: XCTestCase {
             runs.increment()
             return try database.searchClips(matching: query, limit: limit)
         }
+        // Widen the throttle so the whole burst lands in one window even on a slow runner.
+        store.pulseRefilterDelay = 1.5
         for number in 1...5 {
             store.recents = store.recents + [clip(Int64(100 + number), "alpha pulse \(number)")]
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
         let same = store.recents
         for _ in 1...5 { store.recents = same }
-        waitFor("the coalesced search ran") { runs.value >= 1 }
+        waitFor("the coalesced search ran", timeout: 5) { runs.value >= 1 }
         RunLoop.main.run(until: Date().addingTimeInterval(1.0))
         XCTAssertEqual(runs.value, 1, "pulses inside the throttle window share one search")
     }

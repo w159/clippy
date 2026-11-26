@@ -67,7 +67,15 @@ extension ClipListView {
         }
         .highPriorityGesture(TapGesture(count: 2).onEnded { onPrimary(clip) })
         .simultaneousGesture(TapGesture(count: 1).onEnded { handleCardTap(clip, at: index) })
-        .contextMenu { cardContextMenu(for: clip) }
+        // Menu content is built only for a row that can open it now: the hovered
+        // row (hover precedes any right-click, see the monitor in +Keyboard), the
+        // cursor row, or a multi-selected row. Other rows skip the per-press cost.
+        .contextMenu {
+            if clip.id == hoveredClipID
+                || (selectedClipIDs.isEmpty ? index == selectedIndex : (clip.id.map { selectedClipIDs.contains($0) } ?? false)) {
+                cardContextMenu(for: clip)
+            }
+        }
         .popover(
             isPresented: Binding(
                 get: { categoryCreationClip?.id == clip.id },

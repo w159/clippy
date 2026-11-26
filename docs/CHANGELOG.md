@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Faster arrow keys in long lists: row menus are built only when they can open, and content keys and the external editor lookup are computed faster.
 - Search fixes: a row no longer drops its hover buttons (Paste, Pin, Delete) when the list changes width, for example when search results make the scroll bar appear, so they stay clickable.
 - Search results now stay in relevance order, with no date headers while a query is active, so the first row, the keyboard cursor and Return all agree on the best match.
 - Searching inside a category pane now finds the same clips as searching History (text, title and recognized image text), scoped to that category.

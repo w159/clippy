@@ -12,7 +12,10 @@ extension ClipListView {
         let cursorID = clips.indices.contains(selectedIndex) ? clips[selectedIndex].id : nil
         let ids = ActionTargetPolicy.ids(selected: selectedClipIDs, cursorID: cursorID,
                                          order: clips.compactMap(\.id))
-        return clips.filter { clip in clip.id.map(ids.contains) ?? false }
+        return clips.filter { clip in
+            guard let id = clip.id else { return false }
+            return ids.contains(id)
+        }
     }
 
     /// The one clip a single-clip action (Return, Cmd+P, Cmd+E, delete) targets:
