@@ -67,7 +67,15 @@ extension ClipListView {
         }
         .highPriorityGesture(TapGesture(count: 2).onEnded { onPrimary(clip) })
         .simultaneousGesture(TapGesture(count: 1).onEnded { handleCardTap(clip, at: index) })
-        .contextMenu { cardContextMenu(for: clip) }
+        // Menu content is built only for a row that can open it now: the hovered
+        // row (hover precedes any right-click, see the monitor in +Keyboard), the
+        // cursor row, or a multi-selected row. Other rows skip the per-press cost.
+        .contextMenu {
+            if clip.id == hoveredClipID
+                || (selectedClipIDs.isEmpty ? index == selectedIndex : (clip.id.map { selectedClipIDs.contains($0) } ?? false)) {
+                cardContextMenu(for: clip)
+            }
+        }
         .popover(
             isPresented: Binding(
                 get: { categoryCreationClip?.id == clip.id },
@@ -91,7 +99,7 @@ extension ClipListView {
             clip: clip,
             isSelected: isSelected,
             isPinned: meta?.isPinned ?? store.isPinned(clip),
-            isSensitive: meta?.isSensitive ?? CardSensitivity.isSensitive(clip),
+            isSensitive: CardSensitivity.isSensitive(clip),
             isOCRRunning: store.ocrInFlightClipIDs.contains(clip.id ?? -1),
             query: store.query,
             isKeyRevealed: clip.id != nil && clip.id == revealedClipID
@@ -150,6 +158,7 @@ extension ClipListView {
                     isRenaming: renaming,
                     onRename: { store.renameClip(clip, userTitle: $0) }
                 )
+                .equatable()
             }
         }
         .id(clip.id)

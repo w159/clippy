@@ -121,6 +121,14 @@ final class PerfPanelMeasureTests: XCTestCase {
         report("list.visibleClips.ms", result, "ms")
         XCTAssertLessThan(result, 500)
 
+        // The memo behind ClipListView.clips(for:) answers repeat reads of the same inputs without refilling.
+        let cache = VisibleClipsCache()
+        XCTAssertNil(cache.lookup(selection: .history, query: "", version: 1))
+        cache.store(store.clips, selection: .history, query: "", version: 1)
+        XCTAssertEqual(cache.lookup(selection: .history, query: "", version: 1)?.count, Self.seedCount)
+        XCTAssertNil(cache.lookup(selection: .history, query: "", version: 2), "a data change invalidates the memo")
+        XCTAssertNil(cache.lookup(selection: .history, query: "a", version: 1), "a query change invalidates the memo")
+        XCTAssertEqual(cache.missCount, 1)
     }
 
     func testPulseRefilterCount() throws {

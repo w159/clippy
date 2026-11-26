@@ -397,6 +397,87 @@ final class PanelHarnessTests: XCTestCase {
         XCTAssertEqual(store.clips.map(\.contentText), ["Send the deck to jo@example.com before the review"])
     }
 
+    // MARK: - Search regressions (2.4.2)
+
+    /// Window-coordinate point for a point in the SwiftUI global space (origin top-left of the content).
+    private func windowPoint(fromGlobal point: CGPoint) -> NSPoint {
+        guard let view = window?.contentView else { return point }
+        let y = view.isFlipped ? point.y : view.bounds.height - point.y
+        return view.convert(NSPoint(x: point.x, y: y), to: nil)
+    }
+
+    /// Seeded fault: search results were regrouped by date bucket, so the best hit (a word-start match
+    /// from an older day) sat below a newer fragment match and Return pasted the wrong clip.
+    func testSearchKeepsRelevanceOrderForReturn() throws {
+        try openPanel(appearance: .aqua)
+        var older = makeTextClip("relevance notes", createdAt: Date().addingTimeInterval(-30 * 3600))
+        try store.database.saveCapturedClip(&older, cap: 1000)
+        var newer = makeTextClip("prerelevance", createdAt: Date())
+        try store.database.saveCapturedClip(&newer, cap: 1000)
+        pump(until: "new clips observed") { self.store.clips.count == 10 }
+
+        typeText("relevance")
+        pump(until: "search landed") { !self.store.hasPendingSearch && self.store.clips.count == 2 }
+        XCTAssertEqual(store.clips.map(\.contentText), ["relevance notes", "prerelevance"],
+                       "the store returns the word-start match first")
+        pressReturn()
+        pump(until: "Return pasted the top hit") { !self.pasted.isEmpty }
+        XCTAssertEqual(pasted, ["relevance notes"], "Return pastes the first row, which is the best match")
+    }
+
+    /// Seeded fault: a parent high-priority double-tap took presses from the row's hover Buttons, and the
+    /// row cleared its hover on any width change. Click a result to select it, then click its Paste button.
+    func testSearchResultRowIsClickableAndItsPasteButtonWorks() throws {
+        try openPanel(appearance: .aqua)
+
+        // Two hits; click the second one and Return pastes exactly that clip.
+        typeText("invoice")
+        pump(until: "two hits") { !self.store.hasPendingSearch && self.store.clips.count == 2 }
+        pump(seconds: 0.5)
+        let second = try XCTUnwrap(centerOfText("Quarterly invoice"), "the second hit is on screen")
+        click(at: second)
+        pump(seconds: 0.7)
+        pump(until: "list focused after a row click") { !(self.window.firstResponder is NSTextView) }
+        pressReturn()
+        pump(until: "Return pasted the clicked row") { !self.pasted.isEmpty }
+        XCTAssertEqual(pasted, ["Quarterly invoice for Acme Corp, due Friday"])
+
+        // One hit; select it and click the Paste button of its action overlay.
+        pasted = []
+        clearQuery()
+        typeText("hub")
+        pump(until: "one hit") { !self.store.hasPendingSearch && self.store.clips.count == 1 }
+        pump(seconds: 0.5)
+        let text = try XCTUnwrap(centerOfText("github.com"), "the hit is on screen")
+        click(at: text)
+        pump(seconds: 0.7)
+        pasted = []
+        let row = try XCTUnwrap(LayoutProbe.shared.frames["row.comfortable"] ?? LayoutProbe.shared.frames["row.compact"],
+                                "row frame reported")
+        // The overlay is Paste, Pin, More, Delete: 4 x 24 pt, 3 x 2 pt apart, 8 pt in from the trailing edge.
+        let paste = windowPoint(fromGlobal: CGPoint(x: row.maxX - 8 - 102 + 12, y: row.midY))
+        click(at: paste)
+        pump(until: "the Paste button fired") { !self.pasted.isEmpty }
+        XCTAssertEqual(pasted.first, "https://github.com/w159/clippy/pull/42")
+    }
+
+    /// Punctuation and emoji queries must neither close nor break the panel.
+    func testPunctuationQueriesKeepThePanelAlive() throws {
+        try openPanel(appearance: .aqua)
+        for query in ["foo-bar", "\"", "*", "c++", "\u{1F600}"] {
+            clearQuery()
+            if query.unicodeScalars.allSatisfy(\.isASCII) { typeText(query) } else { store.query = query }
+            pump(until: "search for \(query) settled") { !self.store.hasPendingSearch }
+            pump(seconds: 0.3)
+            XCTAssertTrue(window.isVisible, "panel still on screen after \(query)")
+            XCTAssertNotNil(window.contentView, "panel content alive after \(query)")
+            XCTAssertEqual(store.query, query)
+        }
+        clearQuery()
+        typeText("invoice")
+        pump(until: "a normal search still works") { !self.store.hasPendingSearch && !self.store.clips.isEmpty }
+    }
+
     // MARK: - Keyboard-only journeys
 
     /// Clip texts in the order History shows them (the filed clip is not listed).

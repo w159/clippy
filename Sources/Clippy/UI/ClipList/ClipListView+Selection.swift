@@ -9,9 +9,13 @@ extension ClipListView {
     /// otherwise the single keyboard-anchored clip.
     var actionableClips: [Clip] {
         let clips = visibleClips
-        let ids = ActionTargetPolicy.ids(selected: selectedClipIDs, cursorID: selectedClip?.id,
+        let cursorID = clips.indices.contains(selectedIndex) ? clips[selectedIndex].id : nil
+        let ids = ActionTargetPolicy.ids(selected: selectedClipIDs, cursorID: cursorID,
                                          order: clips.compactMap(\.id))
-        return clips.filter { clip in clip.id.map(ids.contains) ?? false }
+        return clips.filter { clip in
+            guard let id = clip.id else { return false }
+            return ids.contains(id)
+        }
     }
 
     /// The one clip a single-clip action (Return, Cmd+P, Cmd+E, delete) targets:
@@ -157,7 +161,8 @@ extension ClipListView {
     // MARK: - Selection and actions
 
     var selectedClip: Clip? {
-        visibleClips.indices.contains(selectedIndex) ? visibleClips[selectedIndex] : nil
+        let clips = visibleClips
+        return clips.indices.contains(selectedIndex) ? clips[selectedIndex] : nil
     }
 
     /// Single-click selection with macOS modifier semantics, via the anchor+cursor

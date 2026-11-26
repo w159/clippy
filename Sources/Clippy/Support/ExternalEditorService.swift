@@ -63,16 +63,34 @@ enum ExternalEditorPreference {
     /// installed, else Sublime Text when installed, else nil (system default).
     @MainActor
     static func resolvedAppURL(defaults: UserDefaults = .standard) -> URL? {
+        // Keyed by the preference string so a changed choice resolves at once; only
+        // hits are cached so a newly installed editor is still found.
+        let cacheKey = (bundleID(defaults: defaults) ?? "") as NSString
+        if let hit = urlCache.url(forKey: cacheKey) { return hit }
         let workspace = NSWorkspace.shared
         if let chosen = bundleID(defaults: defaults),
            let url = workspace.urlForApplication(withBundleIdentifier: chosen) {
+            urlCache.set(url, forKey: cacheKey)
             return url
         }
         for id in sublimeBundleIDs {
-            if let url = workspace.urlForApplication(withBundleIdentifier: id) { return url }
+            if let url = workspace.urlForApplication(withBundleIdentifier: id) {
+                urlCache.set(url, forKey: cacheKey)
+                return url
+            }
         }
         return nil
     }
+
+    private static let urlCache = ResolvedAppURLCache()
+}
+
+/// NSCache is thread-safe, so the wrapper is Sendable.
+private final class ResolvedAppURLCache: @unchecked Sendable {
+    private let storage = NSCache<NSString, NSURL>()
+
+    func url(forKey key: NSString) -> URL? { storage.object(forKey: key) as URL? }
+    func set(_ url: URL, forKey key: NSString) { storage.setObject(url as NSURL, forKey: key) }
 }
 
 // MARK: - Seams

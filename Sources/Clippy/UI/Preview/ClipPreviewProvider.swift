@@ -163,11 +163,37 @@ extension ClipPreviewProvider {
         case .filePath: return ClipVisualKind(style: .file, label: "File path", symbol: "folder")
         case .image, .file, .text: break
         }
-        let item = textItem(clip.previewText)
+        // The text classifier runs dozens of regexes. Rows rebuild on every cursor move, so the verdict
+        // is memoized by the (at most 300 character) preview text it depends on.
+        let preview = clip.previewText
+        let key = preview as NSString
+        if let hit = textVisualCache.object(forKey: key) { return hit.value }
+        let item = textItem(preview)
         let style = item.kindStyle
         let label = style == .richText ? "Rich text" : item.kindLabel
-        return ClipVisualKind(style: style, label: label, symbol: style.symbolName)
+        let result = ClipVisualKind(style: style, label: label, symbol: style.symbolName)
+        textVisualCache.setObject(VisualBox(result), forKey: key)
+        return result
     }
+
+    private final class VisualBox {
+        let value: ClipVisualKind
+        init(_ value: ClipVisualKind) { self.value = value }
+    }
+
+    /// NSCache is thread-safe and evicts under memory pressure, so the wrapper is Sendable.
+    private final class VisualCache: @unchecked Sendable {
+        private let storage: NSCache<NSString, VisualBox> = {
+            let cache = NSCache<NSString, VisualBox>()
+            cache.countLimit = 2000
+            return cache
+        }()
+
+        func object(forKey key: NSString) -> VisualBox? { storage.object(forKey: key) }
+        func setObject(_ value: VisualBox, forKey key: NSString) { storage.setObject(value, forKey: key) }
+    }
+
+    private static let textVisualCache = VisualCache()
 }
 
 extension ClipPreviewItem {

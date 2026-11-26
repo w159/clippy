@@ -1,13 +1,19 @@
 import SwiftUI
 
 /// Renders a `ClipPreviewItem` with design-system tokens. Sensitive clips render only a mask.
-struct ClipPreviewView: View {
+struct ClipPreviewView: View, @MainActor Equatable {
     @Environment(\.clippyTokens) private var tokens
     let item: ClipPreviewItem
     /// Lines kept for code/text; nil = unlimited (large sheet).
     var lineLimit: Int?
     /// Point size for text, JSON and code; nil keeps the system text styles.
     var contentFontSize: CGFloat?
+
+    /// Inputs only (the environment still invalidates): lets `.equatable()` skip the code tokenizing
+    /// and JSON pretty-printing when a cursor move re-evaluates the column with the same item.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.item == rhs.item && lhs.lineLimit == rhs.lineLimit && lhs.contentFontSize == rhs.contentFontSize
+    }
 
     private var bodyFont: Font { contentFontSize.map { .system(size: $0) } ?? .body }
     private var monoFont: Font { .system(size: contentFontSize ?? 12, design: .monospaced) }
@@ -61,14 +67,8 @@ struct ClipPreviewView: View {
         }
     }
 
-    @ViewBuilder
     private func imageView(_ url: URL?) -> some View {
-        if let url, let image = NSImage(contentsOf: url) {
-            PreviewCheckerboard(tileSize: 12) { Image(nsImage: image).resizable().scaledToFit() }
-                .frame(maxWidth: .infinity, maxHeight: contentFontSize == nil ? 360 : 480)
-        } else {
-            Label("Image unavailable", systemImage: "photo").foregroundStyle(tokens.textSecondary)
-        }
+        PreviewImageView(url: url, maxHeight: contentFontSize == nil ? 360 : 480)
     }
 
     private func fileView(path: String, name: String) -> some View {
@@ -88,6 +88,49 @@ struct ClipPreviewView: View {
             VStack(alignment: .leading) {
                 Text(value.literal).font(.system(.body, design: .monospaced)).foregroundStyle(tokens.textPrimary)
                 Text(value.hex).font(.caption).foregroundStyle(tokens.textSecondary)
+            }
+        }
+    }
+}
+
+/// Image preview that reads the media file off the main thread. Until the bytes arrive (or when the
+/// file is missing) it shows the "Image unavailable" placeholder, so selection never blocks on disk.
+struct PreviewImageView: View {
+    @Environment(\.clippyTokens) private var tokens
+    let url: URL?
+    let maxHeight: CGFloat
+    private enum LoadState {
+        case loading
+        case loaded(NSImage)
+        case failed
+    }
+
+    @State private var state: LoadState = .loading
+
+    var body: some View {
+        Group {
+            switch state {
+            case .loading:
+                Color.clear.frame(maxWidth: .infinity, minHeight: 120, maxHeight: maxHeight)
+            case .loaded(let image):
+                PreviewCheckerboard(tileSize: 12) { Image(nsImage: image).resizable().scaledToFit() }
+                    .frame(maxWidth: .infinity, maxHeight: maxHeight)
+            case .failed:
+                Label("Image unavailable", systemImage: "photo").foregroundStyle(tokens.textSecondary)
+            }
+        }
+        .task(id: url) {
+            state = .loading
+            guard let url else {
+                state = .failed
+                return
+            }
+            let data = await Task.detached(priority: .userInitiated) { try? Data(contentsOf: url) }.value
+            guard !Task.isCancelled else { return }
+            if let image = data.flatMap({ NSImage(data: $0) }) {
+                state = .loaded(image)
+            } else {
+                state = .failed
             }
         }
     }
